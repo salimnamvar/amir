@@ -261,28 +261,41 @@ SandboxAttestation:
 - `network_mode: proxy` is required for cloud LLM CLIs.
 - `network_mode: none` is only for offline/local tools (no provider API).
 - Empty allowlist = **deny-all** except platform-injected LLM provider routes for cost attribution.
-- `coding_standard` profile expands to LLM provider + common package registries (PyPI, npm, crates, Go proxy, etc.).
 - Security evaluates SandboxPolicy; Execution owns the Workspace aggregate.
+
+### Network Allowlist Profile Expansion
+
+Profiles expand **before** merge. Expansion is fixed by Configuration Context (platform registry); implementers MUST NOT invent ad-hoc domain sets.
+
+| Profile | Expansion |
+|---------|-----------|
+| `llm_only` | Platform-managed LLM provider routes only (injected by egress for cost attribution; not editable by agents) |
+| `coding_standard` | `llm_only` ∪ package registries: `pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `registry.yarnpkg.com`, `proxy.golang.org`, `sum.golang.org`, `crates.io`, `static.crates.io`, `rubygems.org`, `repo.maven.apache.org`, `index.crates.io` |
+| `custom` | Use `network_allowlist` as-is (no preset expansion); still subject to merge below |
+
+Platform may extend the coding_standard registry via configuration with audit trail; tenants cannot broaden beyond SandboxPolicy ceiling.
 
 ### Network Allowlist Merge Algorithm
 
-The effective network allowlist is computed as an **intersection** across three layers:
+The effective network allowlist is computed as an **intersection** (never union, never override-by-most-specific-alone):
 
 ```
-effective_allowlist = AgentDefinition.required_network ∩ SandboxPolicy.allowlist ∩ Role.required_network
+1. Expand profile → profile_domains
+2. agent_set   = AgentDefinition.security_profile.network_allowlist
+                 ∪ profile_domains from AgentDefinition.default_network_allowlist_profile
+3. sandbox_set = SandboxPolicy.network_allowlist
+                 ∪ profile_domains from SandboxPolicy.network_allowlist_profile
+4. role_set    = Role.required_network (if empty, treat as "no additional role constraint"
+                 — i.e. do not zero the intersection; skip role layer when unset)
+5. effective_allowlist = agent_set ∩ sandbox_set [∩ role_set if role_set non-empty]
+6. Always ∪ platform LLM routes (for metered provider access when network_mode=proxy)
 ```
 
-Where:
-- **AgentDefinition.required_network** - declared capability needs (e.g., api.github.com)
-- **SandboxPolicy.allowlist** - tenant/team policy ceiling (enforced by Security Context)
-- **Role.required_network** - task-specific network requirements (hard filter)
-
-The intersection principle ensures:
-1. Agents cannot gain network access beyond their declared capabilities
-2. Security policies can only narrow, never broaden, access
-3. Role constraints are the minimum viable network footprint
-
-Workspace.security_context.network_allowlist records the computed effective allowlist after merge.
+Principles:
+1. **Intersection only** — no layer can grant a destination another layer denies
+2. Security policies can only **narrow**, never broaden, access relative to agent declaration
+3. Empty agent or sandbox allowlist (after profile expansion of `custom` with `[]`) = deny-all except platform LLM routes
+4. Workspace.security_context.network_allowlist **records** the computed effective list; it is not an independent authority
 
 ---
 

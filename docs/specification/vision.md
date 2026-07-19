@@ -39,7 +39,7 @@ The core architectural insight: **CLI agents are unreliable, non-deterministic p
 ### Agent Management
 - Multi-agent type support (Claude, Codex, OpenCode, Gemini CLI)
 - Three-layer runtime: PromptCompiler → AgentExecutor → OutputParser
-- ParserRegistry with 5-strategy fallback chain
+- ParserRegistry with 4-strategy default chain (llm_coercion opt-in only)
 - Workspace observation as ground truth
 - Capability-based routing with multi-dimensional scoring
 - AgentScorecard with historical performance metrics
@@ -129,7 +129,7 @@ The vision has been hardened based on three rounds of architecture audits:
 - **Validation Feedback Loop** (All 17): Structured error → correction → retry with budget
 - **Three-Layer Runtime** (Xiaomi/Tinker/Gemini): PromptCompiler → AgentExecutor → OutputParser
 - **Workspace Observation** (Tinker/Qwen): Artifacts from git diff, not agent claims
-- **ParserRegistry** (Kimi/GLM/Gemini): 5-strategy fallback chain
+- **ParserRegistry** (Kimi/GLM/Gemini): 4-strategy default chain; llm_coercion opt-in
 - **Capability Scoring** (All 17): Multi-dimensional weighted algorithm with historical metrics
 - **Cost Gate** (All 17): Hierarchical enforcement with reservation protocol
 - **Durable Workflow** (All 17): Saga pattern with git-native compensation

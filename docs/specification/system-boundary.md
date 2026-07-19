@@ -15,7 +15,7 @@ Amir is a **complete** control plane for reliable orchestration of external AI a
 | AgentSession | Central durable execution aggregate with checkpoints |
 | AgentInvocation | Request DTO that creates a session |
 | Workspace Observation | Artifacts derived from git/tree observation with claim reconciliation |
-| ParserRegistry | Full strategy chain including tool interception, workspace, budgeted LLM coercion |
+| ParserRegistry | Default 4-strategy chain (structured_output → tool_call → markdown_block → workspace_observation); llm_coercion opt-in with approval only |
 | Validation Feedback Loop | Structural + semantic validation with budgeted retry and escalation |
 | Circuit Breaker | Per-agent failure counting on AgentScorecard (threshold=5) |
 | Task Management | Create, assign (hard filter → score → negotiate), execute, complete |
@@ -23,7 +23,7 @@ Amir is a **complete** control plane for reliable orchestration of external AI a
 | Compensation | Abstract workflow intents → durable git/PR/artifact effects |
 | Human Approvals | Approval entity with escalation |
 | Audit | Merkle-chained events with KMS-backed signing keys |
-| Cost Control | Hierarchical gate with structural ceilings and in-flight cancel |
+| Cost Control | Hierarchical gate with structural ceilings, CostLease sync hard kill, validation_budget partition |
 | Sandbox | Mandatory gVisor (prod) / Firecracker option; docker only for development |
 | Egress Proxy | All traffic through Amir proxy; default-deny allowlist |
 | Domain Model | Task, AgentSession, Workspace, Artifact, CostRecord, MatchingDecision, … |

@@ -42,14 +42,14 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 
 **Entities**:
 - Task - Work unit with required cost_budget, retry_state, matching_decision_id
-- AgentSession - Central durable execution aggregate (checkpoints, tool calls, limits, workspace)
+- AgentSession - Central durable execution aggregate (lean: status, limits, refs, recent samples; full telemetry in events)
 - AgentInvocation - Request DTO that creates a session (not an aggregate root)
 - Workspace - Per-session filesystem with baseline observation and durable_effects
-- Artifact - Produced output with lineage, observation_method, claim_reconciliation
+- Artifact - Produced output with lineage, observation_method; claim reconciliation by validation ID ref
 - CompiledPrompt - Versioned prompt artifact for reproducibility
-- ValidationResult - Structured validation + claim reconciliation
-- FeedbackArtifact - Corrections and suggested strategy for retry
-- MatchingDecision - Agent selection audit (hard filters + scores + negotiation)
+- ValidationResult - Structured validation + **canonical** claim_reconciliation
+- FeedbackArtifact - Corrections and suggested strategy for retry (refs ValidationResult)
+- MatchingDecision - Agent selection audit (hard filters + scores + negotiation + exploration)
 
 **Lifecycle (Task)**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
 
@@ -222,4 +222,6 @@ ExecutionContext(Task.Assigned)
     → ObservabilityContext(CostLease.Released; Cost.Committed or Released)
 ```
 
-**Trust boundary**: The CostLease shared-state gate lives in Observability Context. Execution Context holds a lease token reference. The sidecar/egress proxy checks the lease synchronously on each metering tick; cancellation is immediate when lease expires or is revoked.
+**Trust boundary**: The CostLease shared-state gate lives in Observability Context. Execution Context holds a lease token reference. The sidecar/egress proxy checks the lease **synchronously** on each metering tick (≤100ms); cancellation is immediate when lease expires or is revoked. Lease service unavailability is **fail-closed** (no further metered consumption).
+
+**Post-cancel**: Sessions killed by lease terminate with `last_failure_category=budget_exceeded`. Default `retry_on` excludes `budget_exceeded` (no automatic retry into the same wall). Team/tenant/org kills emit `EscalationSignal` (`cost_limit_exceeded`). Durable effects already committed still enter the normal compensation path.

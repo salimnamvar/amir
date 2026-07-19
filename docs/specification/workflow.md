@@ -62,9 +62,11 @@ type WorkflowEngine interface {
 ```
 REQUESTED → PLANNED → IMPLEMENTATION → TESTING → REVIEW → APPROVED → COMPLETED
                  ↓            ↓              ↓
-           COMPENSATING   FAILED/BLOCKED   ESCALATED
+           COMPENSATING   FAILED         ESCALATED
                  ↓
-              CANCELLED
+        COMPENSATION_BLOCKED  (durable-effect compensation failed; human EscalationSignal)
+                 ↓
+              CANCELLED / FAILED (after human resolution)
 ```
 
 ### Task Specification
@@ -181,12 +183,15 @@ For code-producing workflows, compensation uses Git operations:
 
 ### Compensation Execution
 
+Default policy: `continue_on_compensation_failure=false`. Durable-effect failures (git_revert, branch_delete, pr_close, …) **block** the workflow and escalate to humans — they must not be silently skipped.
+
 ```python
 class CompensationExecutor:
     """Executes compensation actions in reverse order."""
     
     async def compensate(self, workflow: WorkflowInstance) -> CompensationResult:
         results = []
+        continue_on_failure = workflow.compensation_config.continue_on_compensation_failure  # default False
         
         # Execute in reverse order (LIFO)
         for action in reversed(workflow.compensation_stack):
@@ -196,26 +201,48 @@ class CompensationExecutor:
                 action.status = "completed"
                 results.append(result)
             except CompensationError as e:
-                # Log but continue compensating
-                # Partial compensation is better than no compensation
                 action.status = "failed"
                 action.error = str(e)
-                results.append(result)
+                results.append(CompensationActionResult(success=False, error=str(e)))
+                emit(Compensation.Failed(...))
+                if not continue_on_failure:
+                    # Durable-effect failure → blocked state + human escalation
+                    workflow.status = "CompensationBlocked"
+                    emit(Compensation.Blocked(...))
+                    emit(Escalation.Signal(
+                        escalation_type="compensation_blocked",
+                        target_type="workflow_instance",
+                        target_id=workflow.id,
+                        reason=str(e),
+                    ))
+                    return CompensationResult(blocked=True, ...)
+                # Explicit opt-in only: log and continue remaining actions
         
         return CompensationResult(
             workflow_id=workflow.id,
             actions_executed=len(results),
             actions_succeeded=sum(1 for r in results if r.success),
-            actions_failed=sum(1 for r in results if not r.success)
+            actions_failed=sum(1 for r in results if not r.success),
+            blocked=False,
         )
 ```
 
+### Compensation Failure Path (COMPENSATION_BLOCKED)
+
+| Condition | Behavior |
+|-----------|----------|
+| Durable-effect compensation fails | Emit `Compensation.Failed` |
+| `continue_on_compensation_failure=false` (default) | Enter **CompensationBlocked**; emit `Escalation.Signal` (`compensation_blocked`) |
+| Human acknowledges | Resume compensation, abort workflow, or manual remediate (`EscalationSignal.resolution`) |
+| `continue_on_compensation_failure=true` | Explicit opt-in only; log failure and continue stack (not recommended for git/PR effects) |
+
 ### Compensation Guarantees
 
-- **Best-effort**: Compensation attempts all actions even if some fail
+- **Default block-and-escalate**: Durable-effect failures do not silently continue
 - **Logged**: Every compensation action is logged with before/after state
-- **Auditable**: Compensation events emitted for each action
+- **Auditable**: Compensation events (`Started` / `Executed` / `Failed` / `Blocked` / `Completed`) for each path
 - **Idempotent**: Compensation actions are idempotent (reverting twice is safe)
+- **Human signal**: `EscalationSignal` is the mandatory human escalation channel when blocked
 
 ## Retry and Failure Handling
 
@@ -262,7 +289,7 @@ class Approval(BaseModel):
     status: str = "PENDING"  # PENDING | AUTO_APPROVED | GRANTED | REJECTED | EXPIRED
     requested_at: datetime
     responded_at: datetime | None = None
-    auto_approve: bool = True
+    auto_approve: bool = False  # safe default; explicit opt-in required
     timeout_seconds: int = 86400
     context: dict = {}  # What the approver sees
 ```
@@ -428,7 +455,7 @@ Event: Workflow.Compensated → state: Failed
 Event-sourced WorkflowInstance with synchronous checkpointing. Recovery via event replay. Durable execution primitives (timeouts, heartbeats).
 
 ### Compensation Model (All 17 Audits)
-Saga pattern with LIFO compensation stack. Git-native compensation for code workflows. Best-effort compensation with full audit trail.
+Saga pattern with LIFO compensation stack. Git-native compensation for durable effects. Default block-and-escalate on compensation failure (CompensationBlocked + EscalationSignal); continue_on_failure is explicit opt-in only.
 
 ### Idempotent Execution (Claude/Kimi)
 All step executions use idempotency keys. Stored with outcome to prevent duplicate side effects.

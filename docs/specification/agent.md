@@ -55,26 +55,42 @@ Pending → Starting → Running → WaitingForInput
  Compensating → Compensated
 ```
 
-### AgentSession Aggregate
+### AgentSession Aggregate (Lean Document)
+
+AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry.
+Keep the session document lean for long-running sessions:
+
+| Concern | On session document | Authoritative store |
+|---------|---------------------|---------------------|
+| Identity, status, limits, refs | Yes | Session row |
+| Checkpoints (full history) | `recent_checkpoint_ids` ring (≤20) | `checkpoints` table + `AgentSession.Checkpoint` events |
+| Tool calls (full history) | Recent ring (≤50) | Tool-call event stream |
+| Live meters | Latest `resource_usage` snapshot only | `CostRecord` + `Cost.Recorded` |
+| Validation / feedback | IDs + optional last result | `ValidationResult` / `FeedbackArtifact` contracts |
+| Cost hard kill | `cost_lease_id` | `CostLease` (Observability) |
 
 ```
-AgentSession (Aggregate Root)
+AgentSession (Aggregate Root — lean)
 ├── session_id: UUID (idempotency key)
 ├── task_id: UUID
 ├── agent_definition_id: UUID
+├── matching_decision_id: UUID
 ├── attempt_number: int
 ├── previous_session_id: UUID | None (for feedback chain)
 ├── status: SessionStatus
 ├── workspace_id: UUID
 ├── sandbox_id: UUID
+├── sandbox_attestation_id: UUID
 ├── compiled_prompt_id: UUID
-├── checkpoints: list[Checkpoint]
-├── tool_calls: list[ToolCall]
-├── partial_outputs: list[PartialOutput]
-├── validation_result: ValidationResult | None
-├── feedback_artifact: FeedbackArtifact | None
-├── resource_usage: ResourceUsage
-├── cost_record: CostRecord
+├── cost_lease_id: UUID
+├── resource_limits: ResourceLimits  # anyOf max_tokens | max_usd
+├── recent_checkpoint_ids: list[UUID]  # ring ≤20; full history in events/table
+├── tool_calls: list[ToolCall]         # ring ≤50; full history in event stream
+├── pending_input: PendingInput | None
+├── validation_result_id: UUID | None
+├── feedback_artifact: FeedbackArtifact | None  # last feedback only
+├── resource_usage: ResourceUsage               # latest snapshot only
+├── cost_record_id: UUID
 └── replay_metadata: ReplayMetadata
 ```
 
@@ -292,7 +308,9 @@ class OutputParser(ABC):
 
 ### Strategy Chain (Fallback Order)
 
-Parser strategy is a **state machine owned by the control plane**, never by the agent:
+Parser strategy is a **state machine owned by the control plane**, never by the agent.
+
+**Default chain (4 strategies)** — `llm_coercion` is **not** included. Workspace observation is preferred ground truth for code/filesystem work.
 
 ```
 1. Structured Output Mode (JSON schema enforced by agent)
@@ -314,21 +332,28 @@ Parser strategy is a **state machine owned by the control plane**, never by the 
    └─ Ignore agent stdout narrative
    └─ Confidence: 0.85 (for code changes)
 
-5. LLM Coercion (last resort, budgeted)
-   └─ Cheap model reformatting within coercion budget (default $0.05, timeout 30s)
-   └─ Takes raw text + target schema → structured JSON
-   └─ Confidence: 0.60
-   └─ Coercion cost billed to orchestration_cost_usd
-
-6. Reject
-   └─ All strategies failed
+5. Reject
+   └─ Default chain exhausted
    └─ Emit Artifact.Rejected + ValidationResult
    └─ Trigger FeedbackLoop
 ```
 
+### llm_coercion Escape Hatch (not default)
+
+`llm_coercion` undermines “workspace is ground truth” if used casually. It is therefore **opt-in only**:
+
+| Requirement | Rule |
+|-------------|------|
+| Chain membership | Not in default ParserRegistry chain |
+| Authorization | Requires human `Approval` (`coercion_approval_id` on Artifact) |
+| Observation method | MUST set `observation_method=synthesized` |
+| Scrutiny | Higher audit retention; billed to `orchestration_cost_usd` |
+| Budget | Hard cap (default $0.05, timeout 30s); counts against validation_budget when used in repair |
+| Prefer | Always prefer workspace_observation over coercion when filesystem evidence exists |
+
 ### OutputMode Negotiation
 
-Agents declare supported output modes. Control plane selects best available. **`free_text` is not a control-plane mode** — unstructured stdout may still arrive, but extraction falls through the strategy chain (markdown → workspace → coercion → reject).
+Agents declare supported output modes. Control plane selects best available. **`free_text` is not a control-plane mode** — unstructured stdout may still arrive, but extraction falls through the default strategy chain (markdown → workspace → reject). Coercion is never automatic.
 
 ```yaml
 OutputMode:
@@ -386,10 +411,10 @@ Agent output is treated as untrusted narrative. The filesystem is ground truth.
 
 ### Synthetic Artifact Generation
 
-When agent output parsing fails or claims diverge:
+When agent output parsing fails or claims diverge, construct the artifact from workspace observation and attach **references** to the canonical `ValidationResult.claim_reconciliation` (do not embed a second incompatible shape):
 
 ```python
-def synthesize_artifact(workspace: Workspace, baseline: str) -> CodeChangeArtifact:
+def synthesize_artifact(workspace: Workspace, baseline: str, validation: ValidationResult) -> CodeChangeArtifact:
     """Construct artifact from workspace observation (authoritative)."""
     diff = workspace.git_diff(baseline)
     status = workspace.git_status()
@@ -403,13 +428,10 @@ def synthesize_artifact(workspace: Workspace, baseline: str) -> CodeChangeArtifa
             "tests": detect_test_changes(status),
             "commit_message": extract_commit_message(workspace)
         },
-        observation_method="synthesized",
-        claim_reconciliation={
-            "claims_match_observation": False,
-            "authoritative_source": "workspace",
-            "baseline_commit": baseline,
-            "current_commit": workspace.current_head(),
-        },
+        observation_method="workspace_diff",  # or synthesized only with coercion_approval_id
+        validation_result_id=validation.validation_id,
+        claim_reconciliation_validation_id=validation.validation_id,
+        # Canonical claim_reconciliation lives on ValidationResult only
     )
 ```
 
@@ -427,26 +449,35 @@ Critical mechanism for handling agents that produce invalid artifacts.
    - Quality criteria validator
    - Behavioral contract validator
 4. If INVALID:
-   a. ValidationResult emitted with structured error categories
-   b. FeedbackGenerator creates FeedbackArtifact:
-      - error_context: Detailed description of what's wrong
-      - corrections: Specific suggestions for fix
-      - suggested_strategy: Which parser strategy might work better
-      - previous_raw_output: Agent's output for context
+   a. ValidationResult emitted with structured error categories + claim_reconciliation
+   b. FeedbackGenerator creates FeedbackArtifact (references validation_result_id)
    c. ReinvocationPolicy evaluated:
       - max_retry_attempts: Configurable (default 3)
-      - budget_remaining: Check cost budget allows retry
+      - execution budget (cost_budget) remaining for agent work
+      - **validation_budget** remaining for repair-loop overhead (validators, feedback compile, optional coercion)
+      - retry_on matches last_failure_category (shared vocabulary)
       - escalation_path: Same agent → different agent → human
-   d. If retry allowed:
+   d. If retry allowed AND validation_budget not exhausted:
       - New AgentSession created with attempt_number + 1
       - previous_session_id linked for audit trail
       - FeedbackArtifact injected into PromptCompiler
-      - Agent retries with full context
-   e. If retry exhausted:
-      - Task.Failed permanently emitted
-      - Escalation event emitted
+      - Agent retries; validation spend is metered against validation_budget, not cost_budget
+   e. If retry exhausted OR validation_budget exhausted:
+      - Task.Failed permanently emitted (category may be budget_exceeded for validation starvation)
+      - EscalationSignal emitted
 5. If VALID:
    - Artifact.Validated emitted
+
+### Validation vs Execution Budget Partition
+
+Repair must not be starved by (or steal from) the agent’s execution ceiling:
+
+| Budget | Pays for | On exhaustion |
+|--------|----------|---------------|
+| `Task.cost_budget` / session `resource_limits` | Agent LLM tokens, tools, sandbox runtime | Cancel session; category `budget_exceeded` |
+| `Task.validation_budget` | Structural/semantic validators, feedback compile, optional approved coercion | Stop repair loop; escalate; do not silently continue agent retries |
+
+If `validation_budget` is omitted, platform reserves a default share (e.g. 10% of cost_budget or a fixed floor) so the feedback loop remains funded.
    - Task transitions toward completion
 ```
 
@@ -648,15 +679,42 @@ def score_agent(agent: AgentDefinition, task: Task, context: ExecutionContext, h
     if history and history.circuit_breaker.state == "half_open":
         total_score *= 0.5
 
+    # Cold-start / exploration: pure historical scoring starves new agents/versions.
+    exploration_bonus = 0.0
+    exploration_reason = None
+    cold = is_cold_scorecard(history)  # invocations < threshold OR null/stale scorecard
+    if cold:
+        exploration_bonus = context.exploration_bonus or 0.15  # default boost
+        exploration_reason = (
+            "low_invocation_count" if history and history.total_invocations < context.exploration_min_invocations
+            else "stale_scorecard" if history and is_stale(history)
+            else "cold_start"
+        )
+        total_score = min(1.0, total_score + exploration_bonus)
+
     return MatchingDecision(
         selected_agent_id=agent.id,
         score=total_score,
         dimension_scores=scores,
+        exploration_bonus=exploration_bonus,
+        exploration_reason=exploration_reason,
         explanation=generate_explanation(scores, weights),
         projected_cost_usd=estimate_cost(agent, task),
         projected_latency_seconds=estimate_latency(agent, task, history),
     )
 ```
+
+### Cold-Start Exploration
+
+Pure historical scoring locks new agents/versions out of the routing market. Minimal explicit exploration:
+
+| Condition | Default | Effect |
+|-----------|---------|--------|
+| `total_invocations < exploration_min_invocations` | 10 | Apply `exploration_bonus` (default 0.15) |
+| Scorecard missing for this agent version | — | Treat as cold_start; warm-start from prior version name if available, then still apply reduced bonus until threshold |
+| Scorecard age > staleness threshold | configurable | `stale_scorecard` reason + bonus |
+
+Exploration never bypasses hard filters (circuit breaker open, missing tools, budget infeasible, etc.). Bonus is recorded on `MatchingDecision` for audit.
 
 ### MatchingDecision Artifact
 
@@ -681,6 +739,8 @@ MatchingDecision:
   projected_cost_usd: float
   projected_latency_seconds: float
   scorecard_staleness_seconds: int | null
+  exploration_bonus: float | null
+  exploration_reason: cold_start | stale_scorecard | low_invocation_count | null
 ```
 
 ## Sandbox Manager
@@ -723,25 +783,61 @@ Per-Org Monthly Budget
     ↓ (if exceeded → system alert; require admin override for new work; cancel non-critical in-flight)
 ```
 
+### Synchronous CostLease (Hard Kill Gate)
+
+Eventual consistency from Observability → Execution is **too slow** for hierarchical hard breaches. Every in-flight session holds a **CostLease** (shared-state gate):
+
+| Aspect | Design |
+|--------|--------|
+| Schema | `cost-lease.schema.yaml` |
+| Owner | Observability Context (lease authority) |
+| Holder | Execution Context (`AgentSession.cost_lease_id`) |
+| Check path | Sidecar + egress proxy on **every metering tick (≤100ms)** — synchronous read of lease status |
+| Hard kill | `cancelled=true` or `status=revoked` → terminate agent process immediately; session → `cancelled` |
+| Failure mode | Lease service unavailable → **fail-closed** (`fail_closed_on_unavailable=true`): deny further metered LLM egress |
+| Trust boundary | Execution never self-authorizes continued spend after lease revoke; Observability is source of truth for hierarchical limits |
+
+```
+ExecutionContext(Task.Assigned)
+  → ObservabilityContext(Cost.ReservationCreated + CostLease.Created)
+  → ExecutionContext(AgentSession.Started with cost_lease_id)
+  → each tick: sidecar checks lease (sync) + meters tokens
+  → hard breach: Observability sets lease cancelled/revoked
+  → next tick (≤100ms): process killed; session cancelled
+  → CostLease.Released; Cost.Committed or Released
+```
+
+### Post-Cancel Path (budget_exceeded)
+
+Cost-killed sessions terminate with failure category **`budget_exceeded`**.
+
+| Policy | Behavior |
+|--------|----------|
+| Default `retry_on` | Does **not** include `budget_exceeded` — no automatic retry into the same wall |
+| Task terminal | Failed / Cancelled with `last_failure_category=budget_exceeded` |
+| Escalation | Team/tenant/org scope → emit `EscalationSignal` (`cost_limit_exceeded`) |
+| Compensation | If durable effects already recorded, enter normal compensation path for the workflow step |
+| Resume | Only after budget headroom restored (new reservation) and human/admin override if scope ≥ team |
+
 ### In-Flight vs New Work on Higher-Level Breach
 
 | Scope | Soft threshold (default 80%) | Hard threshold (default 100%) |
 |-------|------------------------------|--------------------------------|
-| Invocation | Warn / throttle streaming | Kill agent process |
-| Team hourly | Reject new assignments | Cancel in-flight team sessions (graceful → force) |
+| Invocation | Warn / throttle streaming | Kill agent process via lease |
+| Team hourly | Reject new assignments | Cancel in-flight team sessions (lease revoke) |
 | Tenant daily | Pause non-critical new work | Cancel non-critical in-flight; critical requires override |
 | Org monthly | Alert + freeze non-essential | Same as tenant hard + admin page |
 
-Higher-level breach **does** stop in-flight work at hard threshold — not only new assignment. Cancellation emits `Cost.BudgetExceeded` with `scope` and `action=cancel_inflight`.
+Higher-level breach **does** stop in-flight work at hard threshold — not only new assignment. Cancellation emits `Cost.BudgetExceeded` with `scope` and `action=cancel_inflight`, and revokes active leases for affected sessions.
 
 ### Reservation Protocol
 
 ```
 1. Pre-flight: Estimate cost (prefer p95 historical; apply reservation_buffer_pct, default 10%)
-2. Reserve: Deduct estimate+buffer from team/tenant budgets
-3. Execute: Track actual via sidecar + egress token counting
-4. Commit: On completion, adjust reservation to actual
-5. Release: On failure/cancel, release unspent reservation
+2. Reserve: Deduct estimate+buffer from team/tenant budgets; create CostLease
+3. Execute: Track actual via sidecar + egress token counting; sync lease check each tick
+4. Commit: On completion, adjust reservation to actual; release lease
+5. Release: On failure/cancel, release unspent reservation; release lease
 ```
 
 ### Cost Enforcement
@@ -749,15 +845,24 @@ Higher-level breach **does** stop in-flight work at hard threshold — not only 
 ```python
 class CostEnforcer:
     def check_and_enforce(self, session: AgentSession, token_count: int, usd_cost: float) -> None:
+        lease = get_cost_lease(session.cost_lease_id)  # synchronous shared-state gate
+        if lease is None or lease.fail_closed_on_unavailable and not lease.is_reachable():
+            raise CostLimitExceeded("Lease unavailable — fail closed")
+        if lease.cancelled or lease.status == "revoked":
+            kill_process(session)
+            raise CostLimitExceeded(lease.cancellation_reason or "lease_revoked")
+
         limits = session.resource_limits
         if limits.max_tokens and token_count > limits.max_tokens * 0.95:
+            revoke_lease(lease, reason="invocation_budget_exceeded")
             raise CostLimitExceeded("Token limit threshold reached")
         if limits.max_usd is not None and usd_cost > limits.max_usd * 0.95:
+            revoke_lease(lease, reason="invocation_budget_exceeded")
             raise CostLimitExceeded("USD limit threshold reached")
 
         team_usage = get_team_hourly_usage(session.team_id)
         if team_usage.at_hard_limit(usd_cost):
-            cancel_inflight_sessions(team_id=session.team_id, reason="team_hourly_hard")
+            revoke_leases_for_team(session.team_id, reason="team_budget_exceeded")
             raise TeamBudgetExceeded("Team hourly budget hard limit")
 
         emit_cost_event(session.id, token_count, usd_cost)
@@ -781,7 +886,7 @@ class CostEnforcer:
 ## Addressing Audit Concerns
 
 ### CLI Parsing Reliability (All 17 Audits)
-ParserRegistry with 5-strategy fallback chain. Workspace observation as ground truth. LLM coercion as last resort. No single point of failure in extraction.
+ParserRegistry with **4-strategy default** chain (structured_output → tool_call → markdown_block → workspace_observation). Workspace observation as ground truth. `llm_coercion` is opt-in with human approval only — not in the default chain.
 
 ### Agent Non-Determinism (All 17 Audits)
 AgentSession with full checkpointing and replay metadata. Every execution is reproducible. Circuit breaker prevents cascading failures.
@@ -793,7 +898,7 @@ Structured ValidationResult with error categories. Budgeted retry with escalatio
 Multi-dimensional scoring with historical AgentScorecard. Circuit breaker penalizes failing agents. Configurable weights per team.
 
 ### Cost Enforcement (All 17 Audits)
-Hierarchical cost gate with reservation protocol. Pre-flight estimation. Sidecar proxy for real-time enforcement. No advisory-only budgets.
+Hierarchical cost gate with reservation protocol, **synchronous CostLease** hard-kill gate, pre-flight estimation, and sidecar/egress metering. No advisory-only budgets. `budget_exceeded` is not retried by default.
 
 ### Workspace Observation (Tinker/Qwen)
 Artifacts derived from git diff, not agent claims. Synthetic artifact generation when parsing fails completely.

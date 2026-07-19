@@ -39,7 +39,7 @@ class DomainEvent(BaseModel):
 | Task.Assigned | Orchestrator | task_id, agent_id, role, matching_decision |
 | Task.Started | Orchestrator | task_id, session_id |
 | Task.Completed | Orchestrator | task_id, artifact_ids |
-| Task.Failed | Orchestrator | task_id, error, retry_state, agent_circuit_breaker_state |
+| Task.Failed | Orchestrator | task_id, error, retry_state (last_failure_category), agent_circuit_breaker_state (snapshot from AgentScorecard at failure time — not task-owned) |
 | Task.Cancelled | Orchestrator | task_id, reason |
 | AgentSession.Started | AgentExecutor | session_id, agent_id, attempt_number |
 | AgentSession.Completed | AgentExecutor | session_id, artifact_id |
@@ -80,7 +80,10 @@ class DomainEvent(BaseModel):
 | Cost.ReservationCreated | CostEnforcer | task_id, estimated_cost, team_id |
 | Cost.ReservationCommitted | CostEnforcer | task_id, actual_cost |
 | Cost.ReservationReleased | CostEnforcer | task_id, reason |
-| Cost.BudgetExceeded | CostGate | level, team_id, threshold |
+| Cost.BudgetExceeded | CostGate | level, team_id, threshold, action=cancel_inflight\|reject_new |
+| CostLease.Created | CostGate | lease_id, task_id, session_id, reserved_usd, reserved_tokens, scope |
+| CostLease.Revoked | CostGate | lease_id, cancellation_reason, scope |
+| CostLease.Released | CostGate | lease_id, consumed_usd, consumed_tokens |
 
 ### Compensation Events (Permanent)
 
@@ -88,7 +91,10 @@ class DomainEvent(BaseModel):
 |------------|----------|---------|
 | Compensation.Started | WorkflowEngine | workflow_id, steps_to_compensate |
 | Compensation.Executed | CompensationExecutor | workflow_id, action_type, target, status |
+| Compensation.Failed | CompensationExecutor | workflow_id, action_type, target, error |
+| Compensation.Blocked | WorkflowEngine | workflow_id, failed_action, durable_effect_ref |
 | Compensation.Completed | WorkflowEngine | workflow_id, actions_succeeded, actions_failed |
+| Escalation.Signal | WorkflowEngine / CostGate | signal_id, target_type, target_id, escalation_type, reason |
 
 ### Routing Events (Configurable)
 
@@ -145,9 +151,10 @@ Compensation.Executed (correlation_id: W-123, step N)
     ↓
 Compensation.Executed (correlation_id: W-123, step N-1)
     ↓
-Compensation.Completed (correlation_id: W-123)
-    ↓
-Workflow.Compensated (correlation_id: W-123)
+  [on durable-effect failure and continue_on_compensation_failure=false]
+    → Compensation.Failed → Compensation.Blocked → Escalation.Signal
+  [else all succeeded]
+    → Compensation.Completed → Workflow.Compensated
 ```
 
 ## Correlation and Causation

@@ -191,13 +191,14 @@ AgentSession (Aggregate Root)
 ├── sandbox_id: UUID
 ├── sandbox_attestation_id: UUID
 ├── compiled_prompt_id: UUID
+├── cost_lease_id: UUID  # sync hard-kill gate (Observability-owned CostLease)
 ├── resource_limits: ResourceLimits  # anyOf max_tokens | max_usd REQUIRED
-├── checkpoints: list[Checkpoint]
-├── tool_calls: list[ToolCall]
+├── recent_checkpoint_ids: list[UUID]  # ring ≤20; full history in events/table
+├── tool_calls: list[ToolCall]         # ring ≤50; full history in event stream
 ├── pending_input: PendingInput | None  # waiting_for_input
 ├── validation_result_id: UUID | None
-├── feedback_artifact: FeedbackArtifact | None
-├── resource_usage: ResourceUsage  # live meters
+├── feedback_artifact: FeedbackArtifact | None  # last feedback only
+├── resource_usage: ResourceUsage  # latest snapshot only; not full history
 ├── cost_record_id: UUID  # authoritative CostRecord ref
 └── replay_metadata: ReplayMetadata
 ```
@@ -208,9 +209,9 @@ AgentSession (Aggregate Root)
 - Must belong to exactly one Task
 - Owns exactly one Workspace for its lifetime
 - attempt_number must be >= 1
-- Each checkpoint must reference valid session state
+- High-frequency data (full tool_calls, full checkpoints, usage history) lives in events/linked stores — not unbounded on the session document
 - resource_limits must include at least one cost ceiling
-- Live resource_usage must not exceed resource_limits (sidecar enforces)
+- Live resource_usage must not exceed resource_limits (sidecar enforces via CostLease)
 
 ### Workspace Aggregate (Execution)
 

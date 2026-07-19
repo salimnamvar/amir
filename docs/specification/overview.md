@@ -1,12 +1,31 @@
 # Amir Architecture Specification
 
-**Version:** 2.1.0  
+**Version:** 2.1.1  
 **Status:** Authoritative Technical Specification  
 **Owner:** Technical Leadership
 
 ---
 
 ## Audit Findings Synthesis
+
+### Round 5 Residual Hardening (This Pass)
+
+Focused correction of production-blocking gaps still open after the post–Round 4 hardening commit. Not a redesign.
+
+| Priority | Issue | Resolution |
+|----------|-------|------------|
+| 1 | Cost hard kill eventual-only | **CostLease** sync shared-state gate; fail-closed; post-cancel = `budget_exceeded` (no default retry) |
+| 2 | Compensation best-effort dead-end | Default `continue_on_compensation_failure=false` → **CompensationBlocked** + `EscalationSignal` |
+| 3 | AgentSession God Object | Lean session: ring buffers + event/table history; not unbounded telemetry |
+| 4a | docker/production prose-only | JSON Schema **`if/then` at schema root** (was wrongly nested under `properties`) |
+| 4b | `auto_approve` unsafe default | Schema + workflow prose default **`false`** |
+| 4c | claim_reconciliation triplication | Canonical on **ValidationResult**; Artifact/Feedback reference by ID |
+| 4d | retry vocab mismatch | Shared enum including **`budget_exceeded`** |
+| 5 | Cold-start starvation | **exploration_bonus** on MatchingDecision + scoring algorithm |
+| 6 | Validation starves repair | **`validation_budget`** partitioned from execution `cost_budget` |
+| 7 | llm_coercion in default chain | **Removed from default** (4 strategies); opt-in + approval only |
+| 8a | Allowlist merge undefined | **Intersection** + fixed profile expansion registry |
+| 8b | SecretBinding missing | Formal **secret-binding.schema.yaml** |
 
 ### Round 4 Audit Findings (Independent Architecture Audits)
 
@@ -25,7 +44,7 @@
 | Adapter/runtime boundary | Copilot, Xiaomi, Minimax | Explicit pump/respond_input/inject_feedback; interactive prompts; continuity |
 | Remove proficiency zombie | GLM | Role required_capabilities use tools/constraints only |
 | Remove free_text control-plane mode | GLM | Output modes: json_schema, tool_use, markdown_yaml, workspace_observation |
-| In-flight budget cancellation | Claude | Team/tenant/org hard thresholds cancel in-flight sessions |
+| In-flight budget cancellation | Claude | Team/tenant/org hard thresholds cancel in-flight sessions via CostLease |
 | Network allowlist default-deny | Claude, Xiaomi | Empty allowlist = deny except platform LLM routes; coding_standard profile |
 | Scorecard version warm-start | Claude | Prior agent version metrics carry over when name matches |
 | Key lifecycle for attestation | Claude, Xiaomi | KMS/HSM refs, rotation window, compromise handling |
@@ -37,10 +56,10 @@
 | Finding | Source | Implementation |
 |---------|--------|---------------------|
 | Abstract-only compensation enums | GLM | Dual-layer: abstract intent in Workflow + concrete effects in Execution |
-| Sever AgentSession telemetry from contracts | GLM | Session remains a first-class durable aggregate (needed for replay/idempotency); live meters separated from authoritative CostRecord; tool_calls capped at 100 inline, full history in events |
+| Sever AgentSession telemetry from contracts | GLM | Session remains durable aggregate; high-frequency data is events/linked tables with bounded ring samples |
 | Multi-turn AgentConversation entity | Prior | Modeled as session `waiting_for_input` + adapter protocol; no separate aggregate |
 | EvaluationTask contract type | Prior | Covered by semantic validators with budget; no separate contract type |
-| SecretBinding full schema | Xiaomi, Copilot | Added secret-binding.schema.yaml for ephemeral secret grants with TTL |
+| SecretBinding full schema | Xiaomi, Copilot | secret-binding.schema.yaml for ephemeral secret grants with TTL |
 | AgentScorecard formal schema | Xiaomi | Structure specified in observability/agent docs as read model; time-series view in Observability Context |
 
 #### Rejected Findings
@@ -66,76 +85,61 @@ Prior round fully accepted foundations remain in force: AgentSession state machi
 
 ## Specification Status
 
-**Status:** `COMPLETE_AND_CONSISTENT` (v2.1.0-hardened)
+**Status:** `COMPLETE_AND_CONSISTENT` (v2.1.1)
 
-Hardened relative to v2.0.0:
+Hardened relative to v2.0.0 / residual v2.1.0 gaps:
 
 - ✅ **Execution-first**: AgentSession central aggregate; invocation is request DTO
-- ✅ **Dangling contracts closed**: MatchingDecision, CompiledPrompt, ValidationResult, SandboxAttestation
+- ✅ **Dangling contracts closed**: MatchingDecision, CompiledPrompt, ValidationResult, SandboxAttestation, CostLease, SecretBinding, EscalationSignal
 - ✅ **Cost ceilings structural**: anyOf max_tokens/max_usd required
+- ✅ **Synchronous cost control**: CostLease shared-state gate; fail-closed; post-cancel path defined
 - ✅ **Circuit breaker**: agent-only on AgentScorecard; Task has retry_state
 - ✅ **Workspace cardinality**: 1 Task → many Workspaces via sessions
-- ✅ **Compensation**: durable effects, two-layer abstract/concrete, blocked state with escalation
-- ✅ **Assignment pipeline**: hard filter → score → negotiate with fallback
+- ✅ **Compensation**: durable effects; dual-layer; **CompensationBlocked** + EscalationSignal (not best-effort default)
+- ✅ **Assignment pipeline**: hard filter → score (+exploration) → negotiate with fallback
 - ✅ **Claim reconciliation**: canonical on ValidationResult; workspace authoritative
 - ✅ **Adapter boundary**: interactive prompts, pump loop, continuity, replay
-- ✅ **No phasing language** in compatibility or system boundary docs; infrastructure options reframed
-- ✅ **Bounded Context Separation** with single Workspace owner
-- ✅ **Mandatory security posture**: gVisor, egress proxy, attestation keys
-- ✅ **Synchronous cost control**: CostLease shared-state gate for hard kill
-- ✅ **SecretBinding schema**: formal contract for ephemeral secret grants
+- ✅ **No phasing language** in compatibility or system boundary docs
+- ✅ **Lean AgentSession**: high-frequency data in events/tables; bounded samples on document
+- ✅ **docker illegal in production**: root-level JSON Schema if/then
+- ✅ **llm_coercion**: not in default ParserRegistry chain
 
 ---
 
-## Hardened Design Changes (Post-Round 4 Audit Pass)
+## Hardened Design Changes (v2.1.1 — Audit5 Residual Pass)
 
-The following critical inconsistencies and production-blocking gaps were resolved:
-
-### Schema Enforcement Fixes
+### What Was Fixed
 
 | Issue | Fix |
 |-------|-----|
-| Production/docker restriction not structurally enforced | Added JSON Schema `if/then` constraint to sandbox.schema.yaml |
-| auto_approve default was unsafe | Changed default from `true` to `false` in approval.schema.yaml |
-| Duplicate agent_scorecards tables | Renamed Execution Context table to `agent_scorecards_current`; Observability Context retains full metrics |
-| Workspace status enum not enforced at DB level | Added CHECK constraint in persistence.md |
+| sandbox `if/then` under `properties` (non-functional) | Moved to **schema root**; docker structurally illegal when `environment=production` (or omitted) |
+| Compensation “best-effort continue” | Default block → **CompensationBlocked** + human `EscalationSignal`; executor pseudocode updated |
+| AgentSession God Object risk | Lean model: ring buffers (checkpoints ≤20, tool_calls ≤50), `tool_call_events` table, latest usage snapshot only |
+| claim_reconciliation shapes | Canonical on ValidationResult (+ `authoritative_source=workspace`); Artifact/Feedback by ID only |
+| retry_on vs last_failure_category | Shared vocabulary including `budget_exceeded` |
+| Cost kill post-path undefined | `budget_exceeded` not in default retry_on; EscalationSignal for team+; compensation if durable effects exist |
+| CostLease incomplete | Scope, fail-closed, trust boundary, event types documented |
+| Pure historical scoring | Exploration bonus when cold/low invocations/stale scorecard |
+| Validation starves repair | `Task.validation_budget` partitioned from execution budget |
+| llm_coercion default chain | 4-strategy default; coercion opt-in + `coercion_approval_id` |
+| auto_approve True in prose | Aligned to **false** (schema + workflow.md) |
+| Allowlist merge / profile | Intersection algorithm + fixed coding_standard domain expansion |
+| SecretBinding | Formal schema retained and referenced in contracts matrix |
+| Prose contradictions (5-strategy, etc.) | Aligned vision, system-boundary, agent, security, stories |
 
-### Claim Reconciliation Canonicalization
+### What Was Deliberately Left Unchanged (and Why)
 
-- **ValidationResult** now holds the authoritative `claim_reconciliation` shape (full forensic data)
-- **Artifact** and **Feedback** reference it via `claim_reconciliation_validation_id` instead of duplicating incompatible structures
-- Added `coercion_approval_id` to Artifact for when `observation_method=synthesized` is used (llm_coercion requires approval)
-
-### Cost Control & Retry Alignment
-
-- Added `CostLease` schema for synchronous hard kill on budget breaches
-- Added `cost_lease_id` to AgentSession for lease reference
-- Aligned `retry_on` vocabulary with `last_failure_category`: `[structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]`
-- Added `validation_budget` to Task for partitioned repair-loop budget
-
-### Cold-Start & Exploration
-
-- Added `exploration_bonus` and `exploration_reason` to MatchingDecision for new agents/versions
-
-### Security Clarifications
-
-- Specified network allowlist merge algorithm as **intersection**: `AgentDefinition ∩ SandboxPolicy ∩ Role.constraints`
-- Added `SecretBinding` schema (secret-binding.schema.yaml) for ephemeral secret grants
-
-### Compensation Failure Path
-
-- Added `CompensationBlocked` state to WorkflowInstance lifecycle
-- Added `EscalationSignal` schema for human escalation on blocked compensation
-- Changed `continue_on_compensation_failure` default to `false` (safe default: block and escalate)
-
-### llm_coercion Escape Hatch
-
-- Removed from default ParserRegistry chain (4-strategy default: workspace_observation is preferred ground truth)
-- If `observation_method=synthesized` is used, `coercion_approval_id` is required
-
-### Phasing Language Cleanup
-
-- Feature Completeness Matrix reframed as "Infrastructure Options" instead of tiered "Default/Extended/Scale"
+| Item | Why unchanged |
+|------|----------------|
+| TeamSession / multi-agent shared workspace | Explicitly out of scope; no new major subsystem |
+| Full Memory aggregate / LearningEngine | Out of scope; scorecard + exploration is sufficient for routing cold-start |
+| Temporal as mandatory engine | Interface seam only; durability via event-sourced WorkflowInstance |
+| Firecracker / eBPF mandatory | Optional max-security / hardening; gVisor remains production default |
+| AgentScorecard as separate JSON Schema file | Read model fully specified in agent/observability; MatchingDecision already contracts scoring outputs |
+| PromptTemplate formal schema | Integrity via `template_hash` on CompiledPrompt; template structure is config, not runtime contract |
+| Merkle global sequence redesign | Per-aggregate chaining is production-viable; global sequence optimization is implementation detail |
+| Opening the protocol | Internal coherence first |
+| FS snapshot compensation as required | Durable git/PR/artifact effects remain the compensation target |
 
 ---
 

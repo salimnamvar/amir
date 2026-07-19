@@ -80,11 +80,13 @@ CREATE TABLE tasks (
     attempts INTEGER DEFAULT 0,
     max_attempts INTEGER DEFAULT 3,
     -- retry_state (task-scoped); circuit breakers live on agent_scorecards
-    last_failure_category TEXT,
+    last_failure_category TEXT,  -- structural|semantic|policy|quality|timeout|infrastructure|cancelled|budget_exceeded
     last_session_id UUID,
     escalated BOOLEAN DEFAULT FALSE,
     cost_budget_max_tokens INTEGER,
     cost_budget_max_usd REAL,
+    validation_budget_max_tokens INTEGER,  -- partitioned from execution budget
+    validation_budget_max_usd REAL,
     matching_decision_id UUID,
     active_workspace_id UUID,
     created_at TIMESTAMP,
@@ -105,11 +107,15 @@ CREATE TABLE agent_sessions (
     sandbox_id UUID,
     sandbox_attestation_id UUID,
     compiled_prompt_id UUID,
+    cost_lease_id UUID,  -- sync hard-kill gate reference
     validation_result_id UUID,
     cost_record_id UUID,
     max_tokens INTEGER,
     max_usd REAL,
     timeout_seconds INTEGER NOT NULL,
+    -- High-frequency telemetry is NOT stored as unbounded JSON on this row:
+    -- checkpoints → checkpoints table; tool_calls → event stream; usage history → cost_records
+    resource_usage_snapshot JSONB,  -- latest meters only
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
     CHECK (max_tokens IS NOT NULL OR max_usd IS NOT NULL)
@@ -166,6 +172,34 @@ CREATE TABLE checkpoints (
     payload JSONB,
     workspace_snapshot TEXT,
     created_at TIMESTAMP
+);
+
+-- Full tool-call history (session document holds only a recent ring buffer)
+CREATE TABLE tool_call_events (
+    tool_call_id UUID PRIMARY KEY,
+    session_id UUID REFERENCES agent_sessions(session_id) NOT NULL,
+    tool_name TEXT NOT NULL,
+    tool_input JSONB,
+    tool_output JSONB,
+    status TEXT NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP
+);
+
+CREATE TABLE cost_leases (
+    lease_id UUID PRIMARY KEY,
+    task_id UUID NOT NULL,
+    agent_session_id UUID,
+    reserved_usd REAL NOT NULL,
+    reserved_tokens INTEGER NOT NULL,
+    consumed_usd REAL DEFAULT 0,
+    consumed_tokens INTEGER DEFAULT 0,
+    scope TEXT NOT NULL,  -- invocation|team|tenant|org
+    status TEXT NOT NULL,  -- active|revoked|expired|released
+    cancelled BOOLEAN DEFAULT FALSE,
+    cancellation_reason TEXT,
+    created_at TIMESTAMP,
+    expires_at TIMESTAMP
 );
 
 CREATE TABLE idempotency_keys (
