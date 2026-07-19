@@ -34,14 +34,14 @@
 
 #### Partially Accepted Findings
 
-| Finding | Source | Partial Implementation |
+| Finding | Source | Implementation |
 |---------|--------|---------------------|
 | Abstract-only compensation enums | GLM | Dual-layer: abstract intent in Workflow + concrete effects in Execution |
-| Sever AgentSession telemetry from contracts | GLM | Session remains a first-class durable aggregate (needed for replay/idempotency); live meters separated from authoritative CostRecord |
+| Sever AgentSession telemetry from contracts | GLM | Session remains a first-class durable aggregate (needed for replay/idempotency); live meters separated from authoritative CostRecord; tool_calls capped at 100 inline, full history in events |
 | Multi-turn AgentConversation entity | Prior | Modeled as session `waiting_for_input` + adapter protocol; no separate aggregate |
 | EvaluationTask contract type | Prior | Covered by semantic validators with budget; no separate contract type |
-| SecretBinding full schema | Xiaomi, Copilot | Described in Security Context + SecretBroker; dedicated schema reserved for next contract pass if needed |
-| AgentScorecard formal schema | Xiaomi | Structure specified in observability/agent docs as read model |
+| SecretBinding full schema | Xiaomi, Copilot | Added secret-binding.schema.yaml for ephemeral secret grants with TTL |
+| AgentScorecard formal schema | Xiaomi | Structure specified in observability/agent docs as read model; time-series view in Observability Context |
 
 #### Rejected Findings
 
@@ -66,7 +66,7 @@ Prior round fully accepted foundations remain in force: AgentSession state machi
 
 ## Specification Status
 
-**Status:** `COMPLETE_AND_CONSISTENT` (v2.1.0)
+**Status:** `COMPLETE_AND_CONSISTENT` (v2.1.0-hardened)
 
 Hardened relative to v2.0.0:
 
@@ -75,13 +75,67 @@ Hardened relative to v2.0.0:
 - ✅ **Cost ceilings structural**: anyOf max_tokens/max_usd required
 - ✅ **Circuit breaker**: agent-only on AgentScorecard; Task has retry_state
 - ✅ **Workspace cardinality**: 1 Task → many Workspaces via sessions
-- ✅ **Compensation**: durable effects, two-layer abstract/concrete
+- ✅ **Compensation**: durable effects, two-layer abstract/concrete, blocked state with escalation
 - ✅ **Assignment pipeline**: hard filter → score → negotiate with fallback
-- ✅ **Claim reconciliation**: parser vs workspace; workspace authoritative
+- ✅ **Claim reconciliation**: canonical on ValidationResult; workspace authoritative
 - ✅ **Adapter boundary**: interactive prompts, pump loop, continuity, replay
-- ✅ **No phasing language** in compatibility or system boundary docs
+- ✅ **No phasing language** in compatibility or system boundary docs; infrastructure options reframed
 - ✅ **Bounded Context Separation** with single Workspace owner
 - ✅ **Mandatory security posture**: gVisor, egress proxy, attestation keys
+- ✅ **Synchronous cost control**: CostLease shared-state gate for hard kill
+- ✅ **SecretBinding schema**: formal contract for ephemeral secret grants
+
+---
+
+## Hardened Design Changes (Post-Round 4 Audit Pass)
+
+The following critical inconsistencies and production-blocking gaps were resolved:
+
+### Schema Enforcement Fixes
+
+| Issue | Fix |
+|-------|-----|
+| Production/docker restriction not structurally enforced | Added JSON Schema `if/then` constraint to sandbox.schema.yaml |
+| auto_approve default was unsafe | Changed default from `true` to `false` in approval.schema.yaml |
+| Duplicate agent_scorecards tables | Renamed Execution Context table to `agent_scorecards_current`; Observability Context retains full metrics |
+| Workspace status enum not enforced at DB level | Added CHECK constraint in persistence.md |
+
+### Claim Reconciliation Canonicalization
+
+- **ValidationResult** now holds the authoritative `claim_reconciliation` shape (full forensic data)
+- **Artifact** and **Feedback** reference it via `claim_reconciliation_validation_id` instead of duplicating incompatible structures
+- Added `coercion_approval_id` to Artifact for when `observation_method=synthesized` is used (llm_coercion requires approval)
+
+### Cost Control & Retry Alignment
+
+- Added `CostLease` schema for synchronous hard kill on budget breaches
+- Added `cost_lease_id` to AgentSession for lease reference
+- Aligned `retry_on` vocabulary with `last_failure_category`: `[structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]`
+- Added `validation_budget` to Task for partitioned repair-loop budget
+
+### Cold-Start & Exploration
+
+- Added `exploration_bonus` and `exploration_reason` to MatchingDecision for new agents/versions
+
+### Security Clarifications
+
+- Specified network allowlist merge algorithm as **intersection**: `AgentDefinition ∩ SandboxPolicy ∩ Role.constraints`
+- Added `SecretBinding` schema (secret-binding.schema.yaml) for ephemeral secret grants
+
+### Compensation Failure Path
+
+- Added `CompensationBlocked` state to WorkflowInstance lifecycle
+- Added `EscalationSignal` schema for human escalation on blocked compensation
+- Changed `continue_on_compensation_failure` default to `false` (safe default: block and escalate)
+
+### llm_coercion Escape Hatch
+
+- Removed from default ParserRegistry chain (4-strategy default: workspace_observation is preferred ground truth)
+- If `observation_method=synthesized` is used, `coercion_approval_id` is required
+
+### Phasing Language Cleanup
+
+- Feature Completeness Matrix reframed as "Infrastructure Options" instead of tiered "Default/Extended/Scale"
 
 ---
 

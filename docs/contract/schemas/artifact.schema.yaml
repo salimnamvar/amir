@@ -72,28 +72,21 @@ properties:
   observation_method:
     type: string
     enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
-    description: "How artifact was derived; workspace_diff and synthesized are preferred ground truth"
+    description: "How artifact was derived; workspace_diff and synthesized are preferred ground truth. synthesized requires llm_coercion approval."
 
-  # Parser-claim vs workspace reconciliation
-  claim_reconciliation:
-    type: object
-    description: "Records whether agent/parser claims match workspace observation"
-    properties:
-      claims_match_observation:
-        type: boolean
-      parser_strategy_used:
-        type: string
-        enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
-      baseline_commit:
-        type: string
-      current_commit:
-        type: string
-      divergence_summary:
-        type: string
-      authoritative_source:
-        type: string
-        enum: [workspace, parser, synthesized]
-        description: "Which source won when claims diverged; workspace always preferred for code changes"
+  # Reference to canonical claim reconciliation (ValidationResult)
+  # The complete claim_reconciliation data is held on ValidationResult;
+  # this reference enables workspace-ground-truth lookup without duplication.
+  claim_reconciliation_validation_id:
+    type: string
+    format: uuid
+    description: "Reference to ValidationResult.claim_reconciliation for authoritative claim vs workspace comparison"
+
+  # When llm_coercion is used, synthesized is required and approval_id must be set
+  coercion_approval_id:
+    type: string
+    format: uuid
+    description: "Required when observation_method=synthesized; references Approval that authorized coercion override"
 
   validation_result_id:
     type: string

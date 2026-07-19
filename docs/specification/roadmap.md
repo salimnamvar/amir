@@ -39,27 +39,26 @@
 ### Parser
 | Option | Technology |
 |--------|------------|
-| Default | ParserRegistry with 2 strategies (structured_output, markdown_block) |
-| Extended | 5 strategies including tool_call_interception, workspace_observation, llm_coercion |
-| Full | Custom parsers per agent type |
+| Default | ParserRegistry with 4 strategies (structured_output, tool_call, markdown_block, workspace_observation) |
+| Extended | Custom parser plugins per agent type |
 
 ---
 
 ## Feature Completeness Matrix
 
-All features are designed and specified. Implementation options vary by deployment scale.
+All features are designed and specified. Implementation options vary by deployment infrastructure.
 
-| Feature | Default | Extended | Scale |
-|---------|---------|----------|-------|
-| Multi-Agent | 1 adapter | Multiple | 10+ |
-| Runtime | gVisor | gVisor + Firecracker | Multi-runtime |
-| Events | File + Outbox | Kafka | Multi-region |
-| Storage | SQLite | PostgreSQL | Sharded |
-| Policy | Static | OPA | Federated |
-| Observability | Logs | Prometheus | Dedicated cluster |
-| Parser | 2 strategies | 5 strategies | Custom |
-| Audit | File | Merkle-chained | Transparency log |
-| Cost | Basic tracking | Hierarchical gate | ML prediction |
+| Feature | Infrastructure Options |
+|---------|---------------------|
+| Multi-Agent | Single adapter, Multiple adapters, Large-scale pool (10+) |
+| Runtime | gVisor (production), Firecracker (max security), Docker (dev only) |
+| Events | File-based + Outbox, Kafka, Multi-region streaming |
+| Storage | SQLite, PostgreSQL, Sharded PostgreSQL |
+| Policy | Static rules, OPA integration, Federated policy |
+| Observability | Structured logs, Prometheus metrics, Dedicated observability cluster |
+| Parser | 4-strategy default chain, Custom parser plugins |
+| Audit | File-based (WORM), Merkle-chained events, Transparency log |
+| Cost | Structural ceilings, Hierarchical cost gate, Pre-flight estimation + reservation |
 
 ---
 

@@ -122,7 +122,7 @@ CREATE TABLE workspaces (
     repo_url TEXT,
     branch TEXT,
     workdir TEXT,
-    status TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('created', 'active', 'observed', 'cleaned', 'failed')),
     baseline_commit TEXT,
     current_commit TEXT,
     baseline_tree_hash TEXT,
@@ -134,7 +134,8 @@ CREATE TABLE workspaces (
 );
 
 -- Circuit breaker lives with agent performance, not tasks
-CREATE TABLE agent_scorecards (
+-- Note: This is a CURRENT_STATE view for quick lookup; full metrics in Observability Context agent_scorecards
+CREATE TABLE agent_scorecards_current (
     agent_definition_id UUID PRIMARY KEY,
     success_rate REAL,
     circuit_breaker_state TEXT DEFAULT 'closed',
@@ -235,9 +236,17 @@ CREATE TABLE access_policies (
 CREATE TABLE secret_bindings (
     id UUID PRIMARY KEY,
     task_id UUID,
-    secret_path TEXT,
+    session_id UUID,
+    secret_name TEXT,
+    secret_ref TEXT,
     injected_at TIMESTAMP,
-    expires_at TIMESTAMP
+    expires_at TIMESTAMP,
+    access_method TEXT CHECK (access_method IN ('env', 'file', 'proxy')),
+    access_path TEXT,
+    single_use BOOLEAN DEFAULT FALSE,
+    status TEXT CHECK (status IN ('active', 'used', 'expired', 'revoked')),
+    created_by TEXT,
+    revoked_at TIMESTAMP
 );
 
 CREATE TABLE egress_log (
@@ -272,6 +281,8 @@ CREATE TABLE cost_records (
     completed_at TIMESTAMP
 );
 
+-- Historical Scorecards (time-series by period)
+-- Full metrics read model for routing decisions; distinct from current state view in Execution Context.
 CREATE TABLE agent_scorecards (
     agent_definition_id UUID,
     period TEXT,

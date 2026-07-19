@@ -1,0 +1,75 @@
+# CostLease Contract Schema
+# Synchronous cost lease / shared-state gate for in-flight session cancellation
+# Enables immediate cancellation when team/tenant/org limits are breached
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [lease_id, task_id, reserved_usd, reserved_tokens]
+properties:
+  lease_id:
+    type: string
+    format: uuid
+    description: "Unique lease identifier"
+
+  task_id:
+    type: string
+    format: uuid
+    description: "Task this lease applies to"
+
+  agent_session_id:
+    type: string
+    format: uuid
+    description: "Current session holding this lease"
+
+  # Reservation amounts
+  reserved_usd:
+    type: number
+    minimum: 0
+    description: "USD reserved against budget (may include buffer)"
+
+  reserved_tokens:
+    type: integer
+    minimum: 0
+    description: "Tokens reserved against budget (may include buffer)"
+
+  # Consumption tracking
+  consumed_usd:
+    type: number
+    minimum: 0
+    default: 0
+    description: "USD consumed so far"
+
+  consumed_tokens:
+    type: integer
+    minimum: 0
+    default: 0
+    description: "Tokens consumed so far"
+
+  # Time bounds
+  created_at:
+    type: string
+    format: date-time
+
+  expires_at:
+    type: string
+    format: date-time
+    description: "Absolute expiry for this lease"
+
+  # Status
+  status:
+    type: string
+    enum: [active, revoked, expired, released]
+    default: "active"
+    description: "Lease lifecycle state"
+
+  # Cancellation signal
+  cancelled:
+    type: boolean
+    default: false
+    description: "If true, in-flight sessions must terminate immediately"
+
+  cancellation_reason:
+    type: string
+    enum: [invocation_budget_exceeded, team_budget_exceeded, tenant_budget_exceeded, org_budget_exceeded, manual_revocation]
+    description: "Why the lease was cancelled"

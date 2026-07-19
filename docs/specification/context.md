@@ -82,29 +82,15 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - WorkflowDefinition - Template for workflow patterns (immutable)
 - WorkflowInstance - Live workflow execution (event-sourced)
 - Approval - Approval tracking (binary with escalation)
+- EscalationSignal - First-class signal for compensation blocking, SLO breaches, and manual escalation
 - CompensationAction - Abstract rollback intent with concrete effect mapping
 - StepResult - Ordered execution history with compensation info
 
-**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / Rejected
+**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / **CompensationBlocked** / Rejected
 
 **Storage**: PostgreSQL (durable state) + Event Store (event sourcing)
 
-**Events**: Workflow.Created, Workflow.Transitioned, Workflow.Completed, Workflow.Compensated, Approval.Requested, Approval.Granted, Approval.Rejected, Compensation.Started, Compensation.Executed, Compensation.Failed
-
-**Workflow Engine Interface**:
-
-```go
-type WorkflowEngine interface {
-    CreateWorkflow(definition_id UUID, team_id UUID, idempotency_key string) (UUID, error)
-    ExecuteStep(workflow_id UUID, task_spec TaskSpec) error
-    WaitForSignal(workflow_id UUID, signal_name string, timeout time.Duration) error
-    CompleteWorkflow(workflow_id UUID) error
-    CompensateWorkflow(workflow_id UUID) error
-    GetState(workflow_id UUID) (WorkflowState, error)
-}
-```
-
-**Compensation boundary**: Workflow emits abstract compensation intents. Execution maps them to durable resources recorded in `Workspace.durable_effects` (commits, branches, PRs, artifact IDs). Compensating an already-cleaned ephemeral workspace filesystem is a no-op; durable effects remain the target.
+**Events**: Workflow.Created, Workflow.Transitioned, Workflow.Completed, Workflow.Compensated, Approval.Requested, Approval.Granted, Approval.Rejected, Compensation.Started, Compensation.Executed, Compensation.Failed, **Compensation.Blocked**, **Escalation.Signal**
 
 ## 4. Security Context
 
@@ -115,7 +101,7 @@ type WorkflowEngine interface {
 **Entities**:
 - SandboxPolicy - Rules evaluated before sandbox/workspace creation
 - AccessPolicy - RBAC/ABAC rules (static or OPA)
-- SecretBinding - Per-session secret grants with TTL
+- SecretBinding - Per-session secret grants with TTL (see secret-binding.schema.yaml)
 - AuditEvent - Security-relevant state changes (Merkle-chained)
 - EgressProxy - Network egress control and token counting
 - SandboxAttestation - Runtime integrity verification
@@ -143,6 +129,7 @@ Platform signing keys for SandboxAttestation and Merkle audit roots:
 - Metric - Time-series data point
 - CostRecord - Token/cost consumption with multi-dimensional attribution (authoritative)
 - CostSummary - Aggregated cost by period/team/agent
+- CostLease - **Synchronous cost lease for in-flight session cancellation** (see cost-lease.schema.yaml)
 - QualityMetric - Artifact quality assessment
 - AgentScorecard - Historical performance metrics + **circuit breaker state**
 - ValidationMetric - Validation pipeline performance
@@ -209,8 +196,15 @@ WorkflowContext(Workflow.StepFailed)
     → For each completed step N..1 (LIFO):
         → Read durable_effects for step N (commit/branch/PR/artifact)
         → ExecutionContext(execute concrete compensation)
+        → If compensation action fails:
+            → If continue_on_compensation_failure=false:
+                → WorkflowContext(Compensation.Blocked)
+                → WorkflowContext(Escalation.Signal to human)
+                → WorkflowInstance enters CompensationBlocked state
+            → Else: log and continue (default: false)
         → Ephemeral Workspace cleanup is independent and usually already done
-    → WorkflowContext(Workflow.Failed)
+    → If all compensation succeeded:
+        → WorkflowContext(Workflow.Failed)
     → ObservabilityContext(Compensation metrics recorded)
 ```
 
@@ -219,10 +213,13 @@ WorkflowContext(Workflow.StepFailed)
 ```
 ExecutionContext(Task.Assigned)
     → ObservabilityContext(Cost.ReservationCreated with buffer)
-    → ExecutionContext(AgentSession.Started)
-    → Sidecar + Egress (token counting)
-    → ObservabilityContext(Cost.Recorded per batch)
-    → If invocation hard limit: kill process
-    → If team/tenant/org hard limit: cancel in-flight + reject new
-    → ObservabilityContext(Cost.Committed or Released)
+    → ObservabilityContext(CostLease.Created; shared-state gate for synchronous hard kill)
+    → ExecutionContext(AgentSession.Started + cost_lease_id)
+    → Sidecar + Egress (token counting) every 100ms
+    → ObservabilityContext(Cost.Recorded per batch; lease checked synchronously)
+    → If invocation limit: kill process (sync lease gate)
+    → If team/tenant/org limit: cancel in-flight via lease (sync hard kill)
+    → ObservabilityContext(CostLease.Released; Cost.Committed or Released)
 ```
+
+**Trust boundary**: The CostLease shared-state gate lives in Observability Context. Execution Context holds a lease token reference. The sidecar/egress proxy checks the lease synchronously on each metering tick; cancellation is immediate when lease expires or is revoked.

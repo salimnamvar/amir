@@ -1,0 +1,61 @@
+# EscalationSignal Contract Schema
+# First-class escalation signal that can inject into AgentSession or WorkflowInstance
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [signal_id, target_type, target_id, escalation_type]
+properties:
+  signal_id:
+    type: string
+    format: uuid
+    description: "Unique escalation identifier"
+
+  target_type:
+    type: string
+    enum: [agent_session, workflow_instance]
+    description: "What type of entity to escalate"
+
+  target_id:
+    type: string
+    format: uuid
+    description: "ID of the target entity"
+
+  escalation_type:
+    type: string
+    enum:
+      - compensation_blocked
+      - cost_limit_exceeded
+      - validation_failed
+      - slo_breach
+      - manual_trigger
+      - circuit_breaker_open
+    description: "Type of escalation trigger"
+
+  reason:
+    type: string
+    description: "Human-readable reason for escalation"
+
+  triggered_at:
+    type: string
+    format: date-time
+    description: "When escalation was triggered"
+
+  acknowledged_at:
+    type: string
+    format: date-time
+    description: "When human acknowledged (optional)"
+
+  acknowledged_by:
+    type: string
+    description: "Who acknowledged the escalation"
+
+  resolution:
+    type: string
+    enum: [pending, resumed, aborted, compensated]
+    default: "pending"
+    description: "Current resolution state"
+
+  resolution_notes:
+    type: string
+    description: "Notes on how the escalation was resolved"

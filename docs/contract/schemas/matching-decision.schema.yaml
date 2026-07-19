@@ -170,6 +170,17 @@ properties:
     default: false
     description: "True when historical metrics were carried from a prior agent version"
 
+  exploration_bonus:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Exploration boost applied for cold-start agents (invocation count < threshold or stale scorecard)"
+
+  exploration_reason:
+    type: string
+    enum: [cold_start, stale_scorecard, low_invocation_count]
+    description: "Why exploration bonus was applied"
+
   decided_at:
     type: string
     format: date-time

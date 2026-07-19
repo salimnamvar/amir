@@ -101,7 +101,15 @@ properties:
           type: string
         trigger:
           type: string
-          enum: [on_complete, on_approve, on_timeout, on_fail, on_compensate]
+          enum: [on_complete, on_approve, on_timeout, on_fail, on_compensate, on_compensation_blocked]
+
+  # Events for compensation lifecycle
+  events:
+    - Compensation.Started
+    - Compensation.Executed
+    - Compensation.Failed
+    - Compensation.Blocked  # Triggers human escalation
+    - Escalation.Signal
   
   # Compensation configuration
   compensation:
@@ -118,7 +126,14 @@ properties:
         type: integer
         minimum: 1
         default: 3
+      # Compensation failure handling:
+      # - continue_on_compensation_failure=false (default) causes COMPENSATION_BLOCKED state
+      # - COMPENSATION_BLOCKED triggers human escalation via EscalationSignal
       continue_on_compensation_failure:
         type: boolean
+        default: false
+        description: "If false, compensation failure blocks workflow and triggers human escalation"
+      escalation_on_blocked:
+        type: boolean
         default: true
-        description: "Continue compensating even if some actions fail"
+        description: "Emit EscalationSignal when entering COMPENSATION_BLOCKED state"

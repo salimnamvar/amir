@@ -46,7 +46,9 @@ So that I can validate the result
 
 Acceptance:
 - Control plane owns ParserRegistry strategy chain (not the agent)
-- Strategy order: structured_output → tool_call → markdown_block → workspace_observation → llm_coercion
+- Strategy order: structured_output → tool_call → markdown_block → workspace_observation
+- workspace_observation is the preferred ground-truth strategy for code changes
+- llm_coercion is NOT in the default chain; requires explicit human approval + higher scrutiny
 - free_text is not a control-plane output mode
 - Artifact validated against schema
 - Invalid output triggers feedback loop
@@ -178,7 +180,8 @@ Acceptance:
 ## Implementation Notes
 
 - AgentSession is the central runtime aggregate; AgentInvocation is a request DTO only
-- ParserRegistry with 5-strategy fallback chain (no single point of failure)
+- ParserRegistry with 4-strategy fallback chain (workspace_observation as ground truth)
+- llm_coercion requires explicit human approval + observation_method=synthesized when used
 - Workspace observation as ground truth (artifacts from git diff, not agent claims)
 - Circuit breaker per agent prevents cascading failures
 - PromptCompiler renders structured prompts for reproducibility

@@ -56,6 +56,10 @@ properties:
   budget:
     type: object
     properties:
+      hourly_usd_limit:
+        type: number
+        minimum: 0
+        description: "Per-team hourly budget for cost ceiling enforcement"
       daily_usd_limit:
         type: number
         minimum: 0
@@ -66,3 +70,37 @@ properties:
         type: integer
         minimum: 1
         default: 10
+
+  # Default scoring weights for agent matching (must sum to 1.0)
+  scoring_weights:
+    type: object
+    description: "Default weights for capability matching; sum must equal 1.0"
+    properties:
+      skill_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      language_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      tool_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      historical_success:
+        type: number
+        minimum: 0
+        maximum: 1
+      cost_efficiency:
+        type: number
+        minimum: 0
+        maximum: 1
+      latency:
+        type: number
+        minimum: 0
+        maximum: 1
+      availability:
+        type: number
+        minimum: 0
+        maximum: 1

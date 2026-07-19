@@ -82,6 +82,11 @@ properties:
     format: uuid
     description: "Reference to CompiledPrompt artifact"
 
+  cost_lease_id:
+    type: string
+    format: uuid
+    description: "CostLease reference for synchronous hard kill on budget breach"
+
   # Hard resource ceilings (structurally enforced)
   resource_limits:
     type: object
@@ -100,6 +105,9 @@ properties:
       - required: [max_tokens]
       - required: [max_usd]
   
+  # Checkpoints are retained; tool_calls and resource_usage are high-frequency data
+  # For long-running sessions, these are streamed as events and linked by ID
+  # rather than embedded, to keep session document lean.
   checkpoints:
     type: array
     items:
@@ -119,9 +127,11 @@ properties:
         workspace_snapshot:
           type: string
           description: "Git commit or tree hash at this checkpoint"
-  
+
+  # Recent tool calls retained inline for debugging; full history in ToolCallEvent stream
   tool_calls:
     type: array
+    maxItems: 100
     items:
       type: object
       required: [tool_call_id, tool_name, started_at, status]
@@ -174,9 +184,11 @@ properties:
     $ref: "feedback.schema.yaml"
   
   # Live metering (sidecar); not the durable CostRecord
+  # For long-running sessions, this is the latest snapshot; full history in CostRecord.
+  # CostLease cancellation check is synchronous on each metering tick.
   resource_usage:
     type: object
-    description: "Live usage meters; authoritative accounting is CostRecord"
+    description: "Latest usage snapshot; authoritative accounting is CostRecord. Checked against CostLease for synchronous hard kill."
     properties:
       tokens_consumed:
         type: integer

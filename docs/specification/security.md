@@ -264,6 +264,26 @@ SandboxAttestation:
 - `coding_standard` profile expands to LLM provider + common package registries (PyPI, npm, crates, Go proxy, etc.).
 - Security evaluates SandboxPolicy; Execution owns the Workspace aggregate.
 
+### Network Allowlist Merge Algorithm
+
+The effective network allowlist is computed as an **intersection** across three layers:
+
+```
+effective_allowlist = AgentDefinition.required_network ∩ SandboxPolicy.allowlist ∩ Role.required_network
+```
+
+Where:
+- **AgentDefinition.required_network** - declared capability needs (e.g., api.github.com)
+- **SandboxPolicy.allowlist** - tenant/team policy ceiling (enforced by Security Context)
+- **Role.required_network** - task-specific network requirements (hard filter)
+
+The intersection principle ensures:
+1. Agents cannot gain network access beyond their declared capabilities
+2. Security policies can only narrow, never broaden, access
+3. Role constraints are the minimum viable network footprint
+
+Workspace.security_context.network_allowlist records the computed effective allowlist after merge.
+
 ---
 
 ## Audit Trail
@@ -348,7 +368,7 @@ VerifiableAuditEvent:
 ## Addressing Audit Concerns
 
 ### CLI Parsing Reliability (All 17 Audits)
-ParserRegistry with 5-strategy fallback chain. Workspace observation as ground truth. LLM coercion as last resort.
+ParserRegistry with 4-strategy fallback chain (structured_output → tool_call → markdown_block → workspace_observation). Workspace observation as ground truth. LLM coercion requires explicit human approval + observation_method=synthesized.
 
 ### Agent Non-Determinism (All 17 Audits)
 AgentSession with full checkpointing and replay metadata. Circuit breaker prevents cascading failures.

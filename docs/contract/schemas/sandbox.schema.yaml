@@ -59,11 +59,24 @@ properties:
     description: "Preset expanded before enforcement; custom uses network_allowlist only"
   
   # Production constraint: docker runtime is invalid when environment=production
+  # Enforced via JSON Schema if/then (see below)
   environment:
     type: string
     enum: [development, staging, production]
     default: production
-    description: "deployment environment; production rejects runtime=docker"
+    description: "deployment environment"
+
+  # Structural enforcement: docker runtime prohibited in production
+  # Uses JSON Schema 2020-12 if/then conditional
+  if:
+    properties:
+      environment:
+        const: production
+  then:
+    properties:
+      runtime:
+        enum: [gvisor, firecracker]
+        description: "Production mandates gVisor or Firecracker; docker prohibited"
   
   # Resource limits
   resource_limits:

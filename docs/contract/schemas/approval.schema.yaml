@@ -38,8 +38,8 @@ properties:
   # Gate configuration
   auto_approve:
     type: boolean
-    default: true
-    description: "Whether this gate auto-approves"
+    default: false
+    description: "Whether this gate auto-approves; safe default requires explicit opt-in"
   
   timeout_seconds:
     type: integer

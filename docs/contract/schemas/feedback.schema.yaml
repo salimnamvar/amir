@@ -77,7 +77,9 @@ properties:
     format: uuid
     description: "ValidationResult that produced this feedback"
 
-  claim_divergence:
-    type: boolean
-    default: false
-    description: "True when failure was due to parser/agent claims disagreeing with workspace observation"
+  # Claim reconciliation reference (authoritative source is ValidationResult)
+  # When validation failure includes claim divergence, this references the canonical data.
+  claim_reconciliation_validation_id:
+    type: string
+    format: uuid
+    description: "Reference to ValidationResult.claim_reconciliation when workspace observation diverges from agent claims"

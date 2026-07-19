@@ -117,7 +117,29 @@ properties:
       - required: [max_tokens]
       - required: [max_usd]
 
+  # Validation/repair budget — partitioned from execution budget to prevent starvation
+  validation_budget:
+    type: object
+    description: "Budget reserved for validation feedback loop; separate from agent execution budget"
+    properties:
+      max_tokens:
+        type: integer
+        minimum: 1
+      max_usd:
+        type: number
+        minimum: 0
+      reservation_buffer_pct:
+        type: number
+        minimum: 0
+        maximum: 20
+        default: 5
+        description: "Buffer for validation chain retries"
+    anyOf:
+      - required: [max_tokens]
+      - required: [max_usd]
+
   # Retry policy (task-scoped attempt accounting — NOT a circuit breaker)
+  # retry_on values align with last_failure_category vocabulary for computable retry eligibility
   retry_policy:
     type: object
     properties:
@@ -137,7 +159,9 @@ properties:
         type: array
         items:
           type: string
-        default: ["FAILED", "TIMEOUT", "VALIDATION_FAILED"]
+          enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]
+        default: ["structural", "semantic", "policy", "quality", "timeout"]
+        description: "Failure categories that trigger retry; budget_exceeded excluded by default (escalate instead)"
       escalate_after:
         type: integer
         minimum: 1
@@ -159,7 +183,8 @@ properties:
         default: 0
       last_failure_category:
         type: string
-        enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled]
+        enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]
+        description: "Category of last failure; used for retry eligibility and routing decisions"
       last_session_id:
         type: string
         format: uuid
