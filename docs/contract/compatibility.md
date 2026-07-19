@@ -42,22 +42,13 @@ This means:
 | ValidationResultContract | N-1 minor | Changed error category enum, removed claim_reconciliation |
 | SandboxAttestationContract | N-1 minor | Changed signature algorithm, removed signing_key_ref |
 
-## First-Class Runtime Contracts
+## Contract Catalog
 
-| Contract Type | Schema | Purpose | Key Fields |
-|--------------|--------|---------|------------|
-| AgentSession | `agent-session.schema.yaml` | Durable execution aggregate | session_id, checkpoints, tool_calls, resource_limits, workspace_id |
-| AgentInvocation | `agent-invocation.schema.yaml` | Request DTO that creates a session | task_id, agent_definition_id, idempotency_key, resource_limits |
-| FeedbackArtifact | `feedback.schema.yaml` | Validation failure → re-invocation | error_context, corrections, suggested_strategy |
-| CostRecord | `cost-record.schema.yaml` | Multi-dimensional cost tracking | orchestration_cost_usd, worker_cost_usd, team_id |
-| MatchingDecision | `matching-decision.schema.yaml` | Agent selection audit | score, hard_filters, contract_negotiation, candidates |
-| CompiledPrompt | `compiled-prompt.schema.yaml` | Reproducible prompt artifact | template_hash, system_prompt, output_contract |
-| ValidationResult | `validation-result.schema.yaml` | Structured validation output | valid, validators, claim_reconciliation |
-| SandboxAttestation | `sandbox-attestation.schema.yaml` | Runtime integrity | image_hash, attestation_signature, signing_key_ref |
-| Workspace | `workspace.schema.yaml` | Per-session filesystem + durable effects | session_id, baseline_commit, durable_effects |
-| CostLease | `cost-lease.schema.yaml` | Sync hard-kill gate for hierarchical budgets | lease_id, cancelled, cancellation_reason, scope |
-| SecretBinding | `secret-binding.schema.yaml` | Ephemeral secret grants with TTL | binding_id, secret_ref, expires_at, access_method |
-| EscalationSignal | `escalation-signal.schema.yaml` | Human escalation (compensation blocked, cost, …) | escalation_type, target_type, target_id |
+Complete inventory (data schemas, SQL DDL, interfaces) lives in:
+
+**[`docs/contract/README.md`](README.md)**
+
+Do not restate field lists here. This file is **versioning policy only**.
 
 ## Breaking Change Rules
 

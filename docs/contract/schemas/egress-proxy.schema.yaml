@@ -1,0 +1,36 @@
+# EgressProxy Contract Schema
+# Mandatory network egress control-plane configuration
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [listen_address, domain_allowlist]
+properties:
+  listen_address:
+    type: string
+    default: "127.0.0.1:8443"
+  tls:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      ca_ref:
+        type: string
+  domain_allowlist:
+    type: array
+    items:
+      type: string
+    description: "Effective allowlist after profile expansion + intersection merge"
+  token_counting:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+  secret_scrubbing:
+    type: boolean
+    default: true
+  mtls_required:
+    type: boolean
+    default: true

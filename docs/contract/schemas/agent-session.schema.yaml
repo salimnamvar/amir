@@ -131,22 +131,7 @@ properties:
     maxItems: 20
     description: "Recent checkpoint samples only; not the full history"
     items:
-      type: object
-      required: [checkpoint_id, state, timestamp]
-      properties:
-        checkpoint_id:
-          type: string
-          format: uuid
-        state:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-        payload:
-          type: object
-        workspace_snapshot:
-          type: string
-          description: "Git commit or tree hash at this checkpoint"
+      $ref: "checkpoint.schema.yaml"
 
   # Recent tool-call samples only; full history is ToolCallEvent stream
   tool_calls:
@@ -154,27 +139,7 @@ properties:
     maxItems: 50
     description: "Ring buffer of recent tool calls for debugging; full history in event stream"
     items:
-      type: object
-      required: [tool_call_id, tool_name, started_at, status]
-      properties:
-        tool_call_id:
-          type: string
-          format: uuid
-        tool_name:
-          type: string
-        tool_input:
-          type: object
-        tool_output:
-          type: object
-        started_at:
-          type: string
-          format: date-time
-        completed_at:
-          type: string
-          format: date-time
-        status:
-          type: string
-          enum: [running, completed, failed]
+      $ref: "tool-call.schema.yaml"
 
   tool_call_event_stream_ref:
     type: string
@@ -232,24 +197,7 @@ properties:
     description: "Authoritative CostRecord in Observability Context"
   
   replay_metadata:
-    type: object
-    properties:
-      model_identifier:
-        type: string
-      prompt_hash:
-        type: string
-        description: "SHA256 of compiled prompt"
-      full_prompt:
-        type: string
-      seed:
-        type: integer
-      sandbox_profile_hash:
-        type: string
-      agent_version:
-        type: string
-      adapter_type:
-        type: string
-        enum: [cli, mcp, api, remote]
+    $ref: "replay-metadata.schema.yaml"
   
   started_at:
     type: string

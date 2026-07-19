@@ -1,5 +1,15 @@
 # Architecture Principles
 
+## 0. Contracts vs Documentation
+
+| Artifact | Format / location | Authority for |
+|----------|-------------------|---------------|
+| Contracts | `docs/contract/` (JSON Schema YAML, SQL, interface YAML) | Structure, storage, interfaces |
+| Specification | `docs/specification/*.md` | Behavior, flows, ownership |
+| Stories | `docs/story/*.md` | Acceptance criteria |
+
+Documents **link** to contracts. They must not embed or redefine schemas, DDL, or field inventories. See [`docs/contract/README.md`](../contract/README.md).
+
 ## 1. Clean Architecture / Hexagonal Architecture
 
 Amir follows Clean Architecture principles with explicit boundaries:

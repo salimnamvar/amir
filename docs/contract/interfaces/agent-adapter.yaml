@@ -1,0 +1,44 @@
+# Agent Adapter Interface Contract
+# Behavioral interface for external agent adapters (not a data entity)
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/interfaces/agent-adapter"
+
+type: object
+required: [interface, methods]
+properties:
+  interface:
+    const: AgentAdapter
+  methods:
+    type: array
+    items:
+      type: object
+      required: [name, purpose]
+      properties:
+        name:
+          type: string
+          enum:
+            - start
+            - pump
+            - respond_input
+            - inject_feedback
+            - cancel
+            - health
+        purpose:
+          type: string
+        inputs:
+          type: array
+          items:
+            type: string
+        outputs:
+          type: array
+          items:
+            type: string
+
+# Canonical method semantics (authority for implementers):
+# start(session, compiled_prompt, sandbox) -> handle
+# pump(handle) -> event stream chunks: output_chunk | tool_call | needs_input | completed | failed | timed_out
+# respond_input(handle, text) -> void  (only when waiting_for_input)
+# inject_feedback(handle, feedback_artifact) -> void
+# cancel(handle) -> void  (SIGTERM then SIGKILL best-effort)
+# health() -> healthy | degraded | unhealthy

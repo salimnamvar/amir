@@ -83,6 +83,16 @@ Prior round fully accepted foundations remain in force: AgentSession state machi
 
 ---
 
+## Contract vs Documentation Separation
+
+| Layer | Location | Role |
+|-------|----------|------|
+| **Contracts** | `docs/contract/` | Sole authority for structure (JSON Schema YAML, SQL DDL, interface YAML) |
+| **Specification** | `docs/specification/` | Behavior, flows, principles, ownership — **references** contracts |
+| **Stories** | `docs/story/` | User-facing acceptance criteria — **references** contracts |
+
+**Rules:** Markdown must not embed full schemas, DDL, or field dumps. Catalog: [`docs/contract/README.md`](../contract/README.md).
+
 ## Specification Status
 
 **Status:** `COMPLETE_AND_CONSISTENT` (v2.1.1)
@@ -127,6 +137,17 @@ Hardened relative to v2.0.0 / residual v2.1.0 gaps:
 | SecretBinding | Formal schema retained and referenced in contracts matrix |
 | Prose contradictions (5-strategy, etc.) | Aligned vision, system-boundary, agent, security, stories |
 
+### Separation of Concerns (Contracts vs Documents)
+
+All structural definitions now live only under `docs/contract/`:
+
+- **Data:** `schemas/*.schema.yaml` (JSON Schema)
+- **Database:** `sql/*.sql`
+- **Interfaces:** `interfaces/*.yaml`
+- **Catalog:** `docs/contract/README.md`
+
+Specification and story markdown **reference** contracts; they no longer embed schemas, DDL, or field inventories.
+
 ### What Was Deliberately Left Unchanged (and Why)
 
 | Item | Why unchanged |
@@ -135,16 +156,18 @@ Hardened relative to v2.0.0 / residual v2.1.0 gaps:
 | Full Memory aggregate / LearningEngine | Out of scope; scorecard + exploration is sufficient for routing cold-start |
 | Temporal as mandatory engine | Interface seam only; durability via event-sourced WorkflowInstance |
 | Firecracker / eBPF mandatory | Optional max-security / hardening; gVisor remains production default |
-| AgentScorecard as separate JSON Schema file | Read model fully specified in agent/observability; MatchingDecision already contracts scoring outputs |
 | PromptTemplate formal schema | Integrity via `template_hash` on CompiledPrompt; template structure is config, not runtime contract |
 | Merkle global sequence redesign | Per-aggregate chaining is production-viable; global sequence optimization is implementation detail |
 | Opening the protocol | Internal coherence first |
 | FS snapshot compensation as required | Durable git/PR/artifact effects remain the compensation target |
+| Algorithm pseudocode in specs | Behavior documentation (not structure); must not restate field lists |
 
 ---
 
 ## Quick Links
 
+- [**Contract catalog**](../contract/README.md) — schemas, SQL, interfaces
+- [Compatibility policy](../contract/compatibility.md)
 - [Vision & Goals](vision.md)
 - [Architecture Principles](principles.md)
 - [Bounded Contexts](context.md)

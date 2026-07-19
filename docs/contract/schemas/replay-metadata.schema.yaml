@@ -1,0 +1,31 @@
+# ReplayMetadata Contract Schema
+# Material required to reproduce an AgentSession execution
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [session_id, model_identifier, prompt_hash, agent_version]
+properties:
+  session_id:
+    type: string
+    format: uuid
+  model_identifier:
+    type: string
+  prompt_hash:
+    type: string
+    description: "SHA256 of compiled prompt"
+  full_prompt:
+    type: string
+    description: "Optional full prompt body (may live in object storage)"
+  seed:
+    type: integer
+  sandbox_profile_hash:
+    type: string
+  agent_version:
+    type: string
+  adapter_type:
+    type: string
+    enum: [cli, mcp, api, remote]
+  tool_call_stream_ref:
+    type: string
+    description: "Reference to full tool-call history (not inline)"

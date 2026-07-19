@@ -57,87 +57,42 @@ Pending → Starting → Running → WaitingForInput
 
 ### AgentSession Aggregate (Lean Document)
 
+> **Contract:** [`docs/contract/schemas/agent-session.schema.yaml`](../contract/schemas/agent-session.schema.yaml)
+
 AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry.
-Keep the session document lean for long-running sessions:
 
 | Concern | On session document | Authoritative store |
 |---------|---------------------|---------------------|
-| Identity, status, limits, refs | Yes | Session row |
-| Checkpoints (full history) | `recent_checkpoint_ids` ring (≤20) | `checkpoints` table + `AgentSession.Checkpoint` events |
-| Tool calls (full history) | Recent ring (≤50) | Tool-call event stream |
-| Live meters | Latest `resource_usage` snapshot only | `CostRecord` + `Cost.Recorded` |
-| Validation / feedback | IDs + optional last result | `ValidationResult` / `FeedbackArtifact` contracts |
-| Cost hard kill | `cost_lease_id` | `CostLease` (Observability) |
-
-```
-AgentSession (Aggregate Root — lean)
-├── session_id: UUID (idempotency key)
-├── task_id: UUID
-├── agent_definition_id: UUID
-├── matching_decision_id: UUID
-├── attempt_number: int
-├── previous_session_id: UUID | None (for feedback chain)
-├── status: SessionStatus
-├── workspace_id: UUID
-├── sandbox_id: UUID
-├── sandbox_attestation_id: UUID
-├── compiled_prompt_id: UUID
-├── cost_lease_id: UUID
-├── resource_limits: ResourceLimits  # anyOf max_tokens | max_usd
-├── recent_checkpoint_ids: list[UUID]  # ring ≤20; full history in events/table
-├── tool_calls: list[ToolCall]         # ring ≤50; full history in event stream
-├── pending_input: PendingInput | None
-├── validation_result_id: UUID | None
-├── feedback_artifact: FeedbackArtifact | None  # last feedback only
-├── resource_usage: ResourceUsage               # latest snapshot only
-├── cost_record_id: UUID
-└── replay_metadata: ReplayMetadata
-```
+| Identity, status, limits, refs | Yes | Session row / agent-session contract |
+| Checkpoints (full history) | Recent IDs only | [`checkpoint.schema.yaml`](../contract/schemas/checkpoint.schema.yaml) + SQL |
+| Tool calls (full history) | Recent ring only | [`tool-call.schema.yaml`](../contract/schemas/tool-call.schema.yaml) + stream |
+| Live meters | Latest snapshot | [`cost-record.schema.yaml`](../contract/schemas/cost-record.schema.yaml) |
+| Validation / feedback | IDs | validation-result / feedback contracts |
+| Cost hard kill | `cost_lease_id` | [`cost-lease.schema.yaml`](../contract/schemas/cost-lease.schema.yaml) |
 
 ### Checkpoint
 
 Every significant state change is recorded as an immutable checkpoint:
 
-```python
-class Checkpoint(BaseModel):
-    checkpoint_id: UUID
-    session_id: UUID
-    state: SessionStatus
-    timestamp: datetime
-    payload: dict[str, Any]  # State-specific data
-    workspace_snapshot: str  # Git commit hash at this point
-```
+
+> **Contract:** [`docs/contract/schemas/checkpoint.schema.yaml`](../contract/schemas/checkpoint.schema.yaml)
+
 
 ### ToolCall
 
 Tracks agent tool usage for debugging and replay:
 
-```python
-class ToolCall(BaseModel):
-    tool_call_id: UUID
-    session_id: UUID
-    tool_name: str
-    tool_input: dict
-    tool_output: dict | None
-    started_at: datetime
-    completed_at: datetime | None
-    status: str  # running | completed | failed
-```
+
+> **Contract:** [`docs/contract/schemas/tool-call.schema.yaml`](../contract/schemas/tool-call.schema.yaml)
+
 
 ### ReplayMetadata
 
 Enables exact reproduction of agent execution:
 
-```python
-class ReplayMetadata(BaseModel):
-    model_identifier: str
-    prompt_hash: str  # SHA256 of compiled prompt
-    full_prompt: str
-    seed: int | None
-    tool_calls: list[ToolCall]
-    sandbox_profile_hash: str
-    agent_version: str
-```
+
+> **Contract:** [`docs/contract/schemas/replay-metadata.schema.yaml`](../contract/schemas/replay-metadata.schema.yaml)
+
 
 ## Adapter / Runtime Boundary
 
@@ -158,59 +113,8 @@ CLI agents are unreliable: they may hang on interactive prompts, rewrite history
 
 ### AgentAdapter Interface
 
-```python
-class AgentAdapter(ABC):
-    """Boundary between Amir runtime and an external agent process/API."""
+> **Interface contract:** [`docs/contract/interfaces/agent-adapter.yaml`](../contract/interfaces/agent-adapter.yaml)
 
-    @abstractmethod
-    async def start_session(self, session: AgentSession, prompt: CompiledPrompt) -> None:
-        """Spawn or attach agent. Non-blocking. Must record sandbox_attestation_id."""
-        pass
-
-    @abstractmethod
-    async def pump(self, session_id: UUID) -> AdapterEvent:
-        """
-        Drive the agent until the next control-plane event:
-        - output_chunk | tool_call | needs_input | completed | failed | timed_out
-        """
-        pass
-
-    @abstractmethod
-    async def respond_input(self, session_id: UUID, response: str) -> None:
-        """Answer an interactive prompt when status=waiting_for_input."""
-        pass
-
-    @abstractmethod
-    async def inject_feedback(self, session_id: UUID, feedback: FeedbackArtifact) -> None:
-        """
-        For multi-turn adapters: inject corrections into the live conversation.
-        For single-turn CLI: no-op; control plane starts a new session with feedback compiled in.
-        """
-        pass
-
-    @abstractmethod
-    async def cancel(self, session_id: UUID) -> None:
-        """Cancel running session. Best-effort SIGTERM then SIGKILL."""
-        pass
-
-    @abstractmethod
-    async def get_raw_output(self, session_id: UUID) -> RawAgentOutput:
-        """Return captured stdout/stderr/tool stream for OutputParser."""
-        pass
-
-    @abstractmethod
-    def supports_contract(self, contract_type: str, version: str) -> bool:
-        pass
-
-    @abstractmethod
-    def supports_output_mode(self, mode: OutputMode) -> bool:
-        pass
-
-    @abstractmethod
-    def map_native_session(self, session_id: UUID) -> str | None:
-        """Optional native agent session/conversation id for continuity."""
-        pass
-```
 
 ### Interactive Prompt Protocol
 
@@ -235,24 +139,9 @@ The PromptCompiler is Amir's interface to LLMs. It takes structured contracts an
 
 ### CompiledPrompt Artifact
 
-```yaml
-CompiledPrompt:
-  prompt_id: UUID
-  version: str  # SemVer
-  template_hash: str  # SHA256 of template + inputs
-  system_prompt: str
-  user_prompt: str
-  output_contract:
-    type: str
-    version: str
-    json_schema: str  # Embedded schema for structured output
-  tools_allowed: list[str]
-  context_budget: int  # Max tokens for context
-  metadata:
-    role_name: str
-    task_id: str
-    agent_definition_id: str
-```
+
+> **Contract:** [`docs/contract/schemas/compiled-prompt.schema.yaml`](../contract/schemas/compiled-prompt.schema.yaml)
+
 
 ### Prompt Compilation Process
 
@@ -274,37 +163,15 @@ The ParserRegistry manages versioned extraction strategies. Each strategy is ind
 
 ### ParserRegistry Interface
 
-```python
-class ParserRegistry(ABC):
-    """Registry of output extraction strategies."""
-    
-    @abstractmethod
-    def get_parser(self, agent_adapter_type: str, output_mode: OutputMode) -> OutputParser:
-        """Get appropriate parser for agent type and output mode."""
-        pass
-    
-    @abstractmethod
-    def register_parser(self, agent_adapter_type: str, output_mode: OutputMode, parser: OutputParser) -> None:
-        """Register a new parser strategy."""
-        pass
-```
+
+> **Interface contract:** [`docs/contract/interfaces/parser-registry.yaml`](../contract/interfaces/parser-registry.yaml)
+
 
 ### OutputParser Interface
 
-```python
-class OutputParser(ABC):
-    """Single extraction strategy."""
-    
-    @abstractmethod
-    def parse(self, raw_output: RawAgentOutput, expected_contract: ContractType) -> ParseResult:
-        """Attempt to extract structured artifact from raw output."""
-        pass
-    
-    @abstractmethod
-    def can_handle(self, raw_output: RawAgentOutput) -> float:
-        """Return confidence score (0.0-1.0) that this parser can handle the output."""
-        pass
-```
+
+> **Interface contract:** [`docs/contract/interfaces/parser-registry.yaml`](../contract/interfaces/parser-registry.yaml)
+
 
 ### Strategy Chain (Fallback Order)
 
@@ -355,14 +222,9 @@ Parser strategy is a **state machine owned by the control plane**, never by the 
 
 Agents declare supported output modes. Control plane selects best available. **`free_text` is not a control-plane mode** — unstructured stdout may still arrive, but extraction falls through the default strategy chain (markdown → workspace → reject). Coercion is never automatic.
 
-```yaml
-OutputMode:
-  enum:
-    - json_schema            # Agent enforces JSON Schema compliance
-    - tool_use               # Agent uses submit_artifact tool
-    - markdown_yaml          # Agent wraps output in markdown code blocks
-    - workspace_observation  # Prefer filesystem derivation (coding tasks)
-```
+
+> **Contract:** [`docs/contract/schemas/agent.schema.yaml#supported_output_modes`](../contract/schemas/agent.schema.yaml#supported_output_modes)
+
 
 ## Workspace Observation Layer
 
@@ -483,78 +345,15 @@ If `validation_budget` is omitted, platform reserves a default share (e.g. 10% o
 
 ### ValidationResult Contract
 
-```yaml
-ValidationResult:
-  type: object
-  required: [valid, error_categories]
-  properties:
-    valid:
-      type: boolean
-    error_categories:
-      type: array
-      items:
-        type: object
-        required: [category, code, message]
-        properties:
-          category:
-            type: string
-            enum: [structural, semantic, policy, quality]
-          code:
-            type: string
-            description: "Machine-readable error code"
-          message:
-            type: string
-            description: "Human-readable error description"
-          path:
-            type: string
-            description: "JSON path to offending field"
-          severity:
-            type: string
-            enum: [error, warning, info]
-    warnings:
-      type: array
-      items:
-        type: string
-    validation_duration_ms:
-      type: integer
-```
+
+> **Contract:** [`docs/contract/schemas/validation-result.schema.yaml`](../contract/schemas/validation-result.schema.yaml)
+
 
 ### FeedbackArtifact Contract
 
-```yaml
-FeedbackArtifact:
-  type: object
-  required: [error_context, attempt_number, max_attempts]
-  properties:
-    error_context:
-      type: string
-      description: "What went wrong in the previous attempt"
-    corrections:
-      type: array
-      items:
-        type: string
-      description: "Specific suggestions for correction"
-    suggested_strategy:
-      type: string
-      enum: [retry_same, retry_different_agent, apply_corrections, human_intervention]
-      description: "Recommended next action"
-    previous_raw_output:
-      type: string
-      description: "Agent's raw output for context"
-    previous_artifact:
-      type: object
-      description: "Previous attempt's artifact (if any)"
-    attempt_number:
-      type: integer
-      minimum: 1
-    max_attempts:
-      type: integer
-      minimum: 1
-    feedback_strategy:
-      type: string
-      enum: [structural_hint, semantic_hint, strategy_change, agent_change]
-      description: "Type of feedback to inject"
-```
+
+> **Contract:** [`docs/contract/schemas/feedback.schema.yaml`](../contract/schemas/feedback.schema.yaml)
+
 
 ## Agent Scorecard
 
@@ -562,61 +361,10 @@ Historical performance metrics that feed the capability scoring algorithm.
 
 ### AgentScorecard Aggregate
 
-```
-AgentScorecard (Read Model, derived from events)
-├── agent_definition_id: UUID
-├── total_invocations: int
-├── successful_invocations: int
-├── failed_invocations: int
-├── success_rate: float  # 0.0-1.0
-├── avg_cost_usd: float
-├── avg_duration_seconds: float
-├── p95_duration_seconds: float
-├── avg_tokens_consumed: int
-├── failure_patterns: list[FailurePattern]
-├── last_10_results: list[ValidationResult]
-├── circuit_breaker: CircuitBreakerState
-└── last_updated: datetime
-```
-
-### FailurePattern
-
-```yaml
-FailurePattern:
-  type: object
-  properties:
-    error_code:
-      type: string
-    count:
-      type: integer
-    last_seen:
-      type: string
-      format: date-time
-    avg_recovery_attempts:
-      type: integer
-```
-
-### CircuitBreakerState
-
-```yaml
-CircuitBreakerState:
-  type: object
-  properties:
-    state:
-      type: string
-      enum: [closed, open, half_open]
-    consecutive_failures:
-      type: integer
-    last_failure_at:
-      type: string
-      format: date-time
-    recovery_timeout_seconds:
-      type: integer
-      default: 300
-    half_open_max_attempts:
-      type: integer
-      default: 1
-```
+> **Contracts:**
+> - Scorecard: [`agent-scorecard.schema.yaml`](../contract/schemas/agent-scorecard.schema.yaml)
+> - Circuit breaker (agent-scoped only): [`circuit-breaker-state.schema.yaml`](../contract/schemas/circuit-breaker-state.schema.yaml)
+> - Storage: [`sql/observability.sql`](../contract/sql/observability.sql)
 
 ## Agent Execution Sidecar
 
@@ -718,30 +466,7 @@ Exploration never bypasses hard filters (circuit breaker open, missing tools, bu
 
 ### MatchingDecision Artifact
 
-Full schema: `docs/contract/schemas/matching-decision.schema.yaml`.
-
-```yaml
-MatchingDecision:
-  decision_id: UUID
-  task_id: UUID
-  selected_agent_id: UUID
-  score: float  # 0.0-1.0
-  dimension_scores: dict
-  hard_filters:
-    passed: bool
-    rejected_agents: list[{agent_id, reason}]
-  contract_negotiation:
-    negotiated_version: str
-    compatible: bool
-    fallback_used: bool
-  candidates: list[{agent_id, score, rank, eliminated_reason?}]
-  explanation: str
-  projected_cost_usd: float
-  projected_latency_seconds: float
-  scorecard_staleness_seconds: int | null
-  exploration_bonus: float | null
-  exploration_reason: cold_start | stale_scorecard | low_invocation_count | null
-```
+> **Contract:** [`docs/contract/schemas/matching-decision.schema.yaml`](../contract/schemas/matching-decision.schema.yaml)
 
 ## Sandbox Manager
 

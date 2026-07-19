@@ -1,0 +1,73 @@
+# AgentScorecard Contract Schema
+# Observability read model for routing, circuit breaking, and warm-start
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [agent_definition_id, period, total_invocations, success_rate, circuit_breaker]
+properties:
+  agent_definition_id:
+    type: string
+    format: uuid
+  agent_name:
+    type: string
+    description: "Stable name used for version warm-start matching"
+  agent_version:
+    type: string
+  period:
+    type: string
+    description: "Aggregation period key (e.g. 2026-W12, all-time, rolling_30d)"
+  total_invocations:
+    type: integer
+    minimum: 0
+  successful_invocations:
+    type: integer
+    minimum: 0
+  failed_invocations:
+    type: integer
+    minimum: 0
+  success_rate:
+    type: number
+    minimum: 0
+    maximum: 1
+  avg_cost_usd:
+    type: number
+    minimum: 0
+  p95_cost_usd:
+    type: number
+    minimum: 0
+  avg_duration_seconds:
+    type: number
+    minimum: 0
+  p95_duration_seconds:
+    type: number
+    minimum: 0
+  avg_tokens_consumed:
+    type: integer
+    minimum: 0
+  failure_patterns:
+    type: array
+    items:
+      type: object
+      required: [error_code, count]
+      properties:
+        error_code:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        last_seen:
+          type: string
+          format: date-time
+        avg_recovery_attempts:
+          type: integer
+          minimum: 0
+  circuit_breaker:
+    $ref: "circuit-breaker-state.schema.yaml"
+  warm_started:
+    type: boolean
+    default: false
+    description: "True when metrics inherited from a prior agent version"
+  last_updated:
+    type: string
+    format: date-time

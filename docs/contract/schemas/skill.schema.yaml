@@ -1,0 +1,25 @@
+# Skill Contract Schema
+# Hierarchical skill taxonomy entry for capability matching
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [skill]
+properties:
+  skill:
+    type: string
+    pattern: "^[a-z][a-z0-9.-]*$"
+    description: "Dot-notation skill id (e.g. code.generate.python.fastapi)"
+  version:
+    type: string
+  output_contracts:
+    type: array
+    items:
+      type: string
+  required_tools:
+    type: array
+    items:
+      type: string
+  eval_suite_ref:
+    type: string
+    description: "Reference to evaluation suite for this skill"

@@ -6,28 +6,10 @@ Events in Amir are immutable facts representing state changes and business occur
 
 ## Domain Event Envelope
 
-```python
-from datetime import datetime
-from uuid import UUID, uuid4
-from typing import Any
+> **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
 
-class DomainEvent(BaseModel):
-    """Standard envelope for all domain events."""
-    
-    event_id: UUID = Field(default_factory=uuid4)
-    event_type: str
-    aggregate_id: UUID
-    aggregate_type: str
-    correlation_id: UUID
-    causation_id: UUID
-    producer: str
-    version: str = "1.0.0"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    payload: dict[str, Any]
-    signature: str = ""  # Cryptographic signature
-    sequence: int = 0    # Monotonic sequence for hash chain
-    prev_hash: str = ""  # SHA256 of previous event
-```
+Events are Merkle-chained (`sequence`, `prev_hash`, optional `signature` / `key_ref`). W3C `traceparent` / `tracestate` may be present.
+
 
 ## Event Taxonomy
 
@@ -180,51 +162,18 @@ Verification: recompute hash chain from first event. Any tampering breaks the ch
 
 Events are published via outbox for reliable delivery:
 
-```python
-class OutboxEventPublisher(EventPublisher):
-    """Publish events via outbox table."""
-    
-    async def publish(self, event: DomainEvent) -> None:
-        # Write to outbox (same transaction as state change)
-        await self.db.insert("outbox_entries", {
-            "event_type": event.event_type,
-            "aggregate_id": event.aggregate_id,
-            "payload": event.model_dump(),
-            "idempotency_key": event.event_id,
-            "created_at": datetime.utcnow()
-        })
-```
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+
 
 ### File-Based Publisher (Fallback)
 
-```python
-class FileEventPublisher(EventPublisher):
-    """Default event publisher to JSONL file."""
-    
-    def __init__(self, path: str):
-        self.path = path
-    
-    async def publish(self, event: DomainEvent) -> None:
-        with open(self.path, "a") as f:
-            f.write(event.model_dump_json() + "\n")
-```
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+
 
 ### Message Queue Publisher (Alternative)
 
-```python
-class MQEventPublisher(EventPublisher):
-    """Alternative publisher for distributed deployments."""
-    
-    def __init__(self, connection: Connection):
-        self.connection = connection
-    
-    async def publish(self, event: DomainEvent) -> None:
-        channel = await self.connection.channel()
-        await channel.default_exchange.publish(
-            routing_key=f"amir.{event.aggregate_type.lower()}s",
-            body=event.model_dump_json()
-        )
-```
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+
 
 ## Event Retention Policies
 

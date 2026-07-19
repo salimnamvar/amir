@@ -1,0 +1,30 @@
+# WorkflowEngine Interface Contract
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/interfaces/workflow-engine"
+
+type: object
+required: [interface, methods]
+properties:
+  interface:
+    const: WorkflowEngine
+  methods:
+    type: array
+    items:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          enum:
+            - CreateWorkflow
+            - ExecuteStep
+            - WaitForSignal
+            - CompleteWorkflow
+            - GetState
+            - FailWorkflow
+            - CompensateWorkflow
+            - RegisterSignalHandler
+            - ResumeWorkflow
+        purpose:
+          type: string

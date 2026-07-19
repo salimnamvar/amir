@@ -1,0 +1,29 @@
+# ToolCall Contract Schema
+# Single tool invocation record (event stream / table row)
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [tool_call_id, session_id, tool_name, started_at, status]
+properties:
+  tool_call_id:
+    type: string
+    format: uuid
+  session_id:
+    type: string
+    format: uuid
+  tool_name:
+    type: string
+  tool_input:
+    type: object
+  tool_output:
+    type: object
+  started_at:
+    type: string
+    format: date-time
+  completed_at:
+    type: string
+    format: date-time
+  status:
+    type: string
+    enum: [running, completed, failed]

@@ -1,0 +1,37 @@
+# ParserRegistry / OutputParser Interface Contract
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/interfaces/parser-registry"
+
+type: object
+required: [interface, default_strategy_chain, methods]
+properties:
+  interface:
+    const: ParserRegistry
+  default_strategy_chain:
+    type: array
+    description: "Default ordered strategies; llm_coercion is NOT included"
+    items:
+      type: string
+      enum:
+        - structured_output
+        - tool_call_interception
+        - markdown_block
+        - workspace_observation
+    minItems: 4
+    maxItems: 4
+  optional_strategies:
+    type: array
+    items:
+      type: string
+      enum: [llm_coercion]
+    description: "Opt-in only; requires human Approval and observation_method=synthesized"
+  methods:
+    type: array
+    items:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          enum: [get_parser, register_parser, parse, can_handle]

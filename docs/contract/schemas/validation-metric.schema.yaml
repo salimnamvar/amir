@@ -1,0 +1,36 @@
+# ValidationMetric Contract Schema
+# Pipeline performance metrics for a validation run
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [session_id, parser_strategy_used, structural_valid]
+properties:
+  session_id:
+    type: string
+    format: uuid
+  validation_result_id:
+    type: string
+    format: uuid
+  parser_strategy_used:
+    type: string
+    enum:
+      - structured_output
+      - tool_call_interception
+      - markdown_block
+      - workspace_observation
+      - llm_coercion
+  parser_attempts:
+    type: integer
+    minimum: 0
+  structural_valid:
+    type: boolean
+  semantic_valid:
+    type: boolean
+  validation_duration_ms:
+    type: integer
+    minimum: 0
+  feedback_generated:
+    type: boolean
+  retry_triggered:
+    type: boolean

@@ -60,36 +60,17 @@ Every agent runs in complete isolation with:
 
 ### Authorization
 
-```python
-class AccessPolicy(BaseModel):
-    """Static or dynamic policy definition."""
-    id: UUID
-    resource: str
-    action: str
-    subject: str
-    effect: str  # allow | deny
-    conditions: dict = {}  # Optional conditions
-```
+
+> **Contract:** [`docs/contract/schemas/access-policy.schema.yaml`](../contract/schemas/access-policy.schema.yaml)
+
 
 ### Pluggable Policy Engine
 
 Static AllowDeny rules are the default. OPA/Rego available as extension:
 
-```yaml
-PolicyEngine:
-  type: object
-  properties:
-    engine_type:
-      type: string
-      enum: [static, opa]
-      default: "static"
-    rules_path:
-      type: string
-      description: "Path to OPA/Rego rules (if engine_type=opa)"
-    evaluation_timeout_ms:
-      type: integer
-      default: 100
-```
+
+> **Contract:** [`docs/contract/schemas/policy-engine.schema.yaml`](../contract/schemas/policy-engine.schema.yaml)
+
 
 Policy evaluation occurs at:
 - Task assignment (can this agent handle this task?)
@@ -109,23 +90,9 @@ Policy evaluation occurs at:
 
 ### Sandbox Configuration
 
-```yaml
-SandboxConfig:
-  runtime: string  # gvisor (default) | firecracker | docker (dev only)
-  user: 65534      # non-root (MUST)
-  read_only_root: true  # (MUST)
-  tmpfs_workspaces: true
-  network_mode: string  # proxy (default) | none
-  network_allowlist: list[string]
-  resource_limits:
-    cpus: float
-    memory: string
-    pids_limit: int
-  security_profile: string  # baseline | hardened
-  attestation:
-    enabled: bool
-    signing_key_ref: string
-```
+
+> **Contract:** [`docs/contract/schemas/sandbox.schema.yaml`](../contract/schemas/sandbox.schema.yaml)
+
 
 ### network_mode: host REMOVED
 
@@ -138,31 +105,9 @@ The `host` network mode has been eliminated. All outbound traffic routes through
 
 All agent network traffic routes through the Amir egress proxy:
 
-```yaml
-EgressProxy:
-  type: object
-  properties:
-    listen_address:
-      type: string
-      default: "127.0.0.1:8443"
-    tls:
-      enabled: boolean
-      ca_ref: string
-    domain_allowlist:
-      type: array
-      items:
-        type: string
-      description: "Allowed outbound domains (CIDR for IPs)"
-    token_counting:
-      enabled: boolean
-      description: "Count tokens for cost attribution"
-    secret_scrubbing:
-      enabled: boolean
-      description: "Scrub PII/secrets from outbound traffic"
-    audit_logging:
-      enabled: boolean
-      description: "Log all outbound requests"
-```
+
+> **Contract:** [`docs/contract/schemas/egress-proxy.schema.yaml`](../contract/schemas/egress-proxy.schema.yaml)
+
 
 ### Agent API Key Routing
 
@@ -200,51 +145,15 @@ LLM Provider
 
 ### Secret Injection
 
-```python
-class SecretBroker:
-    """Just-in-time secret injection."""
-    
-    async def inject_for_task(self, task: Task) -> SecretBindings:
-        """Fetch secrets from vault and prepare for sandbox."""
-        secrets = await self.vault.fetch(task.secret_paths)
-        bindings = SecretBindings(
-            task_id=task.id,
-            secrets=secrets,
-            ttl=task.resource_limits.timeout_seconds
-        )
-        return bindings
-    
-    def mount_in_sandbox(self, sandbox_id: UUID, bindings: SecretBindings) -> None:
-        """Mount secrets as tmpfs in sandbox."""
-        # Write to memory-only filesystem
-        # Secrets available at /secrets/<name>
-        # Automatically cleaned on sandbox destroy
-        # TTL-based revocation
-```
+> **Contract:** [`docs/contract/schemas/secret-binding.schema.yaml`](../contract/schemas/secret-binding.schema.yaml)
+
+SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/proxy, and revokes on session end. Storage: [`sql/security.sql`](../contract/sql/security.sql).
+
 
 ### Runtime Attestation
 
-Sandbox integrity verified via signed attestation. Full schema: `docs/contract/schemas/sandbox-attestation.schema.yaml`.
+> **Contract:** [`docs/contract/schemas/sandbox-attestation.schema.yaml`](../contract/schemas/sandbox-attestation.schema.yaml)
 
-```yaml
-SandboxAttestation:
-  attestation_id: UUID
-  session_id: UUID
-  sandbox_id: UUID
-  runtime: gvisor | firecracker   # docker not attestable in production
-  image_hash: str
-  sandbox_profile_hash: str
-  network_mode: proxy | none
-  attestation_signature: str
-  signing_key_ref: str            # kms://... never embed private keys
-  signature_algorithm: ed25519
-  key_lifecycle:
-    key_id: str
-    rotated_at: datetime | null
-    previous_key_ref: str | null  # dual-valid verification window
-    compromise_revoked: bool
-  attested_at: datetime
-```
 
 ### Platform Key Lifecycle
 
@@ -305,40 +214,9 @@ Principles:
 
 Events are Merkle-chained for tamper-evidence:
 
-```yaml
-VerifiableAuditEvent:
-  type: object
-  required: [event_id, timestamp, sequence, prev_hash]
-  properties:
-    event_id:
-      type: string
-      format: uuid
-    timestamp:
-      type: string
-      format: date-time
-    sequence:
-      type: integer
-      description: "Monotonically increasing sequence number"
-    prev_hash:
-      type: string
-      description: "SHA256 of previous event (hash chain)"
-    event_type:
-      type: string
-    aggregate_id:
-      type: string
-      format: uuid
-    payload:
-      type: object
-    signature:
-      type: string
-      description: "Cryptographic signature over event"
-    algorithm:
-      type: string
-      description: "Signature algorithm (e.g., ECDSA-P256)"
-    key_ref:
-      type: string
-      description: "Reference to signing key"
-```
+
+> **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
+
 
 ### Tamper-Evidence Mechanism
 

@@ -1,0 +1,32 @@
+# OutboxEntry Contract Schema
+# Reliable publish record for domain events
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status]
+properties:
+  sequence:
+    type: integer
+    minimum: 0
+  event_type:
+    type: string
+  aggregate_id:
+    type: string
+    format: uuid
+  aggregate_type:
+    type: string
+  payload:
+    type: object
+  idempotency_key:
+    type: string
+  created_at:
+    type: string
+    format: date-time
+  published_at:
+    type: string
+    format: date-time
+  delivery_status:
+    type: string
+    enum: [pending, published, failed]
+    default: pending

@@ -45,42 +45,11 @@ properties:
               constraints:
                 type: object
               compensation:
-                type: object
+                $ref: "compensation-action.schema.yaml"
                 description: >
                   Compensation is declared at two layers: abstract intent (workflow)
-                  and concrete effect (execution). Workflow emits abstract actions;
-                  Execution maps them to durable resources (git, PR, artifacts).
+                  and concrete effect (execution). See compensation-action contract.
                   Targets durable side effects — never the ephemeral Workspace filesystem.
-                properties:
-                  action_type:
-                    type: string
-                    enum:
-                      - rollback_workspace_effects
-                      - delete_artifacts
-                      - revoke_access
-                      - notify
-                      - custom
-                    description: "Abstract compensation intent owned by Workflow Context"
-                  concrete_actions:
-                    type: array
-                    description: "Execution-context mapping resolved at step completion"
-                    items:
-                      type: object
-                      required: [effect_type, target]
-                      properties:
-                        effect_type:
-                          type: string
-                          enum: [git_revert, branch_delete, pr_close, artifact_delete, resource_cleanup]
-                        target:
-                          type: string
-                          description: "Durable target (commit SHA, branch name, PR number, artifact id)"
-                        parameters:
-                          type: object
-                  target_ref:
-                    type: string
-                    description: "task_id or step_id whose durable_effects are compensated"
-                  parameters:
-                    type: object
         approval_gate:
           type: boolean
           default: false

@@ -1,0 +1,27 @@
+# AccessPolicy Contract Schema
+# Authorization rule (static allow/deny or OPA-backed evaluation input)
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [id, resource, action, subject, effect]
+properties:
+  id:
+    type: string
+    format: uuid
+  resource:
+    type: string
+  action:
+    type: string
+  subject:
+    type: string
+  effect:
+    type: string
+    enum: [allow, deny]
+  conditions:
+    type: object
+    description: "Optional ABAC conditions"
+  engine:
+    type: string
+    enum: [static, opa]
+    default: static

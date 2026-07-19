@@ -1,0 +1,30 @@
+# QualityMetric Contract Schema
+# Measured quality assessment for an artifact or session
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [metric_id, target_type, target_id, measured_at]
+properties:
+  metric_id:
+    type: string
+    format: uuid
+  target_type:
+    type: string
+    enum: [artifact, agent_session, task]
+  target_id:
+    type: string
+    format: uuid
+  score:
+    type: number
+    minimum: 0
+    maximum: 1
+  dimensions:
+    type: object
+    additionalProperties:
+      type: number
+  validator_version:
+    type: string
+  measured_at:
+    type: string
+    format: date-time

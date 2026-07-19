@@ -1,0 +1,23 @@
+# DurableExecutionConfig Contract Schema
+# Timeouts and durability knobs for workflow/session execution
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+properties:
+  start_to_close_timeout_seconds:
+    type: integer
+    minimum: 1
+  schedule_to_start_timeout_seconds:
+    type: integer
+    minimum: 1
+  heartbeat_timeout_seconds:
+    type: integer
+    minimum: 1
+  checkpoint_on_every_transition:
+    type: boolean
+    default: true
+  persistence_backend:
+    type: string
+    enum: [sqlite, postgres]
+    default: postgres

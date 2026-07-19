@@ -24,36 +24,9 @@ The Workflow Engine orchestrates multi-step agent workflows with explicit state 
 
 ## Workflow Engine Interface
 
-```go
-type WorkflowEngine interface {
-    // Create a workflow instance from a definition
-    CreateWorkflow(definition_id UUID, team_id UUID, idempotency_key string) (UUID, error)
-    
-    // Execute a task step within the workflow
-    ExecuteStep(workflow_id UUID, task_spec TaskSpec) error
-    
-    // Wait for signal (human approval, external trigger)
-    WaitForSignal(workflow_id UUID, signal_name string, timeout time.Duration) error
-    
-    // Complete the workflow
-    CompleteWorkflow(workflow_id UUID) error
-    
-    // Get current workflow state
-    GetState(workflow_id UUID) (WorkflowState, error)
-    
-    // Handle workflow failure with compensation
-    FailWorkflow(workflow_id UUID, error string) error
-    
-    // Compensate a failed workflow (rollback completed steps)
-    CompensateWorkflow(workflow_id UUID) error
-    
-    // Register signal handler
-    RegisterSignalHandler(workflow_id UUID, signal Signal) error
-    
-    // Resume a paused workflow
-    ResumeWorkflow(workflow_id UUID) error
-}
-```
+
+> **Interface contract:** [`docs/contract/interfaces/workflow-engine.yaml`](../contract/interfaces/workflow-engine.yaml)
+
 
 ## Workflow Model
 
@@ -71,89 +44,25 @@ REQUESTED → PLANNED → IMPLEMENTATION → TESTING → REVIEW → APPROVED →
 
 ### Task Specification
 
-```python
-class TaskSpec(BaseModel):
-    """Task specification within workflow step."""
-    role: str
-    objective: str
-    expected_outputs: list[str]
-    constraints: dict[str, Any]
-    hard_dependencies: list[UUID]
-    soft_dependencies: list[UUID]
-    compensation: CompensationSpec  # NEW: compensation action for this step
-    timeout_seconds: int = 3600
-    retry_policy: RetryPolicy = RetryPolicy()
-```
+
+> **Contract:** [`docs/contract/schemas/task.schema.yaml`](../contract/schemas/task.schema.yaml)
+
 
 ### CompensationSpec
 
 Each workflow step declares compensation **intent** upfront. Concrete git/PR/artifact actions are resolved when the step records `durable_effects` on its Workspace. Compensation never depends on the ephemeral sandbox filesystem still existing.
 
-```yaml
-CompensationSpec:
-  type: object
-  required: [action_type]
-  properties:
-    action_type:
-      type: string
-      enum:
-        - rollback_workspace_effects
-        - delete_artifacts
-        - revoke_access
-        - notify
-        - custom
-    concrete_effect_types:
-      type: array
-      description: "Resolved at step completion from Workspace.durable_effects"
-      items:
-        type: string
-        enum:
-          - git_revert
-          - branch_delete
-          - pr_close
-          - artifact_delete
-          - resource_cleanup
-    target_ref:
-      type: string
-      description: "task_id or step_id owning durable_effects"
-    parameters:
-      type: object
-```
+
+> **Contract:** [`docs/contract/schemas/compensation-action.schema.yaml`](../contract/schemas/compensation-action.schema.yaml)
+
 
 ### StepResult
 
 Each completed step records its result and compensation action:
 
-```yaml
-StepResult:
-  type: object
-  required: [step_index, status, task_id]
-  properties:
-    step_index:
-      type: integer
-    status:
-      type: string
-      enum: [completed, failed, compensated, skipped]
-    task_id:
-      type: string
-      format: uuid
-    agent_session_id:
-      type: string
-      format: uuid
-    artifact_ids:
-      type: array
-      items:
-        type: string
-        format: uuid
-    compensation_action:
-      $ref: "CompensationAction"
-    started_at:
-      type: string
-      format: date-time
-    completed_at:
-      type: string
-      format: date-time
-```
+
+> **Contract:** [`docs/contract/schemas/step-result.schema.yaml`](../contract/schemas/step-result.schema.yaml)
+
 
 ## Compensation Model (Saga Pattern)
 
@@ -248,15 +157,9 @@ class CompensationExecutor:
 
 ### RetryPolicy
 
-```python
-class RetryPolicy(BaseModel):
-    """Retry behavior for tasks/workflows."""
-    max_attempts: int = 3
-    backoff_seconds: int = 60
-    backoff_strategy: str = "exponential"  # exponential | linear | fixed
-    retry_on: list[str] = ["FAILED", "TIMEOUT"]
-    escalate_after: int = 2  # Escalate to different agent after N failures
-```
+
+> **Contract:** [`docs/contract/schemas/task.schema.yaml#retry_policy`](../contract/schemas/task.schema.yaml#retry_policy)
+
 
 ### Failure Handling Flow
 
@@ -279,48 +182,17 @@ retry_allowed?
 
 ## Approval Model
 
-```python
-class Approval(BaseModel):
-    """Approval tracking for workflow gates."""
-    id: UUID = Field(default_factory=uuid4)
-    workflow_id: UUID
-    gate_name: str
-    approver_id: str | None = None
-    status: str = "PENDING"  # PENDING | AUTO_APPROVED | GRANTED | REJECTED | EXPIRED
-    requested_at: datetime
-    responded_at: datetime | None = None
-    auto_approve: bool = False  # safe default; explicit opt-in required
-    timeout_seconds: int = 86400
-    context: dict = {}  # What the approver sees
-```
+
+> **Contract:** [`docs/contract/schemas/approval.schema.yaml`](../contract/schemas/approval.schema.yaml)
+
 
 ### Approval Escalation
 
 For critical workflows, approval can escalate:
 
-```yaml
-ApprovalEscalation:
-  type: object
-  properties:
-    escalation_chain:
-      type: array
-      items:
-        type: object
-        properties:
-          approver_id:
-            type: string
-          timeout_seconds:
-            type: integer
-          fallback:
-            type: string
-            enum: [next_approver, auto_approve, reject]
-    quorum:
-      type: integer
-      description: "Required number of approvals"
-    justification_required:
-      type: boolean
-      default: false
-```
+
+> **Contract:** [`docs/contract/schemas/approval.schema.yaml#escalation`](../contract/schemas/approval.schema.yaml#escalation)
+
 
 ## Durable Execution
 
@@ -338,24 +210,9 @@ The internal state machine MUST persist state transitions synchronously to maint
 
 ### Durable Execution Primitives
 
-```yaml
-DurableExecutionConfig:
-  type: object
-  properties:
-    start_to_close_timeout_seconds:
-      type: integer
-      description: "Maximum time from step start to completion"
-    schedule_to_close_timeout_seconds:
-      type: integer
-      description: "Maximum time from step scheduling to completion"
-    heartbeat_timeout_seconds:
-      type: integer
-      description: "Maximum time between heartbeats from running step"
-    checkpoint_interval_seconds:
-      type: integer
-      default: 30
-      description: "How often to checkpoint running state"
-```
+
+> **Contract:** [`docs/contract/schemas/durable-execution-config.schema.yaml`](../contract/schemas/durable-execution-config.schema.yaml)
+
 
 ### Recovery Process
 

@@ -1,0 +1,21 @@
+# IdempotencyKey Contract Schema
+# Outcome store for idempotent mutable operations
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [key, operation_type, created_at]
+properties:
+  key:
+    type: string
+  operation_type:
+    type: string
+  outcome:
+    type: object
+    description: "Serialized successful result for replay on duplicate request"
+  created_at:
+    type: string
+    format: date-time
+  expires_at:
+    type: string
+    format: date-time

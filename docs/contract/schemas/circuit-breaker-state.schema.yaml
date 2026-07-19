@@ -1,0 +1,29 @@
+# CircuitBreakerState Contract Schema
+# Agent-scoped only (lives on AgentScorecard, never on Task)
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [state, consecutive_failures]
+properties:
+  state:
+    type: string
+    enum: [closed, open, half_open]
+  consecutive_failures:
+    type: integer
+    minimum: 0
+  failure_threshold:
+    type: integer
+    minimum: 1
+    default: 5
+  last_failure_at:
+    type: string
+    format: date-time
+  recovery_timeout_seconds:
+    type: integer
+    minimum: 1
+    default: 300
+  half_open_max_attempts:
+    type: integer
+    minimum: 1
+    default: 1

@@ -1,0 +1,26 @@
+# Checkpoint Contract Schema
+# Immutable session state sample; full history is event/table backed
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [checkpoint_id, session_id, state, timestamp]
+properties:
+  checkpoint_id:
+    type: string
+    format: uuid
+  session_id:
+    type: string
+    format: uuid
+  state:
+    type: string
+    description: "Session status at checkpoint time"
+  timestamp:
+    type: string
+    format: date-time
+  payload:
+    type: object
+    description: "State-specific snapshot data"
+  workspace_snapshot:
+    type: string
+    description: "Git commit or tree hash at this checkpoint"

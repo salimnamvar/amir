@@ -1,0 +1,19 @@
+# PolicyEngine Contract Schema
+# Configuration for authorization evaluation backend
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [engine_type]
+properties:
+  engine_type:
+    type: string
+    enum: [static, opa]
+    default: static
+  rules_path:
+    type: string
+    description: "Path to OPA/Rego rules when engine_type=opa"
+  evaluation_timeout_ms:
+    type: integer
+    minimum: 1
+    default: 100

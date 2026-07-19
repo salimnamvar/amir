@@ -45,3 +45,33 @@ properties:
     type: integer
     minimum: 1
     default: 86400
+
+  # Escalation chain for multi-approver / critical gates
+  escalation:
+    type: object
+    description: "Optional approval escalation chain"
+    properties:
+      escalation_chain:
+        type: array
+        items:
+          type: object
+          properties:
+            approver_id:
+              type: string
+            timeout_seconds:
+              type: integer
+              minimum: 1
+            fallback:
+              type: string
+              enum: [next_approver, auto_approve, reject]
+      quorum:
+        type: integer
+        minimum: 1
+        description: "Required number of approvals"
+      justification_required:
+        type: boolean
+        default: false
+
+  context:
+    type: object
+    description: "What the approver sees (non-authoritative display payload)"

@@ -1,0 +1,30 @@
+# StepResult Contract Schema
+# Ordered workflow step execution history entry
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [step_id, status]
+properties:
+  step_id:
+    type: string
+  task_id:
+    type: string
+    format: uuid
+  session_id:
+    type: string
+    format: uuid
+  status:
+    type: string
+    enum: [pending, running, succeeded, failed, compensated, skipped]
+  sequence:
+    type: integer
+    minimum: 0
+  compensation:
+    $ref: "compensation-action.schema.yaml"
+  started_at:
+    type: string
+    format: date-time
+  completed_at:
+    type: string
+    format: date-time
