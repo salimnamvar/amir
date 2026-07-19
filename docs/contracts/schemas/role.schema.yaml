@@ -1,0 +1,124 @@
+# Role Contract Schema
+# Contract for role definitions with responsibilities and capabilities
+
+schema:
+  type: object
+  required: [name, responsibility]
+  properties:
+    # Core identity
+    name:
+      type: string
+      description: "Role name (lowercase, machine-readable)"
+      pattern: "^[a-z][a-z0-9-]*$"
+    
+    description:
+      type: string
+      description: "Human-readable role description"
+    
+    # Role contract
+    responsibility:
+      type: string
+      description: "Primary responsibility of this role"
+    
+    inputs:
+      type: array
+      items:
+        type: object
+        required: [contract_type]
+        properties:
+          contract_type:
+            type: string
+            description: "Required input contract type"
+          min_version:
+            type: string
+            description: "Minimum version accepted"
+    
+    outputs:
+      type: array
+      items:
+        type: object
+        required: [contract_type]
+        properties:
+          contract_type:
+            type: string
+            description: "Produced artifact contract type"
+          min_version:
+            type: string
+            description: "Minimum version the role produces"
+    
+    # Action permissions
+    allowed_actions:
+      type: array
+      items:
+        type: string
+      description:: "Action verbs this role can perform"
+      examples: ["file_write", "shell_execute", "file_read"]
+    
+    # Quality criteria (Phase 2: will run tests)
+    quality_criteria:
+      type: object
+      properties:
+        min_test_coverage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: "Minimum test coverage percentage"
+        max_complexity:
+          type: integer
+          description: "Maximum cyclomatic complexity"
+        required_approvals:
+          type: integer
+          minimum: 0
+          description: "Number of human approvals required"
+    
+    # Capability requirements for routing
+    required_capabilities:
+      type: array
+      items:
+        type: object
+        required: [skill]
+        properties:
+          skill:
+            type: string
+            description: "Required skill"
+          minimum_proficiency:
+            type: string
+            enum: [novice, intermediate, expert]
+
+# Example roles
+
+examples:
+  developer:
+    name: "developer"
+    description: "Implements code changes"
+    responsibility: "Generate and implement code changes"
+    inputs:
+      - contract_type: "TaskContract"
+    outputs:
+      - contract_type: "CodeChangeArtifact"
+    allowed_actions:
+      - "file_write"
+      - "file_read"
+    quality_criteria:
+      min_test_coverage: 80
+    required_capabilities:
+      - skill: "code-generation"
+        minimum_proficiency: "intermediate"
+      - skill: "testing"
+        minimum_proficiency: "novice"
+  
+  reviewer:
+    name: "reviewer"
+    description: "Reviews code changes"
+    responsibility: "Review and validate code changes"
+    inputs:
+      - contract_type: "CodeChangeArtifact"
+    outputs:
+      - contract_type: "ReviewResultArtifact"
+    allowed_actions:
+      - "file_read"
+    quality_criteria:
+      required_approvals: 1
+    required_capabilities:
+      - skill: "code-review"
+        minimum_proficiency: "expert"

@@ -1,0 +1,109 @@
+# Task Contract Schema
+# Contract for task definition and execution
+
+schema:
+  type: object
+  required: [title, objective, assigned_role]
+  properties:
+    # Core identity
+    title:
+      type: string
+      description: "Human-readable task title"
+      maxLength: 200
+    
+    objective:
+      type: string
+      description: "Natural language objective"
+      minLength: 1
+    
+    description:
+      type: string
+      description: "Detailed task description"
+    
+    # Role assignment
+    assigned_role:
+      type: string
+      description: "Role to perform this task"
+    
+    # Input artifacts
+    inputs:
+      type: array
+      items:
+        type: string
+        format: uuid
+      description: "Artifact IDs to provide as input"
+    
+    # Expected outputs
+    expected_outputs:
+      type: array
+      items:
+        type: string
+      description: "Expected artifact contract types"
+    
+    # Constraints
+    constraints:
+      type: object
+      description: "Rules for execution"
+      properties:
+        follow_solid:
+          type: boolean
+          default: true
+          description: "Must follow SOLID principles"
+        max_file_changes:
+          type: integer
+          minimum: 1
+        excluded_paths:
+          type: array
+          items:
+            type: string
+          description: "Paths agent cannot modify"
+    
+    # Dependencies
+    depends_on:
+      type: array
+      items:
+        type: string
+        format: uuid
+      description: "Hard dependencies on other tasks"
+    
+    # Priority and timing
+    priority:
+      type: string
+      enum: [critical, high, normal, low, background]
+      default: "normal"
+    
+    deadline:
+      type: string
+      format: date-time
+      description: "When task must complete"
+    
+    # Cost controls
+    cost_budget:
+      type: object
+      properties:
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: "Maximum tokens to consume"
+        max_usd:
+          type: number
+          minimum: 0
+          description: "Maximum USD cost"
+
+# Task lifecycle states
+lifecycle:
+  states:
+    - name: "PENDING"
+      description: "Task created but not yet assigned"
+    - name: "ASSIGNED"
+      description: "Task assigned to specific agent"
+    - name: "RUNNING"
+      description: "Agent is executing task"
+    - name: "VALIDATING"
+      description: "Artifact validation in progress"
+    - name: "COMPLETED"
+      description: "Task completed successfully"
+    - name: "FAILED"
+      description: "Task failed after retries"
+    - name: "CANCELLED"
+      description: "Task cancelled before completion"

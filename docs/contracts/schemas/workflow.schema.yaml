@@ -1,0 +1,125 @@
+# Workflow Contract Schema
+# Contract for workflow templates and instances
+
+schema:
+  type: object
+  required: [name, states]
+  properties:
+    # Template identity
+    name:
+      type: string
+      description: "Workflow name"
+      pattern: "^[a-z][a-z0-9-]*$"
+    
+    description:
+      type: string
+      description: "Workflow purpose and pattern"
+    
+    version:
+      type: string
+      description: "Workflow version (SemVer)"
+      pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    
+    # State machine definition
+    states:
+      type: array
+      items:
+        type: object
+        required: [name]
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          tasks:
+            type: array
+            items:
+              type: object
+              properties:
+                role:
+                  type: string
+                objective:
+                  type: string
+                constraints:
+                  type: object
+          approval_gate:
+            type: boolean
+            default: false
+          timeout_seconds:
+            type: integer
+          on_enter:
+            type: string
+            description: "Hook command on state enter"
+          on_exit:
+            type: string
+            description: "Hook command on state exit"
+    
+    # State transitions
+    transitions:
+      type: array
+      items:
+        type: object
+        required: [from, to]
+        properties:
+          from:
+            type: string
+          to:
+            type: string
+          condition:
+            type: string
+            description: "When this transition is allowed"
+          trigger:
+            type: string
+            enum: [on_complete, on_approve, on_timeout]
+    
+    # Retry and compensation
+    retry_policy:
+      type: object
+      properties:
+        max_attempts:
+          type: integer
+          minimum: 1
+          default: 3
+        backoff_seconds:
+          type: integer
+          minimum: 1
+          default: 60
+        backoff_strategy:
+          type: string
+          enum: [exponential, linear, fixed]
+          default: "exponential"
+        retry_on:
+          type: array
+          items:
+            type: string
+          default: ["FAILED", "TIMEOUT"]
+    
+    # Notification
+    notifications:
+      type: array
+      items:
+        type: object
+        properties:
+          event:
+            type: string
+            enum: [task_failed, task_completed, workflow_failed]
+          channel:
+            type: string
+            enum: [slack, email, webhook]
+          target:
+            type: string
+
+# Workflow states
+lifecycle:
+  states:
+    - REQUESTED: "Workflow requested"
+    - PLANNED: "Workflow planned, tasks created"
+    - IMPLEMENTATION: "Implementation tasks running"
+    - TESTING: "Testing tasks running"
+    - REVIEW: "Review/validation in progress"
+    - APPROVED: "Workflow approved"
+    - COMPLETED: "Workflow completed successfully"
+    - FAILED: "Workflow failed"
+    - BLOCKED: "Workflow blocked by dependency"
+    - CANCELLED: "Workflow cancelled"
+    - ESCALATED: "Workflow escalated for manual handling"

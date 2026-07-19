@@ -1,0 +1,110 @@
+# Agent Invocation Contract Schema
+# Runtime contract for invoking an agent to perform work
+
+schema:
+  type: object
+  required: [task_id, agent_definition_id, contract, workspace]
+  properties:
+    # References
+    task_id:
+      type: string
+      format: uuid
+      description: "Parent task identifier"
+    
+    agent_definition_id:
+      type: string
+      format: uuid
+      description: "Agent to invoke"
+    
+    # Contract to execute
+    contract:
+      type: object
+      required: [type, version, data]
+      properties:
+        type:
+          type: string
+          description: "Contract type (e.g., 'CodeChangeArtifact')"
+        version:
+          type: string
+          description: "Required contract version"
+        data:
+          type: object
+          description: "Contract input data"
+    
+    # Workspace configuration
+    workspace:
+      type: object
+      required: [repo_url, branch, workdir]
+      properties:
+        repo_url:
+          type: string
+          format: uri
+          description: "Git repository URL"
+        branch:
+          type: string
+          description: "Branch to work on (will be created if needed)"
+        workdir:
+          type: string
+          description: "Working directory in sandbox"
+    
+    # Resource constraints
+    resource_limits:
+      type: object
+      properties:
+        max_tokens:
+          type: integer
+          description: "Maximum tokens to consume (hard limit)"
+        max_usd:
+          type: number
+          minimum: 0
+          description: "Maximum USD cost (hard limit)"
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          description: "Execution timeout"
+        memory_mb:
+          type: integer
+          minimum: 1
+          description: "Memory limit in MB"
+    
+    # Callback URLs (future: Phase 2 streaming)
+    callbacks:
+      type: object
+      properties:
+        on_progress:
+          type: string
+          format: uri
+        on_complete:
+          type: string
+          format: uri
+        on_error:
+          type: string
+          format: uri
+
+# Response structure
+response_schema:
+  type: object
+  required: [status]
+  properties:
+    status:
+      type: string
+      enum: [success, failed, timeout]
+    artifact:
+      type: object
+      description: "Produced artifact if successful"
+    error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    resource_usage:
+      type: object
+      properties:
+        tokens_consumed:
+          type: integer
+        duration_seconds:
+          type: number
+        memory_peak_mb:
+          type: number

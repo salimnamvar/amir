@@ -1,0 +1,111 @@
+# Team Contract Schema
+# Contract for team definition and configuration
+
+schema:
+  type: object
+  required: [name]
+  properties:
+    # Core identity
+    name:
+      type: string
+      description: "Team name"
+      pattern: "^[a-zA-Z][a-zA-Z0-9_-]*$"
+      maxLength: 100
+    
+    description:
+      type: string
+      description: "Team purpose and scope"
+    
+    # Namespace configuration
+    namespace:
+      type: string
+      description: "Kubernetes/database namespace"
+      default: "{{name}}"
+    
+    # Role bindings
+    roles:
+      type: array
+      items:
+        type: object
+        required: [name, ref]
+        properties:
+          name:
+            type: string
+            description: "Role name in this team"
+          ref:
+            type: object
+            required: [kind, name]
+            properties:
+              kind:
+                type: string
+                enum: [roledefinition, inline]
+              name:
+                type: string
+              # For inline role definitions (Phase 2)
+              definition:
+                $ref: "../schemas/role.schema.yaml"
+    
+    # Agent bindings
+    agent_bindings:
+      type: array
+      items:
+        type: object
+        required: [role, agent]
+        properties:
+          role:
+            type: string
+            description: "Role this agent binding applies to"
+          agent:
+            type: string
+            format: uuid
+            description: "AgentDefinition ID"
+    
+    # Budget and quotas
+    budget:
+      type: object
+      properties:
+        daily_usd_limit:
+          type: number
+          minimum: 0
+        monthly_token_limit:
+          type: integer
+          minimum: 0
+        max_concurrent_tasks:
+          type: integer
+          minimum: 1
+          default: 10
+    
+    # Environment configuration
+    environment:
+      type: object
+      properties:
+        default_repo:
+          type: string
+          format: uri
+        secrets_namespace:
+          type: string
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+    
+    # Policies
+    policies:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          ref:
+            type: string  # PolicyDefinition ID or inline
+
+# Team lifecycle states
+lifecycle:
+  states:
+    - name: "ACTIVE"
+      description: "Team is active and accepting tasks"
+    - name: "SUSPENDED"
+      description: "Team temporarily paused (no new tasks)"
+    - name: "ARCHIVED"
+      description: "Team archived, no further execution"
