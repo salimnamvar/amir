@@ -38,14 +38,14 @@ class LoggingConfig(BaseModel):
 
     @field_validator("level", mode="before")
     @classmethod
-    def _validate_level(cls, value: object) -> str:
-        if not isinstance(value, str):
+    def _validate_level(cls, a_value: object) -> str:
+        if not isinstance(a_value, str):
             msg = "Logging level must be a string"
             raise TypeError(msg)
-        normalized = value.upper()
+        normalized = a_value.upper()
         valid = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if normalized not in valid:
-            msg = f"Invalid logging level: {value}. Must be one of {valid}"
+            msg = f"Invalid logging level: {a_value}. Must be one of {valid}"
             raise ValueError(msg)
         return normalized
 
@@ -63,9 +63,9 @@ class TeamConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     name: str = ""
-    agents: dict[str, dict[str, object]] = Field(default_factory=dict)
-    roles: dict[str, dict[str, object]] = Field(default_factory=dict)
-    gates: list[dict[str, object]] = Field(default_factory=list)
+    agents: dict[str, dict[str, str]] = Field(default_factory=dict)
+    roles: dict[str, dict[str, str]] = Field(default_factory=dict)
+    gates: list[dict[str, str]] = []
 
 
 class AmirConfig(BaseModel):
