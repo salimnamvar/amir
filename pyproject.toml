@@ -1,0 +1,230 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amir"
+version = "0.1.0"
+description = "Configurable multi-agent orchestration system"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Salim Namvar", email = "salim.namvar@gmail.com" }
+]
+keywords = [
+  "amir",
+  "agents",
+  "orchestration",
+  "workflow",
+  "multi-agent",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Typing :: Typed",
+]
+dependencies = [
+  "pydantic>=2.10",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "pyright",
+  "pre-commit",
+]
+
+[project.scripts]
+amir = "amir.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/salimnamvar/amir"
+Repository = "https://github.com/salimnamvar/amir"
+Issues = "https://github.com/salimnamvar/amir/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src", "tests"]
+show-fixes = true
+
+[tool.ruff.lint]
+select = [
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "I",      # isort
+  "N",      # pep8-naming
+  "UP",     # pyupgrade
+  "B",      # flake8-bugbear
+  "SIM",    # flake8-simplify
+  "C4",     # flake8-comprehensions
+  "RET",    # flake8-return
+  "ARG",    # flake8-unused-arguments
+  "PTH",    # flake8-use-pathlib
+  "TRY",    # tryceratops
+  "RUF",    # Ruff-specific rules
+  "D",      # pydocstyle (Google)
+  "ANN",    # flake8-annotations (type hints required)
+  "T20",    # flake8-print (no print in src)
+  "S",      # flake8-bandit (security)
+  "FBT",    # flake8-boolean-trap
+  "PT",     # flake8-pytest-style
+  "PLC",    # Pylint conventions
+  "PLE",    # Pylint errors
+  "PLW",    # Pylint warnings
+  "ICN",    # flake8-import-conventions
+  "PIE",    # flake8-pie
+  "TCH",    # flake8-type-checking
+  "Q",      # flake8-quotes
+  "COM",    # flake8-commas
+  "BLE",    # flake8-blind-except
+  "EM",     # flake8-errmsg
+  "T10",    # flake8-debugger
+  "FIX",    # flake8-fixme
+  "SLF",    # flake8-self
+  "RSE",    # flake8-raise
+  "PGH",    # pygrep-hooks
+  "FURB",   # refurb
+  "C90",    # mccabe complexity
+  "TD",     # flake8-todos
+  "TID",    # flake8-tidy-imports
+]
+ignore = [
+  "E501",    # line-too-long — handled by formatter
+  "TRY003",  # long messages — meaningful exceptions
+  "D102",    # missing docstring in public method — enforced at class level
+  "D105",    # missing docstring in magic method — self-explanatory
+  "D107",    # missing docstring in __init__ — class docstring suffices
+  "ANN401",  # dynamically typed expressions — too strict
+  "FBT003",  # boolean positional in function call — sometimes needed
+  "COM812",  # trailing comma — conflicts with formatter
+  "ISC001",  # implicit string concat — conflicts with formatter
+  "TD003",   # missing issue link — handled by custom check
+  "EXE001",  # shebang — handled by clean.sh
+  "PLR0913", # too many arguments — sometimes necessary
+  "PLR0912", # too many branches — sometimes necessary
+  "PLR0915", # too many statements — sometimes necessary
+  "SLF001",  # private member access — needed in tests
+  "TC001",   # type-checking import — breaks pydantic with from __future__ import annotations
+  "TC003",   # type-checking stdlib import — same reason
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/amir/cli.py" = ["T201"]
+"tests/**/*.py" = [
+    "ANN",     # type annotations not required in tests
+    "ARG001",  # unused argument — mock callbacks
+    "ARG002",  # unused argument — mock callbacks
+    "ARG005",  # unused lambda argument — mock callbacks
+    "B017",    # blind exception assert — validation tests
+    "BLE001",  # blind exception — test mocks
+    "C901",    # complexity — test helpers
+    "D100",    # missing module docstring — tests
+    "D101",    # missing class docstring — tests
+    "D102",    # missing method docstring — tests
+    "D103",    # missing function docstring — tests
+    "D104",    # missing package docstring — tests
+    "D106",    # missing nested class docstring — tests
+    "D107",    # missing __init__ docstring — tests
+    "D415",    # docstring first line punctuation — tests
+    "EM101",   # exception must not use string literal — test assertions
+    "FBT001",  # boolean positional — test helpers
+    "FBT002",  # boolean default — test helpers
+    "I001",    # import block un-sorted — test imports
+    "PLC0415", # import not at top level — test isolation
+    "PLR2004", # magic values in comparisons — common in tests
+    "PLW0108", # lambda may be unnecessary — test helpers
+    "PT011",   # pytest.raises too broad — validation tests
+    "PT017",   # assertion on exception — test pattern
+    "S101",    # assert usage — expected in tests
+    "S104",    # binding to all interfaces — test config
+    "S105",    # hardcoded password — test fixtures
+    "S108",    # insecure temp files — test data
+    "S608",    # SQL injection — test queries
+    "SLF001",  # private member access — testing internals
+    "T201",    # print statement — allowed in tests
+    "TC002",   # type-checking import — runtime pytest usage
+]
+"**/__init__.py" = ["F401", "TID252"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["amir"]
+force-single-line = true  # Google style: one import per line
+force-sort-within-sections = true  # Alphabetical within each group
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10  # Google recommends simple functions
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--import-mode=importlib",
+  "-v",
+]
+filterwarnings = [
+  "error",
+]
+markers = [
+  "unit: Fast, isolated unit tests with no I/O",
+  "integration: Tests that load real project artifacts (YAML, schema, etc.)",
+  "slow: Slow-running tests (deselect with -m 'not slow')",
+  "domain: Domain layer tests (entities, value objects, aggregates)",
+  "repository: Repository layer tests",
+  "service: Service layer tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["amir"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.13"
+pythonPlatform = "Linux"
+include = ["src"]
+extraPaths = ["src"]
+reportMissingTypeStubs = false

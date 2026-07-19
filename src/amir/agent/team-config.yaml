@@ -1,0 +1,131 @@
+# Team Configuration
+# Defines agent roles and assignments for this project.
+# Agents are assigned by name at runtime, not hardcoded in contracts.
+
+team:
+  name: arian-engineering
+
+# Paths
+paths:
+  shared_rules: shared/rules
+  project_rules: rules
+  contracts: agent
+
+roles:
+  tech-lead:
+    description: Architecture ownership, design decisions, code review
+    responsibilities:
+      - Architecture decisions
+      - Code review
+      - Requirement translation
+      - Parameter tracing verification
+    gates:
+      - design_approval
+      - code_review
+    rules:
+      - shared/rules/architecture/*
+      - shared/rules/software-design/quality/*
+      - shared/rules/code/python.md
+      - rules/agent.md
+
+  coder:
+    description: Implementation, tests, refactoring
+    responsibilities:
+      - Writing code
+      - Unit tests
+      - Integration tests
+      - Refactoring
+    gates:
+      - implementation_complete
+    rules:
+      - shared/rules/code/*
+      - shared/rules/git/*
+      - rules/agent.md
+      - rules/cicd.md
+
+  qa-engineer:
+    description: Product verification, release testing
+    responsibilities:
+      - CLI smoke tests
+      - Output validation
+      - Regression testing
+      - Release verification
+    gates:
+      - release_verification
+    rules:
+      - shared/rules/software-design/quality/*
+      - rules/agent.md
+      - rules/cicd.md
+
+  devops:
+    description: CI/CD pipeline, automation
+    responsibilities:
+      - CI/CD pipeline
+      - Pre-commit hooks
+      - Build verification
+      - Release tagging
+    gates:
+      - pipeline_pass
+    rules:
+      - shared/rules/git/*
+      - shared/rules/software-design/quality/cicd.md
+      - rules/agent.md
+      - rules/cicd.md
+
+# Agent assignments
+agents:
+  mimo:
+    roles: [tech-lead, qa-engineer]
+    description: Architecture guardian + product verifier
+    rules_path: shared/rules
+
+  opencode:
+    roles: [coder, devops]
+    description: Implementation engine + pipeline automation
+    rules_path: shared/rules
+
+# Workflow gates (order matters)
+gates:
+  - name: design_approval
+    from: tech-lead
+    to: coder
+    checklist:
+      - Architecture decision documented
+      - Acceptance criteria defined
+      - Forbidden approaches listed
+      - Test strategy agreed
+
+  - name: implementation_complete
+    from: coder
+    to: tech-lead
+    checklist:
+      - All unit tests pass
+      - All integration tests pass
+      - CLI smoke tests run
+      - Output verified manually
+
+  - name: code_review
+    from: tech-lead
+    to: qa-engineer
+    checklist:
+      - Architecture compliance
+      - All parameters traced
+      - No known issues
+
+  - name: release_verification
+    from: qa-engineer
+    to: devops
+    checklist:
+      - All CI stages pass
+      - CLI smoke tests pass
+      - Output validation passes
+      - Regression matrix passes
+      - Documentation updated
+
+  - name: release
+    from: devops
+    to: none
+    checklist:
+      - CI pipeline passes
+      - Release tagged
+      - Pushed to main
