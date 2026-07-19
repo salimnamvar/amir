@@ -1,0 +1,46 @@
+# Approval Contract Schema
+# Minimal schema for approval tracking (Phase 2 feature)
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+# **DEFERRED** - MVP uses auto-approval
+# This schema is provided for Phase 2 completeness.
+# In MVP, transitions are auto-approved (status = "AUTO_APPROVED")
+
+type: object
+required: [workflow_id, gate_name]
+properties:
+  # References
+  workflow_id:
+    type: string
+    format: uuid
+    description: "Parent workflow"
+  
+  gate_name:
+    type: string
+    description: "Name of approval gate"
+  
+  # Approval status
+  status:
+    type: string
+    enum: [pending, granted, rejected, expired]
+    default: "pending"
+  
+  # Timing
+  requested_at:
+    type: string
+    format: date-time
+  
+  responded_at:
+    type: string
+    format: date-time
+  
+  # For MVP: auto-approved
+  approver_id:
+    type: string
+    description: "Who approved (empty for auto)"
+  
+  # Timeout (Phase 2)
+  timeout_seconds:
+    type: integer
+    default: 86400

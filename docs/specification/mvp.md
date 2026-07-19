@@ -112,6 +112,20 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 
 ---
 
+## Deferred Schemas (Phase 2+)
+
+The following schemas exist but are **not used in MVP**:
+
+| Schema | Reason for Deferral |
+|--------|-------------------|
+| `audit-event.schema.yaml` | MVP uses simple JSONL append-only logging |
+| `approval.schema.yaml` | MVP auto-approves all transitions |
+| `workspace.schema.yaml` | Defined but managed implicitly by Sandbox Manager |
+
+All other schemas under `docs/contract/schemas/` are required for MVP.
+
+---
+
 ## What Was Removed From Previous Scope
 
 Based on audit feedback:

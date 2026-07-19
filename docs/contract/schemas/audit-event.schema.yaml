@@ -1,0 +1,16 @@
+# Audit-Event Contract Schema
+# **DEFERRED** - See specification/mvp.md
+
+# This schema is deferred to Phase 2.
+# In MVP, audit events are simple JSONL lines with no schema validation.
+#
+# Justification:
+# - MVP uses append-only file logging for simplicity
+# - No distributed querying required in single-node deployment
+# - Full observability stack (OpenTelemetry) comes in Phase 2
+#
+# When implemented, this schema will define:
+# - Event envelope structure (timestamp, level, component, event_id)
+# - Security-relevant event types
+# - Retention policies
+# - Correlation with workflow traces
