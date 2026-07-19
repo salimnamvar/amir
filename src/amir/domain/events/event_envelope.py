@@ -1,15 +1,18 @@
 """Domain Event Envelope - Standard event structure for all events."""
 
-from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
 from datetime import datetime
+from uuid import UUID
+from uuid import uuid4
+
+from pydantic import BaseModel
+from pydantic import Field
 
 
 class DomainEvent(BaseModel):
-    """
-    Standard envelope for all domain events.
+    """Standard envelope for all domain events.
     Enables distributed tracing, replay, and debugging.
     """
+
     event_id: UUID = Field(default_factory=uuid4)
     event_type: str
     aggregate_id: UUID
