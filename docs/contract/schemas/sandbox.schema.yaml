@@ -1,0 +1,56 @@
+# Sandbox Contract Schema
+# Pure schema for sandbox configuration
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [runtime, network_mode]
+properties:
+  # Runtime type
+  runtime:
+    type: string
+    enum: [docker, gvisor, firecracker]
+    description: "Sandbox runtime type"
+  
+  # User and filesystem security
+  user:
+    type: integer
+    description: "UID to run as (65534 = nobody for non-root)"
+    default: 65534
+  
+  read_only_root:
+    type: boolean
+    default: true
+    description: "Root filesystem is read-only"
+  
+  tmpfs_workspaces:
+    type: boolean
+    default: true
+    description: "Workspaces mounted as tmpfs (memory-only)"
+  
+  # Network configuration
+  network_mode:
+    type: string
+    enum: [none, host, restricted]
+    default: "none"
+    description: "Network access mode"
+  
+  network_allowlist:
+    type: array
+    items:
+      type: string
+    description: "Allowed network destinations (CIDR)"
+  
+  # Resource limits
+  resource_limits:
+    type: object
+    properties:
+      cpus:
+        type: number
+        minimum: 0.1
+      memory:
+        type: string
+        pattern: "^[0-9]+[kmg]?$"
+      pids_limit:
+        type: integer
+        minimum: 1

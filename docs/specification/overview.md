@@ -49,6 +49,45 @@
 
 ---
 
+## Audit Feedback Disposition
+
+### Accepted Findings (Fully Implemented)
+
+| Finding | Source | Implementation |
+|---------|--------|---------------|
+| Two-Track Entity Lifecycle | All | Configuration: GitOps (Draft→Published→Deprecated) / Runtime: Simple state machines |
+| Bounded Context Separation | All | Five contexts: Configuration, Execution, Workflow, Security, Observability |
+| AgentInvocation as Runtime Entity | All | AgentInvocation sole runtime entity; Task tracks orchestration |
+| DomainEvent Envelope | All | Standard envelope with correlation_id, causation_id for tracing |
+| Workflow Engine Interface Seam | All | WorkflowEngine interface defined for Temporal migration |
+| Sharp MVP Boundary | All | Single adapter, linear workflow, Docker sandbox, file audit |
+| Contract Versioning | ChatGPT/Claude/DeepSeek | SemVer with N-1 compatibility |
+| Non-Root Container Requirement | Kimi/GLM | Mandatory UID 65534, read-only root filesystem |
+| Deterministic Output Extraction | GLM/DeepSeek | Strip markdown → YAML block → validate; no regex fallback |
+| Hard Cost Limits | DeepSeek | Kill switch at 95% threshold |
+
+### Partially Accepted Findings
+
+| Finding | Source | Partial Implementation |
+|---------|--------|---------------------|
+| Workspace as Aggregate Root | GLM/Kimi | Defined as separate root; Security Context can interact directly |
+| Semantic Validation | All | Deferred to Phase 2; only structural validation in MVP |
+| Approval Gates | GLM | Deferred to Phase 2; MVP auto-approves transitions |
+| Multi-Tenancy | Kimi/Perplexity | Deferred to Phase 2; single team in MVP |
+| Full Observability Stack | GLM | Deferred to Phase 2; file logging in MVP |
+
+### Rejected Findings (Deferred)
+
+| Finding | Source | Reason |
+|---------|--------|--------|
+| PromptTemplate Entity | Sakana | MVP uses inline prompt rendering |
+| Memory Entity | Kimi | Deferred to Phase 2; ephemeral state sufficient |
+| Full OPA Policy Engine | All | Static AccessPolicy sufficient for MVP |
+| Hash-Chain Audit (MVP) | GLM | Deferred; append-only file sufficient |
+| Streaming Progress Events | GLM | Deferred to Phase 2 to avoid volume explosion |
+
+---
+
 ## 7. MVP Verdict
 
 **Status:** `READY_FOR_IMPLEMENTATION` for the defined MVP boundary

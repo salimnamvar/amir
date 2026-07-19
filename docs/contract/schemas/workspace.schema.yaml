@@ -1,0 +1,33 @@
+# Workspace Contract Schema
+# Pure schema for workspace isolation
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [repo_url, branch]
+properties:
+  # Git configuration
+  repo_url:
+    type: string
+    format: uri
+    description: "Git repository URL"
+  
+  branch:
+    type: string
+    description: "Git branch for this workspace"
+  
+  workdir:
+    type: string
+    description: "Working directory path within sandbox"
+  
+  # Isolation markers
+  sandbox_id:
+    type: string
+    format: uuid
+    description: "Sandbox this workspace belongs to"
+  
+  # Cleanup settings
+  ephemeral:
+    type: boolean
+    default: true
+    description: "Whether workspace is deleted after task"

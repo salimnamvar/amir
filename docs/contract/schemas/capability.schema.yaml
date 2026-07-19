@@ -1,101 +1,31 @@
 # Capability Contract Schema
-# Contract for agent and role capabilities
+# Pure schema for capability definitions
 
-schema:
-  type: object
-  required: [skill]
-  properties:
-    # Skill definition
-    skill:
-      type: string
-      description: "Unique skill identifier"
-      pattern: "^[a-z][a-z0-9-\\.]*$"
-      examples: ["code-generation", "testing.unit", "code-review.security"]
-    
-    description:
-      type: string
-      description: "Skill description"
-    
-    # Proficiency level
-    proficiency:
-      type: string
-      enum: [novice, intermediate, expert]
-      description: "Skill proficiency level"
-    
-    # Language support
-    languages:
-      type: array
-      items:
-        type: string
-      description: "Supported programming languages"
-      examples: ["python", "typescript", "go", "rust"]
-    
-    # Tool availability
-    tools:
-      type: array
-      items:
-        type: object
-        required: [name]
-        properties:
-          name:
-            type: string
-            description: "Tool name"
-            examples: ["file-write", "shell-execute", "test-runner"]
-          available:
-            type: boolean
-            default: true
-          constraints:
-            type: object
-            properties:
-              max_calls:
-                type: integer
-              rate_limit_per_minute:
-                type: integer
+$schema: "https://json-schema.org/draft/2020-12/schema"
 
-# Capability matching algorithm (Mistral)
-matching_algorithm:
-  algorithm: weighted_scoring
-  factors:
-    skill_match:
-      weight: 0.5
-      description: "Exact skill match required"
-    language_match:
-      weight: 0.3
-      description: "Programming language support"
-    tool_availability:
-      weight: 0.2
-      description: "Required tools available"
+type: object
+required: [skill]
+properties:
+  # Unique skill identifier
+  skill:
+    type: string
+    description: "Unique skill identifier"
+    pattern: "^[a-z][a-z0-9-\\.]*$"
+    examples: ["code-generation", "testing.unit", "code-review.security"]
   
-  scoring:
-    exact_match:
-      score: 1.0
-    partial_match:
-      score: 0.5
-    no_match:
-      score: 0.0
+  description:
+    type: string
+    description: "Human-readable skill description"
   
-  thresholds:
-    minimum_score: 0.7
-    fallback: human_assignment
-
-# Common skills
-skill_library:
-  code-generation:
-    description: "Generate code from specifications"
-    tools: ["file-write"]
+  # Proficiency level
+  proficiency:
+    type: string
+    enum: [novice, intermediate, expert]
+    description: "Skill proficiency level"
   
-  code-refactoring:
-    description: "Refactor existing code"
-    tools: ["file-read", "file-write"]
-  
-  testing:
-    description: "Write and execute tests"
-    tools: ["shell-execute", "file-read", "file-write"]
-  
-  code-review:
-    description: "Review code for quality and correctness"
-    tools: ["file-read"]
-  
-  documentation:
-    description: "Write documentation"
-    tools: ["file-write"]
+  # Supported languages
+  languages:
+    type: array
+    items:
+      type: string
+    description: "Supported programming languages"

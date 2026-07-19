@@ -233,6 +233,63 @@ BudgetLimits:
 
 ---
 
+## Validation-Failure → Re-Invocation Loop
+
+This is the critical feedback mechanism for handling agents that produce invalid artifacts.
+
+### MVP Behavior
+
+```
+1. AgentInvocation.Completed
+2. Contract Validator runs structural validation
+3. If INVALID:
+   - AgentInvocation.Completed → AgentInvocation.Failed
+   - Task.Failed emitted
+   - No retry (Phase 1 limitation)
+4. If VALID:
+   - Artifact.Validated emitted
+   - Task.Completed
+```
+
+### Phase 2 Behavior
+
+```
+1. AgentInvocation.Completed
+2. Contract Validator runs structural validation
+3. If INVALID:
+   - Artifact.Rejected emitted
+   - Feedback Generator creates corrective prompt
+   - Task.attempts incremented
+   - If attempts < max_attempts:
+     - Create new AgentInvocation
+     - Inject feedback into prompt: "Previous attempt failed: [validation errors]"
+     - Agent retries with context
+   - Else:
+     - Task.Failed permanently
+```
+
+### Feedback Format
+
+```yaml
+feedback:
+  type: object
+  required: [validation_errors, attempt_number]
+  properties:
+    validation_errors:
+      type: array
+      items:
+        type: string
+      description: "List of validation errors from previous attempt"
+    attempt_number:
+      type: integer
+      description: "Current retry attempt (1-indexed)"
+    original_contract:
+      type: object
+      description: "Original task contract for reference"
+```
+
+---
+
 ## Addressing Audit Concerns
 
 ### CLI Parsing Risk (All Audits)
