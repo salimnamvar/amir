@@ -1,6 +1,8 @@
 # Audit-Event Contract Schema
 # **DEFERRED** - See specification/mvp.md
 
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
 # This schema is deferred to Phase 2.
 # In MVP, audit events are simple JSONL lines with no schema validation.
 #
@@ -14,3 +16,20 @@
 # - Security-relevant event types
 # - Retention policies
 # - Correlation with workflow traces
+
+type: object
+description: "Deferred to Phase 2 - MVP uses simple JSONL append-only logging"
+properties:
+  event_id:
+    type: string
+    format: uuid
+  timestamp:
+    type: string
+    format: date-time
+  level:
+    type: string
+    enum: [info, warning, error, critical]
+  component:
+    type: string
+  message:
+    type: string
