@@ -108,10 +108,10 @@ class Approval(BaseModel):
 
 ### Strategy
 
-- **Storage**: SQLite with synchronous writes (MVP)
+- **Storage**: SQLite/PostgreSQL with synchronous writes
 - **Checkpoints**: After each state transition
 - **Recovery**: On restart, load state from DB
-- **Migration Path**: PostgreSQL → Temporal ready via interface seam
+- **Migration Path**: PostgreSQL → Temporal-compatible via interface seam
 
 ### Durability Guarantee
 

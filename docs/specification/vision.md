@@ -24,6 +24,43 @@ Amir does **not** provide intelligence itself. It provides the infrastructure fo
 
 ✅ **Two-Track Lifecycle** - Configuration entities follow GitOps promotion, Runtime entities follow lightweight state machines
 
+## Complete Feature Set
+
+### Agent Management
+- Multi-agent type support (Claude, Codex, OpenCode, Gemini CLI)
+- Capability-based routing and selection
+- Health monitoring and auto-removal
+
+### Workflow Orchestration
+- Linear and DAG workflow support
+- State machine persistence with durability guarantees
+- Approval gates (binary auto-approve or manual)
+- Compensation actions for rollback
+
+### Security & Isolation
+- Multiple sandbox runtimes (Docker, gVisor, Firecracker)
+- Mandatory non-root execution
+- Just-in-time secret injection
+- Network isolation with allowlist support
+
+### Observability
+- Structured event logging with retention policies
+- Real-time metrics collection
+- OpenTelemetry integration support
+- Quality assessment and reporting
+
+### Cost Governance
+- Per-task hard limits
+- Team-level budgets
+- Usage tracking and alerts
+
+### Multi-Tenant Support
+- Namespace isolation
+- Team-level quotas
+- RBAC/ABAC authorization
+
+---
+
 ## Non-Goals
 
 ❌ **Agent Intelligence** - Amir does not provide LLMs or reasoning capabilities; it orchestrates external agents
@@ -36,13 +73,7 @@ Amir does **not** provide intelligence itself. It provides the infrastructure fo
 
 ❌ **Homogeneous Agents** - Amir deliberately supports heterogeneous, external agent tools (Claude, Codex, OpenCode, Gemini, etc.)
 
-❌ **Streaming Progress** - Progress events emitted on completion only; continuous streaming not supported
-
-❌ **Multi-Environment GitOps** - Single environment configuration only; external CI/CD handles promotion
-
-❌ **Temporal Workflow Engine** - Custom state machine only; Temporal integration not in scope
-
-❌ **Advanced Policy Engine** - Simple allow/deny policies only; OPA integration not in scope
+---
 
 ## Success Metrics
 
@@ -51,9 +82,8 @@ Amir does **not** provide intelligence itself. It provides the infrastructure fo
 | Agent Execution Reliability | 90% success rate |
 | Contract Validation | Structural + Semantic |
 | Artifact Recovery | Automatic via retry-with-feedback |
-| Sandbox Security | Docker + gVisor/Firecracker options |
-| Cost Control | Per-task hard limits + team budgets |
-| Multi-tenancy | Single team only |
+| Sandbox Security | Multiple runtime options |
+| Cost Control | Per-task + team budgets |
 
 ---
 

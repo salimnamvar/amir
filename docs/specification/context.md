@@ -37,7 +37,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 
 **Lifecycle**: Pending → Running → Completed / Failed / Cancelled
 
-**Storage**: SQLite (MVP) / PostgreSQL (production)
+**Storage**: SQLite / PostgreSQL
 
 **Events**: Task.Created, Task.Assigned, Task.Started, Task.Completed, Task.Failed, AgentInvocation.Started, AgentInvocation.Progress, AgentInvocation.Completed, Artifact.Produced
 
