@@ -1,5 +1,5 @@
 # Workflow Contract Schema
-# Pure schema for workflow templates
+# Complete schema for workflow templates
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -48,6 +48,7 @@ properties:
           default: false
         timeout_seconds:
           type: integer
+          minimum: 1
   
   # State transitions
   transitions:

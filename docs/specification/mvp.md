@@ -8,33 +8,33 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 
 ## In Scope (Must Have - MVP)
 
-| Feature | Description | Implementation Status |
-|---------|-------------|---------------------|
-| Single Agent Type | Claude Code CLI only | ✅ Ready |
-| Agent Execution | Execute in Docker sandbox with seccomp | ✅ Ready |
-| Contract Validation | Structural validation only | ✅ Ready |
-| Task Management | Create, assign, execute, complete tasks | ✅ Ready |
-| Linear Workflow | 3-state: implement → test → review | ✅ Ready |
-| File-Based Audit | Append-only JSONL logging | ✅ Ready |
-| Hard Cost Limits | Token/USD limits enforced at adapter | ✅ Ready |
-| Non-Root Containers | UID 65534, read-only root | ✅ Ready |
-| Domain Model | Task, AgentInvocation, Workspace, Artifact | ✅ Ready |
-| Event Model | DomainEvent with correlation/causation | ✅ Ready |
-| Adapter Interface | AgentAdapter abstract base class | ✅ Ready |
+| Feature | Description |
+|---------|-------------|
+| Single Agent Type | Claude Code CLI only |
+| Agent Execution | Execute in Docker sandbox with seccomp |
+| Contract Validation | Structural validation |
+| Task Management | Create, assign, execute, complete tasks |
+| Linear Workflow | 3-state: implement → test → review |
+| File-Based Audit | Append-only JSONL logging |
+| Hard Cost Limits | Token/USD limits enforced at adapter |
+| Non-Root Containers | UID 65534, read-only root |
+| Domain Model | Task, AgentInvocation, Workspace, Artifact |
+| Event Model | DomainEvent with correlation/causation |
+| Adapter Interface | AgentAdapter abstract base class |
 
-## Out of Scope (Deferred)
+## Out of Scope (Removed)
 
-| Feature | Reason for Deferral | Target Phase |
-|---------|---------------------|--------------|
-| Streaming Mode B | Progress streaming adds complexity | Phase 2 |
-| Multi-Environment GitOps | Single environment sufficient | Phase 2 |
-| Human Approvals | Auto-approve in MVP | Phase 2 |
-| Full Observability Stack | File logs sufficient | Phase 2 |
-| Policy Engine (OPA) | Static policies only | Phase 3 |
-| Multi-Tenancy | Single team for MVP | Phase 2 |
-| Semantic Validation | Requires test runners | Phase 2 |
-| Artifact Lineage | Not needed for single-run | Phase 2 |
-| Temporal Integration | Proven state machine first | Phase 3 |
+| Feature | Reason for Removal |
+|---------|---------------------|
+| Streaming Mode B | Out of scope - heartbeat events instead |
+| Multi-Environment GitOps | Out of scope - single environment |
+| Human Approvals | Out of scope - binary auto-approve only |
+| Full Observability Stack | Out of scope - file logs only |
+| Policy Engine (OPA) | Out of scope - static policies only |
+| Multi-Tenancy | Out of scope - single team only |
+| Semantic Validation | Out of scope - structural only |
+| Artifact Lineage | Out of scope - not needed |
+| Temporal Integration | Out of scope - custom state machine only |
 
 ## MVP Architecture
 
@@ -83,7 +83,7 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
    → Produces CodeChangeArtifact
 
 6. Contract Validator
-   → Validate structrual schema
+   → Validate structural schema
    → Emit Artifact.Validated
 
 7. Orchestrator
@@ -112,26 +112,12 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 
 ---
 
-## Deferred Schemas (Phase 2+)
+## Removed From Previous Scope
 
-The following schemas exist but are **not used in MVP**:
+Based on scope decisions:
 
-| Schema | Reason for Deferral |
-|--------|-------------------|
-| `audit-event.schema.yaml` | MVP uses simple JSONL append-only logging |
-| `approval.schema.yaml` | MVP auto-approves all transitions |
-| `workspace.schema.yaml` | Defined but managed implicitly by Sandbox Manager |
-
-All other schemas under `docs/contract/schemas/` are required for MVP.
-
----
-
-## What Was Removed From Previous Scope
-
-Based on audit feedback:
-
-1. **Removed**: Full event retention tiers (MVP: single file)
-2. **Removed**: Streaming progress events (MVP: completion only)
-3. **Removed**: Multi-environment GitOps (MVP: single environment)
-4. **Removed**: Human approval gates (MVP: auto-approve)
-5. **Removed**: Full OpenTelemetry integration (MVP: structured file logs)
+1. **Removed**: Multi-environment GitOps (single environment)
+2. **Removed**: Human approval gates (binary auto-approve only)
+3. **Removed**: Full OpenTelemetry integration (file logs only)
+4. **Removed**: Temporal/Temporal integration (custom state machine)
+5. **Removed**: OPA policy engine (static policies only)

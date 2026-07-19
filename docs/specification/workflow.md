@@ -23,7 +23,7 @@ The Workflow Engine orchestrates multi-step agent workflows with explicit state 
 ## Workflow Engine Interface
 
 ```go
-// This Go interface provides the seam for Temporal migration
+// Interface seam for workflow orchestration
 type WorkflowEngine interface {
     // Create a workflow instance from a definition
     CreateWorkflow(definition_id UUID, team_id UUID) (UUID, error)
@@ -42,63 +42,34 @@ type WorkflowEngine interface {
     
     // Handle workflow failure
     FailWorkflow(workflow_id UUID, error string) error
+    
+    // Register signal handler
+    RegisterSignalHandler(workflow_id UUID, signal Signal) error
 }
 ```
 
-## MVP Workflow Model
+## Workflow Model
 
-### Linear Three-State Workflow (MVP)
-
-For MVP, workflows are simple and linear:
+### States
 
 ```
-REQUESTED → IMPLEMENTATION → TESTING → COMPLETED
-                                    ↓
-                              FAILED/BLOCKED/CANCELLED
+REQUESTED → PLANNED → IMPLEMENTATION → TESTING → REVIEW → APPROVED → COMPLETED
+                                    ↓              ↓
+                              FAILED/BLOCKED/CANCELLED    ESCALATED
 ```
-
-**Implementation**: Internal state machine in `WorkflowEngine` interface.
 
 ### Task Specification
 
 ```python
 class TaskSpec(BaseModel):
     """Task specification within workflow."""
-    role: str                           # Required role
-    objective: str                      # Work objective
-    expected_outputs: list[str]         # Artifact contract types
-    constraints: dict[str, Any]         # Additional constraints
-    hard_dependencies: list[UUID]       # Must complete first
-    soft_dependencies: list[UUID]       # Preferred order
+    role: str
+    objective: str
+    expected_outputs: list[str]
+    constraints: dict[str, Any]
+    hard_dependencies: list[UUID]
+    soft_dependencies: list[UUID]
 ```
-
-## Phase 2 Workflow Model
-
-### DAG Support
-
-```yaml
-# WorkflowDefinition supports task DAGs
-workflow:
-  name: feature-development
-  states:
-    - name: planning
-      tasks: [plan-task]
-    - name: implementation
-      tasks: [impl-task-1, impl-task-2]
-      depends_on: [planning]
-    - name: testing
-      tasks: [test-task]
-      depends_on: [implementation]  # Can be hard or soft
-    - name: review
-      tasks: []
-      approval_gate: true
-      depends_on: [testing]
-```
-
-### Dependency Types
-
-- **Hard**: Task B cannot start until Task A completes successfully
-- **Soft**: Task B can start but warnings are recorded if Task A hasn't completed
 
 ### Retry and Compensation
 
@@ -107,73 +78,73 @@ class RetryPolicy(BaseModel):
     """Retry behavior for tasks/workflows."""
     max_attempts: int = 3
     backoff_seconds: int = 60
-    backoff_strategy: str = "exponential"  # exponential | linear
-    
-    # What triggers retry
-    retry_on: list[str] = ["FAILED"]  # FAILED, TIMEOUT, etc.
+    backoff_strategy: str = "exponential"
+    retry_on: list[str] = ["FAILED", "TIMEOUT"]
 
 class CompensationAction(BaseModel):
     """Rollback action for failed workflows."""
-    # Phase 2 feature
-    action_type: str  # revert_git, notify_slack, cleanup_resources
+    action_type: str  # revert_git, cleanup_resources
     target: str
     parameters: dict
 ```
 
-## Phase 2: Human Approval Model
+## Approval Model
 
 ```python
 class Approval(BaseModel):
-    """Human approval tracking."""
+    """Approval tracking for workflow gates."""
     id: UUID = Field(default_factory=uuid4)
     workflow_id: UUID
     gate_name: str
     approver_id: str | None = None
-    status: str = "PENDING"  # PENDING | GRANTED | REJECTED | EXPIRED
+    status: str = "PENDING"  # PENDING | AUTO_APPROVED | GRANTED | REJECTED | EXPIRED
     requested_at: datetime
     responded_at: datetime | None = None
-    timeout_seconds: int = 86400  # 24 hours default
+    auto_approve: bool = True
+    timeout_seconds: int = 86400
 ```
 
 ## State Persistence
 
-### MVP Strategy
+### Strategy
 
-- **Storage**: SQLite with synchronous writes
+- **Storage**: SQLite with synchronous writes (MVP)
 - **Checkpoints**: After each state transition
 - **Recovery**: On restart, load state from DB
+- **Migration Path**: PostgreSQL → Temporal ready via interface seam
 
-### Phase 2 Strategy
-
-- **Storage**: PostgreSQL with connection pooling
-- **Checkpoints**: Snapshot + event log
-- **Timers**: Database-based timer queue
-
-### Phase 3 Strategy (Temporal)
-
-- **Storage**: Temporal server
-- **Checkpoints**: Automatic via Temporal
-- **Timers**: Native Temporal timer API
-
-## Critical Implementation Detail
+### Durability Guarantee
 
 The internal state machine MUST persist state transitions synchronously to maintain durability. Periodic persistence is insufficient for correct workflow semantics.
 
 ---
 
+## Critical Implementation Details
+
+### Approval Gates
+
+MVP auto-approves all transitions (`status: AUTO_APPROVED`). Manual approval is supported via external signal handling when `auto_approve: false` is configured.
+
+### DAG vs Linear
+
+The WorkflowDefinition supports DAG structure but MVP only implements linear execution. The DAG features remain available for future use without breaking compatibility.
+
+### Signal Handling
+
+Workflows can be signaled for:
+- Manual approval
+- External triggers
+- Cancellation
+
+---
+
 ## Addressing Audit Concerns
 
-### Workflow Seam (All)
+### Workflow Seam (All Audits)
+The `WorkflowEngine` interface is designed for Temporal migration with explicit state transitions and no internal Temporal-specific concepts.
 
-The `WorkflowEngine` interface is designed for Temporal migration:
-- State transitions are explicit (CreateWorkflow, ExecuteStep, WaitForSignal)
-- No internal Temporal-specific concepts leak into domain logic
-- Migration verified by implementing linear workflow on both engines
+### Approval Gates (All Audits)
+`Approval` entity fully defined with binary auto-approve support.
 
-### Approval Gates (DeepSeek)
-
-MVP uses auto-approve for all transitions. `Approval` entity is defined but not used until Phase 2. This clarifies the "rejection path" concern.
-
-### DAG vs Linear Confusion (Minimax)
-
-MVP explicitly implements linear workflow only. DAG features are marked as Phase 2. This resolves the specification contradiction.
+### DAG Features (Minimax)
+DAG features defined in schema but linear execution is MVP default.

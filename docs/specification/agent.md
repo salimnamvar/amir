@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-The Agent Runtime is responsible for executing external agents in isolated environments and extracting structured artifacts from their output.
+The Agent Runtime executes external agents in isolated environments and extracts structured artifacts from their output.
 
 ```
 ┌─────────────────┐
@@ -11,7 +11,7 @@ The Agent Runtime is responsible for executing external agents in isolated envir
          │
          ▼
 ┌─────────────────┐
-│ AgentSelector   │───→ Configuration Context (read AgentDefinition)
+│ AgentSelector   │───→ AgentDefinition (read capability)
 └────────┬────────┘
          │
          ▼
@@ -26,7 +26,7 @@ The Agent Runtime is responsible for executing external agents in isolated envir
          │
          ▼
 ┌─────────────────┐
-│ParseOutput Loop │───→ Extract → Validate → Feedback (Phase 2)
+│ParseOutput Loop │───→ Extract → Validate → Feedback on failure
 └─────────────────┘
 ```
 
@@ -59,57 +59,13 @@ class AgentAdapter(ABC):
 
 ## AgentInvocationContract
 
-```yaml
-# Machine-readable contract for agent invocation
-schema:
-  type: object
-  required: [task_id, agent_definition_id, contract, workspace]
-  properties:
-    task_id:
-      type: string
-      format: uuid
-    agent_definition_id:
-      type: string
-      format: uuid
-    contract:
-      type: object
-      required: [type, version, data]
-      properties:
-        type:
-          type: string
-        version:
-          type: string
-        data:
-          type: object
-    workspace:
-      type: object
-      required: [repo_url, branch, workdir]
-      properties:
-        repo_url:
-          type: string
-          format: uri
-        branch:
-          type: string
-        workdir:
-          type: string
-    resource_limits:
-      type: object
-      properties:
-        max_tokens:
-          type: integer
-          minimum: 1
-        timeout_seconds:
-          type: integer
-          minimum: 1
-        memory_mb:
-          type: integer
-```
+See `docs/contract/schemas/agent-invocation.schema.yaml` for machine-readable schema.
 
 ## LLM Output Extraction Pipeline
 
-**Critical for MVP reliability** - This pipeline converts unstructured LLM output into validated artifacts.
+Converts unstructured LLM output into validated artifacts.
 
-### Phase 1 (MVP): Deterministic Extraction
+### Deterministic Extraction
 
 ```
 LLM Output
@@ -120,27 +76,54 @@ Extract first valid JSON/YAML block
     ↓
 Validate against Contract Schema
     ↓
-Reject if validation fails (no regex fallback)
+If VALID: Accept artifact
+If INVALID: Trigger feedback loop
 ```
 
-**No regex fallback** - If structured extraction fails, invocation fails and triggers retry-with-feedback in Phase 2.
+**No regex fallback** - If structured extraction fails, the validation-failure feedback loop handles recovery.
 
-### Phase 2 (Planned): Retry with Feedback
+## Validation-Failure → Re-Invocation Feedback Loop
+
+Critical mechanism for handling agents that produce invalid artifacts.
+
+### Behavior
 
 ```
-LLM Output (Invalid)
-    ↓
-ParseOutput Pipeline (fails)
-    ↓
-Feedback Generator (creates corrective prompt)
-    ↓
-Retry with original context + error details
-    ↓
-LLM Output (Retry)
-    ↓
-ParseOutput Pipeline (retry max 2)
-    ↓
-Accept or Fail Permanently
+1. AgentInvocation.Completed
+2. Contract Validator runs structural validation
+3. If INVALID:
+   - Artifact.Rejected emitted with validation errors
+   - Feedback Generator creates corrective prompt
+   - Task.attempts incremented
+   - If attempts < agent_definition.max_retry_attempts:
+     - Create new AgentInvocation
+     - Inject feedback: "Previous attempt failed: [errors]. Correct and resubmit."
+     - Agent retries with full context
+   - Else:
+     - Task.Failed permanently emitted
+4. If VALID:
+   - Artifact.Validated emitted
+   - Task.Completed
+```
+
+### Feedback Format
+
+```yaml
+feedback:
+  type: object
+  required: [validation_errors, attempt_number]
+  properties:
+    validation_errors:
+      type: array
+      items:
+        type: string
+      description: "List of validation errors from previous attempt"
+    attempt_number:
+      type: integer
+      description: "Current retry attempt (1-indexed)"
+    original_contract:
+      type: object
+      description: "Original task contract for reference"
 ```
 
 ## Sandbox Manager Interface
@@ -172,31 +155,27 @@ class SandboxManager(ABC):
 
 ## Sandbox Requirements
 
-### MVP (Phase 1)
+### Runtime Support
+- **Docker**: Default runtime with seccomp profile
+- **gVisor**: Enhanced isolation for production
+- **Firecracker**: MicroVMs for maximum security
 
-- **Technology**: Docker with seccomp profile
-- **Non-root**: MUST run as UID 65534 (nobody)
-- **Root filesystem**: MUST be read-only
-- **Workspace**: Writable tmpfs mounted at `/workspace`
-- **Network**: Default-deny (only loopback)
-- **Resources**: CPU/memory limits enforced
+### Security Mandates
+- **Non-root execution**: MUST run as UID 65534 (nobody)
+- **Read-only root**: Root filesystem MUST be read-only
+- **Workspace isolation**: Writable tmpfs mounted at `/workspace` only
+- **Network default-deny**: Only loopback allowed unless explicitly permitted
 
-### Phase 2
-
-- **Technology**: gVisor or Firecracker microVMs
-- **Enhanced network**: Allowlist-based egress
-- **File scanning**: Malware/secrret detection on workspace
-
-### Phase 3
-
-- **Technology**: Production-grade container security (gVisor + AppArmor)
-- **Multi-region**: Geographically distributed sandboxes
+### Resource Limits
+- **CPU**: Configurable cores limit
+- **Memory**: Configurable limit with hard ceiling
+- **PID limit**: Maximum processes enforceable
 
 ## Cost Control
 
-### Hard Limits (MVP)
+### Hard Limits
 
-Each Task has a cost budget enforced at adapter level:
+Each Task has a cost budget enforced at adapter level.
 
 ```python
 class CostEnforcer:
@@ -209,101 +188,52 @@ class CostEnforcer:
 
 - **Threshold**: 95% of limit triggers kill switch
 - **Enforcement**: Adapter kills process at threshold
-- **Measurement**: Token counting during streaming (Phase 2)
+- **Measurement**: Token counting during streaming
 
-### Team Budgets (Phase 2)
+### Team Budgets
 
 ```yaml
-BudgetLimits:
+budget:
   daily_usd: float
   monthly_tokens: int
   concurrent_tasks: int
-  reservation_based: true  # Allocate before execute
+  reservation_based: true
 ```
+
+## Approval Model
+
+### Binary Approval
+All transitions use binary approval gates:
+- **AUTO_APPROVE**: Workflow proceeds automatically
+- **REJECTED**: Workflow blocked until manual intervention
+
+### Manual Approval
+For critical workflows, approval can be handled externally:
+- External system monitors Workflow.ReviewRequired event
+- External approver calls `workflow.approve(gate_name, approver_id)`
 
 ## Risk Register
 
-| Risk | Severity | Mitigation | MVP Status |
-|------|----------|------------|------------|
-| CLI output parsing | HIGH | Structured output + deterministic extraction | ACCEPT |
-| Sandbox escape | CRITICAL | Non-root containers + read-only root + tmpfs workspace | MITIGATE |
-| Contract drift | MEDIUM | Version pinning + adapter validation | ACCEPT |
-| Cost explosion | HIGH | Hard token/USD limits per task | MITIGATE |
-| Temporal migration blockage | MEDIUM | Clean interface seam defined | ADDRESS |
-
----
-
-## Validation-Failure → Re-Invocation Loop
-
-This is the critical feedback mechanism for handling agents that produce invalid artifacts.
-
-### MVP Behavior
-
-```
-1. AgentInvocation.Completed
-2. Contract Validator runs structural validation
-3. If INVALID:
-   - AgentInvocation.Completed → AgentInvocation.Failed
-   - Task.Failed emitted
-   - No retry (Phase 1 limitation)
-4. If VALID:
-   - Artifact.Validated emitted
-   - Task.Completed
-```
-
-### Phase 2 Behavior
-
-```
-1. AgentInvocation.Completed
-2. Contract Validator runs structural validation
-3. If INVALID:
-   - Artifact.Rejected emitted
-   - Feedback Generator creates corrective prompt
-   - Task.attempts incremented
-   - If attempts < max_attempts:
-     - Create new AgentInvocation
-     - Inject feedback into prompt: "Previous attempt failed: [validation errors]"
-     - Agent retries with context
-   - Else:
-     - Task.Failed permanently
-```
-
-### Feedback Format
-
-```yaml
-feedback:
-  type: object
-  required: [validation_errors, attempt_number]
-  properties:
-    validation_errors:
-      type: array
-      items:
-        type: string
-      description: "List of validation errors from previous attempt"
-    attempt_number:
-      type: integer
-      description: "Current retry attempt (1-indexed)"
-    original_contract:
-      type: object
-      description: "Original task contract for reference"
-```
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| CLI output parsing | HIGH | Structured extraction + feedback loop |
+| Sandbox escape | CRITICAL | Non-root containers + read-only root + tmpfs workspace |
+| Contract drift | MEDIUM | Version pinning + adapter validation |
+| Cost explosion | HIGH | Hard limits + 95% threshold kill |
+| Workflow durability | HIGH | SQLite persistence on each state transition |
 
 ---
 
 ## Addressing Audit Concerns
 
 ### CLI Parsing Risk (All Audits)
+No regex fallback. Structured extraction only. Failure triggers feedback loop.
 
-MVP does NOT use regex fallback. Structured extraction only. If extraction fails, task fails. Retry-with-feedback is Phase 2.
-
-### Sandbox Security (Kimi, GLM)
-
-MVP requires non-root containers with read-only root filesystem. This is a hard requirement, not recommendation.
+### Sandbox Security (All Audits)
+Mandatory non-root containers with read-only root filesystem. gVisor/Firecracker alternatives available.
 
 ### Adapter Protocol (DeepSeek)
-
-All adapters use same JSON serialization via stdin or temp file. No webhook callbacks (sandboxes are network-isolated).
+All adapters use same JSON serialization via stdin or temp file. No webhook callbacks due to network isolation.
 
 ### Capability Matching (Mistral)
-
-Weighted scoring algorithm implemented. See Domain Model section for specification.
+Weighted scoring algorithm with configurable thresholds. See Domain Model for full specification.

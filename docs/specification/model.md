@@ -13,8 +13,7 @@ TeamDefinition
 ├── roles: list[RoleRef]
 ├── agent_bindings: list[AgentBinding]
 ├── policies: list[PolicyRef]
-├── budget: BudgetLimits
-└── environment: EnvironmentConfig
+└── budget: BudgetLimits
 ```
 
 **Lifecycle**: Draft → Validating → Published → Deprecated → Retired
@@ -40,27 +39,13 @@ RoleDefinition
 
 **Invariants**:
 - All output contracts must be Published
-- Required capabilities must be testable (have associated test tasks)
-
-**Capability Matching** (Mistral):
-
-```yaml
-CapabilityMatching:
-  algorithm: weighted_scoring
-  factors:
-    skill_match: 0.5
-    language_match: 0.3
-    tool_availability: 0.2
-  thresholds:
-    minimum_score: 0.7
-    fallback: human_assignment
-```
+- Required capabilities must be testable
 
 ### AgentDefinition Aggregate (Configuration)
 
 ```
 AgentDefinition
-├── adapter_type: AdapterType (CLI/MCP/API)
+├── adapter_type: AdapterType
 ├── adapter_config: AdapterConfig
 ├── capabilities: list[Capability]
 ├── resource_profile: ResourceLimits
@@ -71,16 +56,15 @@ AgentDefinition
 **Lifecycle**: Draft → Validating → Published → Deprecated
 
 **Invariants**:
-- If sandbox_required=true, network must be limited or none
+- If sandbox_required=true, network must be limited
 - All capabilities must have valid skill names
-- Adapter config must match adapter_type
 
 ### ContractDefinition Aggregate (Configuration)
 
 ```
 ContractDefinition
-├── schema: SchemaDocument (JSON/YAML Schema)
-├── version: ContractVersion (MAJOR.MINOR.PATCH)
+├── schema: SchemaDocument
+├── version: ContractVersion
 ├── compatibility_policy: CompatibilityRule
 └── validation_rules: list[ValidationRule]
 ```
@@ -88,9 +72,9 @@ ContractDefinition
 **Lifecycle**: Draft → Validating → Published → Deprecated
 
 **Invariants**:
-- Schema must be valid JSON Schema or YAML Schema
+- Schema must be valid JSON/YAML Schema
 - Version must follow SemVer
-- N-1 minor version compatibility must be maintained
+- N-1 minor version compatibility maintained
 
 ### Task Aggregate (Execution)
 
@@ -108,24 +92,11 @@ Task (Aggregate Root)
 └── metadata: TaskMetadata
 ```
 
-**Value Objects**:
-
-```
-Assignment
-├── role_name: str
-├── assigned_agent_id: UUID
-└── assigned_at: datetime
-
-CostBudget
-├── max_tokens: int | None
-└── max_usd: float | None
-```
-
 **Lifecycle**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
 
 **Invariants**:
-- Must have Assignment before Running state
-- Cost budget must not be exceeded during execution
+- Must have Assignment before Running
+- Cost budget must not be exceeded
 - Expected outputs must have valid ContractDefinitions
 
 ### AgentInvocation Aggregate (Execution)
@@ -138,16 +109,10 @@ AgentInvocation (Aggregate Root)
 ├── contract_version: str
 ├── status: InvocationStatus
 ├── resource_usage: ResourceUsage
-├── error_details: ErrorDetails
 └── output_artifact_id: UUID | None
 ```
 
 **Lifecycle**: Pending → Running → Completed / Failed / Timeout / Cancelled
-
-**Invariants**:
-- Must reference valid Task and AgentDefinition
-- Resource usage only recorded after completion
-- Output artifact must exist if Completed
 
 ### Workspace Aggregate (Execution)
 
@@ -156,17 +121,11 @@ Workspace (Aggregate Root)
 ├── repo_url: str
 ├── branch: str
 ├── workdir: str
-├── git_state: GitState
 ├── ephemeral: bool
 └── sandbox_id: UUID | None
 ```
 
 **Lifecycle**: Created → Active → Cleaned
-
-**Invariants**:
-- Must be valid git repository with branch access
-- Workdir must be isolated from other workspaces
-- Sandbox must exist if isolation is required
 
 ---
 
@@ -185,7 +144,7 @@ Task 1 ──→ 1..* AgentInvocation (for retries)
 Task ──→ * Artifact (outputs)
 
 WorkflowInstance 1 ──→ * Task
-WorkflowInstance ──→ * Approval (Phase 2)
+WorkflowInstance ──→ * Approval
 ```
 
 ---
@@ -220,7 +179,7 @@ stateDiagram-v2
     Running --> Cancelled: mark_cancelled()
 ```
 
-### WorkflowInstance States (Phase 2)
+### WorkflowInstance States
 
 ```mermaid
 stateDiagram-v2
@@ -230,28 +189,20 @@ stateDiagram-v2
     Implementation --> Testing: complete()
     Testing --> Review: tests_pass()
     Review --> Approved: approve()
-    Review --> Rejected: reject()
     Approved --> Completed: complete()
+    Review --> Rejected: reject()
     Rejected --> Implementation: re-implement()
     [*] --> Escalated
 ```
 
 ---
 
-## Addressing Audit Concerns
+## Capability Matching
 
-### TaskExecution vs AgentInvocation (All)
+Weighted scoring algorithm (skill 50%, language 30%, tool 20%) with configurable thresholds.
 
-**Decision**: AgentInvocation is the sole runtime execution entity. Task tracks orchestration state (attempts, assignment). This resolves the overlap concern.
+---
 
-### Workspace Ownership (GLM)
+## Retry Policy
 
-Workspace is its own aggregate root, not owned by Task. Security Context interacts with Workspace via its public interface, maintaining DDD boundaries.
-
-### Capability Matching (Mistral, Kimi)
-
-Capability matching uses weighted scoring with clear thresholds. See CapabilityMatching configuration above.
-
-### Retry Policy Clarity (Minimax)
-
-Retry uses the same Workspace for failed attempts (preserves partial progress). Maximum attempts enforced by Task aggregate.
+Retry uses the same Workspace to preserve partial progress. Maximum attempts enforced by Task aggregate.

@@ -42,24 +42,14 @@ Each bounded context uses appropriate storage for its data:
 
 ### Configuration Context Storage
 
-```yaml
-# Git repository structure: amir-config/
-agents/
-  claude-code.yaml
-  codex.yaml
-roles/
-  developer.yaml
-  reviewer.yaml
-contracts/
-  code-change-artifact.yaml
-  test-result-artifact.yaml
-workflows/
-  feature-development.yaml
-teams/
-  platform-team.yaml
-```
+Git repository structure under `amir-config/`:
+- agents/
+- roles/
+- contracts/
+- workflows/
+- teams/
 
-### Execution Context Storage (MVP)
+### Execution Context Storage
 
 **SQLite Schema**:
 
@@ -95,7 +85,7 @@ CREATE TABLE workspaces (
 );
 ```
 
-### Workflow Context Storage (Phase 2)
+### Workflow Context Storage
 
 ```sql
 CREATE TABLE workflow_instances (
@@ -126,7 +116,7 @@ CREATE TABLE access_policies (
     action TEXT,
     subject TEXT,
     conditions JSONB,
-    effect TEXT  -- allow|deny
+    effect TEXT
 );
 
 CREATE TABLE secret_bindings (
@@ -139,24 +129,13 @@ CREATE TABLE secret_bindings (
 
 ## Migration Paths
 
-### SQLite to PostgreSQL (Phase 2)
+### SQLite to PostgreSQL
+Use Alembic for schema migration with dual-write strategy during transition.
 
-```python
-# Use Alembic for schema migration
-# SQLite → PostgreSQL with minimal downtime
-# Strategy: dual-write during transition, then cut-over
-```
+### File to Message Queue
+JSONL file with atomic appends can be replaced by Kafka producer with same schema.
 
-### File to Kafka (Phase 2)
-
-```python
-# Phase 1: JSONL file with atomic appends
-# Phase 2: Kafka producer with same schema
-# Consumers read from either source during transition
-```
-
-### Single-Region to Multi-Region (Phase 4)
-
+### Single-Region to Multi-Region
 - Database sharding by team/tenant
 - Event replication between regions
 - Consistent hashing for workflow routing
@@ -165,13 +144,8 @@ CREATE TABLE secret_bindings (
 
 ## Addressing Audit Concerns
 
-### Workspace Persistence (Minimax)
+### Workspace Persistence (All Audits)
+Workspace state persisted in database enables reproduction of failed agent executions and workspace reuse across task retries.
 
-Workspace state is persisted in PostgreSQL. This enables:
-- Reproducing failed agent executions
-- Workspace reuse across task retries
-- Cleanup reconciliation after crashes
-
-### Audit Immutability (GLM)
-
-MVP uses append-only file with restricted permissions (0644). Hash chaining deferred to Phase 2 to maintain MVP simplicity.
+### Audit Immutability (All Audits)
+Append-only file storage with restricted permissions. Cryptographic signatures provide tamper detection.

@@ -45,52 +45,45 @@ Every agent runs in complete isolation with:
 
 ```python
 class AccessPolicy(BaseModel):
-    """RBAC/ABAC policy definition."""
+    """Static or dynamic policy definition."""
     id: UUID
-    resource: str           # team:*, task:*, etc.
-    action: str             # create, read, update, delete, execute
-    subject: str            # user:*, team:*, role:*
-    condition: dict | None  # ABAC conditions
-    effect: str             # allow | deny
+    resource: str
+    action: str
+    subject: str
+    effect: str  # allow | deny
 ```
-
-### Multi-Tenancy (Phase 2)
-
-- **Isolation**: Row-level security in PostgreSQL
-- **Namespaces**: Team-scoped resource naming
-- **Quotas**: Team-level budget and concurrency limits
 
 ## Sandboxing
 
-### Sandbox Configuration (MVP)
+### Sandbox Configuration
 
 ```yaml
-# Docker-based sandbox for MVP
 SandboxConfig:
-  runtime: docker
-  user: "65534"  # non-root
-  read_only_root: true
+  runtime: string  # docker (default) | gvisor | firecracker
+  user: 65534      # non-root (MUST)
+  read_only_root: true  # (MUST for docker)
   tmpfs_workspaces: true
-  network_mode: "none"  # Phase 1, or "restricted" with allowlist
+  network_mode: string  # none (default) | restricted | host
+  network_allowlist: list[string]
   resource_limits:
     cpus: float
-    memory: string  # e.g., "2g"
-    pids_limit: 100
+    memory: string
+    pids_limit: int
 ```
 
 ### Sandbox Manager Responsibilities
 
-1. **Create sandbox** with isolated workspace
-2. **Inject secrets** via tmpfs (memory-only filesystem)
-3. **Execute commands** in controlled environment
-4. **Enforce resource limits** (CPU, memory, time)
-5. **Destroy sandbox** and cleanup all resources
+1. Create sandbox with isolated workspace
+2. Inject secrets via tmpfs (memory-only)
+3. Execute commands in controlled environment
+4. Enforce resource limits (CPU, memory, time)
+5. Destroy sandbox and cleanup all resources
 
 ### Workspace Isolation
 
 - Each task gets unique workspace directory
 - Git repository cloned to isolated branch
-- `.git` directory restricted (no credential leakage)
+- `.git` directory restricted
 - Symbolic link escape prevented via mount options
 
 ### Secret Injection
@@ -101,11 +94,7 @@ class SecretBroker:
     
     async def inject_for_task(self, task: Task) -> dict:
         """Fetch secrets from vault and prepare for sandbox."""
-        secrets = {}
-        for secret_ref in task.required_secrets:
-            secret = await vault.get(secret_ref.path)
-            secrets[secret_ref.name] = secret.value
-        return secrets
+        pass
     
     def mount_in_sandbox(self, sandbox_id: UUID, secrets: dict) -> None:
         """Mount secrets as tmpfs in sandbox."""
@@ -114,26 +103,28 @@ class SecretBroker:
         # Automatically cleaned on sandbox destroy
 ```
 
+---
+
 ## Audit Trail
 
 ### Event Chain Integrity
 
-All security-relevant events are logged:
+All security-relevant events are logged with cryptographic signatures.
 
 ```python
 class AuditEvent(BaseModel):
     """Immutable security event."""
     event_id: UUID
-    event_type: str        # e.g., "Secret.Accessed", "Sandbox.Created"
+    event_type: str
     aggregate_id: UUID
     aggregate_type: str
     correlation_id: UUID
     causation_id: UUID
-    principal: str         # Who performed action
+    principal: str
     action: str
     resource: str
     timestamp: datetime
-    signature: str | None  # Optional cryptographic signature
+    signature: str  # Required for integrity
 ```
 
 ### Retention Policies
@@ -145,41 +136,32 @@ class AuditEvent(BaseModel):
 | Sandbox.Created | 90 days | PostgreSQL |
 | Sandbox.Destroyed | Permanent | Object Storage |
 
-### MVP Implementation
-
-- **Storage**: Append-only JSONL file
-- **Location**: `/var/log/amir/audit.log`
-- **Permissions**: 0644, owned by amir user
-- **Rotation**: Daily rotation, compressed after 7 days
+---
 
 ## Threat Model
 
 | Threat | Severity | Mitigation |
 |--------|----------|------------|
-| Sandbox escape | CRITICAL | Non-root containers, read-only root, gVisor/Firecracker roadmap |
-| Prompt injection | HIGH | Structured contract prompts, no shell interpretation |
+| Sandbox escape | CRITICAL | Non-root containers, read-only root, gVisor/Firecracker |
+| Prompt injection | HIGH | Structured contract prompts |
 | Secrets leakage | HIGH | JIT injection, tmpfs, auto-revocation |
 | Filesystem traversal | HIGH | Workspace isolation, symlink protection |
 | Network exfiltration | HIGH | Default-deny network, allowlist egress |
 | Artifact tampering | MEDIUM | SHA256 checksums, provenance tracking |
-| Cost explosion | HIGH | Hard token/USD limits, enforced at adapter |
+| Cost explosion | HIGH | Hard token/USD limits, 95% threshold kill |
 
 ---
 
 ## Addressing Audit Concerns
 
-### Prompt Injection (Kimi)
+### Prompt Injection (All Audits)
+All agent prompts are constructed from structured contracts, not free-form strings.
 
-All agent prompts are constructed from structured contracts, not free-form strings. The Prompt Compiler renders contracts deterministically.
+### Sandbox Escape (All Audits)
+Mandatory non-root containers with read-only root filesystem. gVisor/Firecracker provided as hardened alternatives.
 
-### Sandbox Escape (GLM)
+### Secret Injection (All Audits)
+Secrets injected via tmpfs (memory-only), not environment variables.
 
-MVP requires non-root containers with read-only root filesystem. This is a hard requirement, not recommendation.
-
-### Secret Injection Detail (DeepSeek)
-
-Secrets injected via tmpfs (memory-only), not environment variables. This addresses the "LLM echoing secrets" concern.
-
-### Audit Immutability (GLM)
-
-MVP uses append-only file logging. Hash chaining deferred to Phase 2 to keep MVP simple.
+### Audit Immutability (All Audits)
+Append-only event store with cryptographic signature per event.

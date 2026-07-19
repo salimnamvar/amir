@@ -1,35 +1,53 @@
 # Audit-Event Contract Schema
-# **DEFERRED** - See specification/mvp.md
+# Complete schema for audit events
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
-# This schema is deferred to Phase 2.
-# In MVP, audit events are simple JSONL lines with no schema validation.
-#
-# Justification:
-# - MVP uses append-only file logging for simplicity
-# - No distributed querying required in single-node deployment
-# - Full observability stack (OpenTelemetry) comes in Phase 2
-#
-# When implemented, this schema will define:
-# - Event envelope structure (timestamp, level, component, event_id)
-# - Security-relevant event types
-# - Retention policies
-# - Correlation with workflow traces
-
 type: object
-description: "Deferred to Phase 2 - MVP uses simple JSONL append-only logging"
+required: [event_id, timestamp, level, component, event_type]
 properties:
+  # Event identity
   event_id:
     type: string
     format: uuid
+    description: "Unique event identifier"
+  
   timestamp:
     type: string
     format: date-time
+    description: "Event occurrence time"
+  
+  # Event metadata
   level:
     type: string
     enum: [info, warning, error, critical]
+    description: "Event severity level"
+  
   component:
     type: string
-  message:
+    description: "Source component emitting event"
+  
+  event_type:
     type: string
+    description: "Specific event type (e.g., Task.Created, Agent.Invoked)"
+  
+  # Correlation
+  correlation_id:
+    type: string
+    format: uuid
+    description: "Correlation for trace tracking"
+  
+  causation_id:
+    type: string
+    format: uuid
+    description: "Cause of this event"
+  
+  # Payload
+  payload:
+    type: object
+    description: "Event-specific data"
+  
+  # Security
+  signature:
+    type: string
+    description: "Cryptographic signature for tamper detection"

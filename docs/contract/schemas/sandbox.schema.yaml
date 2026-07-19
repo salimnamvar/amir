@@ -1,5 +1,5 @@
 # Sandbox Contract Schema
-# Pure schema for sandbox configuration
+# Complete schema for sandbox configuration
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -15,7 +15,7 @@ properties:
   # User and filesystem security
   user:
     type: integer
-    description: "UID to run as (65534 = nobody for non-root)"
+    description: "UID to run as (default: 65534 = nobody)"
     default: 65534
   
   read_only_root:
@@ -26,7 +26,7 @@ properties:
   tmpfs_workspaces:
     type: boolean
     default: true
-    description: "Workspaces mounted as tmpfs (memory-only)"
+    description: "Workspaces mounted as tmpfs"
   
   # Network configuration
   network_mode:
@@ -39,7 +39,7 @@ properties:
     type: array
     items:
       type: string
-    description: "Allowed network destinations (CIDR)"
+    description: "Allowed network destinations (CIDR notation)"
   
   # Resource limits
   resource_limits:
@@ -54,3 +54,10 @@ properties:
       pids_limit:
         type: integer
         minimum: 1
+  
+  # Security profile
+  security_profile:
+    type: string
+    enum: [baseline, hardened]
+    default: "baseline"
+    description: "Security profile preset"

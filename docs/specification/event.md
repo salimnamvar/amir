@@ -2,11 +2,9 @@
 
 ## Overview
 
-Events in Amir are immutable facts that represent state changes and business occurrences. All events follow a consistent structure enabling distributed tracing, replay, and debugging.
+Events in Amir are immutable facts representing state changes and business occurrences. All events follow a consistent structure enabling distributed tracing, replay, and debugging.
 
 ## Domain Event Envelope
-
-All events use the standard `DomainEvent` structure:
 
 ```python
 from datetime import datetime
@@ -17,15 +15,16 @@ class DomainEvent(BaseModel):
     """Standard envelope for all domain events."""
     
     event_id: UUID = Field(default_factory=uuid4)
-    event_type: str              # e.g., "Task.Created"
-    aggregate_id: UUID           # Entity that produced this
-    aggregate_type: str          # Type of aggregate
-    correlation_id: UUID         # End-to-end workflow trace
-    causation_id: UUID           # Direct cause of this event
-    producer: str                # Component that emitted
-    version: str = "1.0.0"      # Event schema version
+    event_type: str
+    aggregate_id: UUID
+    aggregate_type: str
+    correlation_id: UUID
+    causation_id: UUID
+    producer: str
+    version: str = "1.0.0"
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    payload: dict[str, Any]      # Event-specific data
+    payload: dict[str, Any]
+    signature: str = ""  # Optional cryptographic signature
 ```
 
 ## Event Taxonomy
@@ -48,13 +47,13 @@ class DomainEvent(BaseModel):
 | Workflow.Created | WorkflowEngine | workflow_id, definition_id |
 | Workflow.Completed | WorkflowEngine | workflow_id, status |
 
-### Progress Events (30-Day Retention)
+### Progress Events (Configurable Retention)
 
 | Event Type | Producer | Payload |
 |------------|----------|---------|
 | AgentInvocation.Progress | AgentAdapter | invocation_id, percent, message |
 
-### Security Events
+### Security Events (Permanent/90 days)
 
 | Event Type | Producer | Payload |
 |------------|----------|---------|
@@ -63,86 +62,76 @@ class DomainEvent(BaseModel):
 | Secret.Accessed | SecretBroker | secret_path, task_id |
 | Access.Denied | Authorization | resource, action, subject, reason |
 
-## Event Flow Examples
+## Event Flow
 
 ### Task Creation Flow
 
 ```
-1. Task.Created
-   correlation_id: WORKFLOW-123
-   causation_id: null
-
-2. Task.Assigned  
-   correlation_id: WORKFLOW-123
-   causation_id: Task.Created event_id
-
-3. AgentInvocation.Started
-   correlation_id: WORKFLOW-123
-   causation_id: Task.Assigned event_id
-```
-
-### Workflow Completion Flow
-
-```
-Task.Completed → Task.Completed (next task) → ... → Workflow.Completed
+Task.Created (correlation_id: W-123, causation_id: null)
+    ↓
+Task.Assigned (correlation_id: W-123, causation_id: Task.Created event_id)
+    ↓
+AgentInvocation.Started (correlation_id: W-123, causation_id: Task.Assigned event_id)
 ```
 
 ## Correlation and Causation
 
-- **correlation_id**: Traces the entire workflow from creation
+- **correlation_id**: Traces entire workflow from creation
 - **causation_id**: Links event to its direct cause
 
-This enables:
-- Full audit trail reconstruction
-- Error chain tracing
-- Replay of specific workflows
+Enables audit trail reconstruction, error tracing, and workflow replay.
 
-## MVP Event Publishing
+---
+
+## Event Publishing
+
+### File-Based Publisher (Default)
 
 ```python
 class FileEventPublisher(EventPublisher):
-    """MVP: Simple file-based event publishing."""
+    """Default event publisher to JSONL file."""
     
-    def __init__(self, path: str = "/var/log/amir/events.jsonl"):
+    def __init__(self, path: str):
         self.path = path
     
     async def publish(self, event: DomainEvent) -> None:
         with open(self.path, "a") as f:
             f.write(event.model_dump_json() + "\n")
-    
-    async def publish_batch(self, events: list[DomainEvent]) -> None:
-        # Write all events atomically
-        lines = [e.model_dump_json() for e in events]
-        with open(self.path, "a") as f:
-            f.write("\n".join(lines) + "\n")
 ```
 
-## Phase 2 Event Publishing
+### Message Queue Publisher (Alternative)
 
 ```python
-class KafkaEventPublisher(EventPublisher):
-    """Phase 2: Kafka with schema registry."""
+class MQEventPublisher(EventPublisher):
+    """Alternative publisher for distributed deployments."""
     
-    def __init__(self, brokers: list[str]):
-        self.producer = KafkaProducer(brokers)
+    def __init__(self, connection: Connection):
+        self.connection = connection
     
     async def publish(self, event: DomainEvent) -> None:
-        topic = f"amir.{event.aggregate_type.lower()}s"
-        await self.producer.send(topic, event.model_dump_json())
+        channel = await self.connection.channel()
+        await channel.default_exchange.publish(
+            routing_key=f"amir.{event.aggregate_type.lower()}s",
+            body=event.model_dump_json()
+        )
 ```
+
+---
+
+## Event Retention Policies
+
+| Category | Retention | Purpose |
+|----------|-----------|---------|
+| Lifecycle | Permanent | Audit trail |
+| Security | Permanent | Compliance, forensics |
+| Progress | Configurable | Debugging, monitoring |
 
 ---
 
 ## Addressing Audit Concerns
 
-### Event Model Overreach (GLM)
+### Event Ordering (All Audits)
+Single-writer per aggregate ensures ordering. Persistent storage provides atomicity.
 
-MVP uses a single append-only file. No tiered retention or complex routing.
-
-### Event Ordering (GLM)
-
-Single-writer per aggregate ensures ordering. SQLite transactions provide atomicity.
-
-### Progress Streaming (GLM, DeepSeek)
-
-MVP does not stream progress. `AgentInvocation.Progress` exists but is only emitted once on completion. Phase 2 adds sampling for high-volume scenarios.
+### Progress Events (All Audits)
+Progress events exist but retention is configurable. Sampling can be applied for high-volume scenarios.

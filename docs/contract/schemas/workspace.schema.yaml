@@ -1,5 +1,5 @@
 # Workspace Contract Schema
-# Pure schema for workspace isolation
+# Complete schema for workspace isolation
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -18,7 +18,8 @@ properties:
   
   workdir:
     type: string
-    description: "Working directory path within sandbox"
+    description: "Working directory path (default: /workspace)"
+    default: "/workspace"
   
   # Isolation markers
   sandbox_id:
@@ -30,4 +31,18 @@ properties:
   ephemeral:
     type: boolean
     default: true
-    description: "Whether workspace is deleted after task"
+    description: "Workspace deleted after task completion"
+  
+  # Security context
+  security_context:
+    type: object
+    properties:
+      network_isolated:
+        type: boolean
+        default: true
+      read_only_root:
+        type: boolean
+        default: true
+      user_id:
+        type: integer
+        default: 65534
