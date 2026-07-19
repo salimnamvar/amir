@@ -13,6 +13,7 @@
 .claude
 .autohand
 .github
+.github/
 .grok
 .kimi
 .mimo
@@ -92,9 +93,9 @@ nosetests.xml
 TEST*.xml
 
 # =============================================================================
-# LINTERS & CACHES
+# linters & caches
 # =============================================================================
-.ruff_cache
+.ruff_cache/
 .cache/
 .eslintcache
 

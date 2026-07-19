@@ -123,7 +123,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"src/amir/cli.py" = ["T201"]
+"src/amir/cli.py" = [
+    "T201",    # print statement — CLI output
+    "FBT001",  # boolean positional — CLI flags
+    "FBT002",  # boolean default — CLI flags
+]
 "tests/**/*.py" = [
     "ANN",     # type annotations not required in tests
     "ARG001",  # unused argument — mock callbacks
