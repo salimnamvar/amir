@@ -22,19 +22,18 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 | Event Model | DomainEvent with correlation/causation |
 | Adapter Interface | AgentAdapter abstract base class |
 
-## Out of Scope (Removed)
+## Extended Features (Available in Design)
 
-| Feature | Reason for Removal |
-|---------|---------------------|
-| Streaming Mode B | Out of scope - heartbeat events instead |
-| Multi-Environment GitOps | Out of scope - single environment |
-| Human Approvals | Out of scope - binary auto-approve only |
-| Full Observability Stack | Out of scope - file logs only |
-| Policy Engine (OPA) | Out of scope - static policies only |
-| Multi-Tenancy | Out of scope - single team only |
-| Semantic Validation | Out of scope - structural only |
-| Artifact Lineage | Out of scope - not needed |
-| Temporal Integration | Out of scope - custom state machine only |
+| Feature | Description |
+|---------|-------------|
+| Multiple Agents | Codex, OpenCode, Gemini CLI supported via adapters |
+| DAG Workflows | WorkflowDefinition supports task dependencies |
+| Human Approvals | Approval entity with manual gating |
+| Semantic Validation | Quality metrics and test execution |
+| Multi-Tenant | Namespace isolation for teams |
+| Advanced Policies | OPA integration option |
+| Temporal Engine | WorkflowEngine interface compatible |
+| Full Observability | Prometheus, OpenTelemetry integration |
 
 ## MVP Architecture
 
@@ -109,15 +108,3 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 | Sandbox escape | Non-root containers, read-only root, security review |
 | Cost explosion | Hard limits enforced at adapter, 95% threshold kill |
 | Workflow durability | SQLite persistence on each state change |
-
----
-
-## Removed From Previous Scope
-
-Based on scope decisions:
-
-1. **Removed**: Multi-environment GitOps (single environment)
-2. **Removed**: Human approval gates (binary auto-approve only)
-3. **Removed**: Full OpenTelemetry integration (file logs only)
-4. **Removed**: Temporal/Temporal integration (custom state machine)
-5. **Removed**: OPA policy engine (static policies only)
