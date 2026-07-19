@@ -92,10 +92,14 @@ properties:
     items:
       type: string
 
-  # Reconciliation between parser claims and workspace observation
+  # Canonical claim reconciliation (authoritative). Artifact and Feedback reference
+  # this via claim_reconciliation_validation_id / validation_result_id — they MUST
+  # NOT duplicate this structure.
   claim_reconciliation:
     type: object
-    description: "Comparison of agent/parser claims against workspace ground truth"
+    description: >
+      Comparison of agent/parser claims against workspace ground truth.
+      This is the single authoritative shape; workspace always wins on divergence.
     properties:
       observation_method:
         type: string
@@ -103,6 +107,17 @@ properties:
       claims_match_observation:
         type: boolean
         description: "True when agent/parser claims are consistent with workspace state"
+      authoritative_source:
+        type: string
+        enum: [workspace]
+        default: workspace
+        description: "Always workspace; parser/agent claims never override filesystem ground truth"
+      baseline_commit:
+        type: string
+        description: "Git commit or tree hash before session execution"
+      current_commit:
+        type: string
+        description: "Git commit or tree hash after session execution (or working-tree marker)"
       claimed_paths:
         type: array
         items:
@@ -123,6 +138,10 @@ properties:
         description: "Paths claimed by agent but not present in workspace diff"
       divergence_summary:
         type: string
+      parser_strategy_used:
+        type: string
+        enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
+        description: "Which ParserRegistry strategy produced the claims being reconciled"
 
   validation_duration_ms:
     type: integer

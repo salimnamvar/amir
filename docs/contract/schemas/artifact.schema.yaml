@@ -72,7 +72,7 @@ properties:
   observation_method:
     type: string
     enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
-    description: "How artifact was derived; workspace_diff and synthesized are preferred ground truth. synthesized requires llm_coercion approval."
+    description: "How artifact was derived. workspace_diff is preferred ground truth. synthesized requires llm_coercion approval (coercion_approval_id) and is not default."
 
   # Reference to canonical claim reconciliation (ValidationResult)
   # The complete claim_reconciliation data is held on ValidationResult;

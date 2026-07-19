@@ -73,3 +73,29 @@ properties:
     type: string
     enum: [invocation_budget_exceeded, team_budget_exceeded, tenant_budget_exceeded, org_budget_exceeded, manual_revocation]
     description: "Why the lease was cancelled"
+
+  # Hierarchy attribution
+  scope:
+    type: string
+    enum: [invocation, team, tenant, org]
+    description: "Budget scope this lease enforces"
+
+  team_id:
+    type: string
+    format: uuid
+
+  tenant_id:
+    type: string
+    format: uuid
+
+  # Failure modes (design contract for implementers)
+  # - Lease check is synchronous on each sidecar/egress metering tick (≤100ms).
+  # - cancelled=true or status=revoked → Execution MUST terminate the session process.
+  # - Lease service unavailable → fail-closed: treat as revoked for new consumption
+  #   (no further LLM egress); complete in-flight tool step only if already started.
+  # - Post-cancel terminal category is budget_exceeded (not retryable by default;
+  #   see Task.retry_policy.retry_on). Emits EscalationSignal when scope is team+.
+  fail_closed_on_unavailable:
+    type: boolean
+    default: true
+    description: "If lease service is unreachable, deny further metered consumption"

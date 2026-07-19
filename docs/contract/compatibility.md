@@ -55,6 +55,9 @@ This means:
 | ValidationResult | `validation-result.schema.yaml` | Structured validation output | valid, validators, claim_reconciliation |
 | SandboxAttestation | `sandbox-attestation.schema.yaml` | Runtime integrity | image_hash, attestation_signature, signing_key_ref |
 | Workspace | `workspace.schema.yaml` | Per-session filesystem + durable effects | session_id, baseline_commit, durable_effects |
+| CostLease | `cost-lease.schema.yaml` | Sync hard-kill gate for hierarchical budgets | lease_id, cancelled, cancellation_reason, scope |
+| SecretBinding | `secret-binding.schema.yaml` | Ephemeral secret grants with TTL | binding_id, secret_ref, expires_at, access_method |
+| EscalationSignal | `escalation-signal.schema.yaml` | Human escalation (compensation blocked, cost, …) | escalation_type, target_type, target_id |
 
 ## Breaking Change Rules
 
