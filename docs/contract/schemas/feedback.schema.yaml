@@ -66,7 +66,18 @@ properties:
     enum: [structural_hint, semantic_hint, strategy_change, agent_change]
     description: "Type of feedback to inject"
   
-  parser_strategy_suggestion:
+  # Advisory only — OutputParser / control plane decides strategy; agent does not.
+  parser_strategy_hint:
     type: string
     enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
-    description: "Suggested parser strategy for next attempt"
+    description: "Optional hint for the next parse chain; not binding on the agent"
+
+  validation_result_id:
+    type: string
+    format: uuid
+    description: "ValidationResult that produced this feedback"
+
+  claim_divergence:
+    type: boolean
+    default: false
+    description: "True when failure was due to parser/agent claims disagreeing with workspace observation"

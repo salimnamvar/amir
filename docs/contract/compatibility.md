@@ -29,27 +29,32 @@ This means:
 | Contract Type | Backward Compatibility | Breaking Changes |
 |---------------|---------------------|-----------------|
 | AgentContract | N-1 minor | Removed required field, changed field type, removed capability |
-| TaskContract | N-1 minor | Changed objective format, removed role reference, removed idempotency_key |
+| TaskContract | N-1 minor | Changed objective format, removed role reference, removed idempotency_key, removed cost ceiling requirement |
 | ArtifactContract | N-1 minor | Schema structure change, required field removal, removed lineage fields |
 | WorkflowContract | N-1 minor | Removed state, changed transition structure, removed compensation config |
-| RoleContract | N-1 minor | Changed inputs/outputs structure |
+| RoleContract | N-1 minor | Changed inputs/outputs structure, reintroduced subjective proficiency |
 | TeamContract | N-1 minor | Changed budget/quota structure, removed scoring_weights |
 | FeedbackContract | N-1 minor | Changed error category enum, removed correction suggestions |
-| AgentSessionContract | N-1 minor | Changed status enum, removed checkpoint structure |
+| AgentSessionContract | N-1 minor | Changed status enum, removed checkpoint structure, removed cost ceiling |
 | CostRecordContract | N-1 minor | Changed attribution fields, removed cost hierarchy |
-| MatchingDecisionContract | N-1 minor | Changed scoring dimensions, removed explanation |
+| MatchingDecisionContract | N-1 minor | Changed scoring dimensions, removed hard_filters, removed explanation |
+| CompiledPromptContract | N-1 minor | Changed template_hash semantics, removed output_contract |
+| ValidationResultContract | N-1 minor | Changed error category enum, removed claim_reconciliation |
+| SandboxAttestationContract | N-1 minor | Changed signature algorithm, removed signing_key_ref |
 
-## New Contract Types (Round 3)
+## First-Class Runtime Contracts
 
-| Contract Type | Purpose | Key Fields |
-|--------------|---------|------------|
-| FeedbackArtifact | Validation failure → re-invocation | error_context, corrections, suggested_strategy |
-| AgentSession | Durable execution lifecycle | session_id, checkpoints, tool_calls, replay_metadata |
-| CostRecord | Multi-dimensional cost tracking | orchestration_cost_usd, worker_cost_usd, team_id |
-| MatchingDecision | Agent selection audit | score, dimension_scores, explanation, projected_cost |
-| CompiledPrompt | Reproducible prompt artifact | template_hash, system_prompt, output_contract |
-| ValidationResult | Structured validation output | valid, error_categories, validation_duration_ms |
-| SandboxAttestation | Runtime integrity | image_hash, attestation_signature, signing_key_ref |
+| Contract Type | Schema | Purpose | Key Fields |
+|--------------|--------|---------|------------|
+| AgentSession | `agent-session.schema.yaml` | Durable execution aggregate | session_id, checkpoints, tool_calls, resource_limits, workspace_id |
+| AgentInvocation | `agent-invocation.schema.yaml` | Request DTO that creates a session | task_id, agent_definition_id, idempotency_key, resource_limits |
+| FeedbackArtifact | `feedback.schema.yaml` | Validation failure → re-invocation | error_context, corrections, suggested_strategy |
+| CostRecord | `cost-record.schema.yaml` | Multi-dimensional cost tracking | orchestration_cost_usd, worker_cost_usd, team_id |
+| MatchingDecision | `matching-decision.schema.yaml` | Agent selection audit | score, hard_filters, contract_negotiation, candidates |
+| CompiledPrompt | `compiled-prompt.schema.yaml` | Reproducible prompt artifact | template_hash, system_prompt, output_contract |
+| ValidationResult | `validation-result.schema.yaml` | Structured validation output | valid, validators, claim_reconciliation |
+| SandboxAttestation | `sandbox-attestation.schema.yaml` | Runtime integrity | image_hash, attestation_signature, signing_key_ref |
+| Workspace | `workspace.schema.yaml` | Per-session filesystem + durable effects | session_id, baseline_commit, durable_effects |
 
 ## Breaking Change Rules
 
@@ -61,6 +66,7 @@ This means:
 - Removing capabilities from agent definitions
 - Changing state machine structure
 - Removing idempotency_key from required fields
+- Removing structural cost ceilings (`anyOf` max_tokens / max_usd)
 
 ### Allowed (MINOR version)
 
@@ -85,13 +91,49 @@ supported_contracts:
     version: ">=1.2.0"
 ```
 
-### Task Assignment
+### Task Assignment Composition Order
 
-Orchestrator finds compatible contract:
+Agent selection is a **hard-filter → score → negotiate** pipeline. Contract negotiation is not a scoring dimension; it is a post-score filter with fallback:
 
 ```python
+def assign_agent(task: Task, candidates: list[AgentDefinition], context) -> MatchingDecision:
+    """Compose hard filters, multi-dimensional scoring, and contract negotiation."""
+    eligible = []
+    rejected = []
+    for agent in candidates:
+        ok, reason = hard_filter(agent, task)  # tools, skills, circuit breaker, health, network
+        if not ok:
+            rejected.append((agent.id, reason))
+            continue
+        eligible.append(agent)
+
+    ranked = sorted(
+        (score_agent(a, task, context, load_scorecard(a)) for a in eligible),
+        key=lambda d: d.score,
+        reverse=True,
+    )
+
+    for decision in ranked:
+        agent = get_agent(decision.selected_agent_id)
+        try:
+            version = negotiate_contract(agent, task)
+            decision.contract_negotiation = {
+                "negotiated_type": task.expected_outputs[0].type,
+                "negotiated_version": version,
+                "compatible": True,
+                "fallback_used": decision is not ranked[0],
+            }
+            decision.hard_filters = {"passed": True, "rejected_agents": rejected}
+            return decision
+        except ContractNotCompatible:
+            decision.eliminated_reason = "contract_incompatible"
+            continue
+
+    raise NoCompatibleAgent(task_id=task.id, rejected=rejected, ranked=ranked)
+
+
 def negotiate_contract(agent: AgentDefinition, task: Task) -> str:
-    """Negotiate best compatible contract version."""
+    """Negotiate best compatible contract version for a specific agent."""
     required = task.expected_outputs[0]
     for supported in agent.supported_contracts:
         if supported.type == required.type:
@@ -100,41 +142,33 @@ def negotiate_contract(agent: AgentDefinition, task: Task) -> str:
     raise ContractNotCompatible()
 ```
 
-## Migration Strategy
+**Rules:**
+1. Hard filters eliminate agents with open circuit breakers, missing tools/skills, or health failures.
+2. Scoring ranks remaining agents (historical scorecards, cost, latency, etc.).
+3. `negotiate_contract()` runs top-down; if the winner is contract-incompatible, the next-ranked agent is tried.
+4. Assignment fails only when no ranked agent is contract-compatible.
 
-### Phase 1: Version Pinning
+## Migration and Deprecation Policy
 
-- All contracts pinned to specific versions in workflow definitions
-- No automatic negotiation
-- Simple deployment model
+### Supporting Multiple Versions
 
-### Phase 2: N-1 Support
+The complete system supports:
 
-- Orchestrator uses highest compatible MINOR version
-- Agents support N-1 versions
-- Automatic rollback on validation failure
+1. **Pinned versions** in workflow definitions when exact reproducibility is required.
+2. **N-1 automatic selection** of the highest compatible MINOR version by default.
+3. **SemVer range negotiation** when agents declare ranges (`>=1.0.0 <2.0.0`), falling back to the highest mutually compatible version.
 
-### Phase 3: Full Negotiation
+Consumers MUST run contract compatibility tests against N-1 before publishing a MINOR release. Canary promotion of new contract versions is supported via WorkflowDefinition version pins.
 
-- Semantic version ranges supported
-- Fallback to lowest common denominator
-- Canary deployment of new contract versions
+### Deprecation Lifecycle
 
-## Deprecation Policy
+When deprecating a contract version:
 
-### Deprecation Notice
-
-When deprecating a contract:
-
-1. Mark as `deprecated: true` in ContractDefinition
-2. Add `deprecation_notice` field with migration guide
-3. Maintain support for 6 months minimum
-
-### End-of-Life
-
-- **Phase 1**: Deprecation warning logged
-- **Phase 2**: Tasks using deprecated contracts require explicit override
-- **Phase 3**: Deprecated contracts rejected unless forced
+1. Mark as `deprecated: true` in ContractDefinition with a `deprecation_notice` migration guide.
+2. Maintain support for a minimum of 6 months.
+3. Emit deprecation warnings on use during the support window.
+4. After the window, reject deprecated contracts unless an explicit `force_deprecated_contract: true` override is set on the Task (audited).
+5. Remove retired versions only via MAJOR registry cleanup with published migration notes.
 
 ## Contract Registry
 
@@ -147,10 +181,13 @@ ContractRegistry
 ├── TestResultArtifact v1.0.0 (Published)
 ├── FeedbackArtifact v1.0.0 (Published)
 ├── AgentSession v1.0.0 (Published)
+├── AgentInvocation v1.0.0 (Published)
 ├── CostRecord v1.0.0 (Published)
 ├── MatchingDecision v1.0.0 (Published)
 ├── CompiledPrompt v1.0.0 (Published)
 ├── ValidationResult v1.0.0 (Published)
+├── SandboxAttestation v1.0.0 (Published)
+├── Workspace v1.0.0 (Published)
 └── ...
 ```
 
@@ -177,24 +214,24 @@ class ContractRegistry:
 
 ---
 
-## Addressing Audit Concerns
+## Design Notes
 
-### Contract Drift (Kimi)
+### Contract Drift
 
-Contract versioning is based on **Amir's expectations**, not agent output. Agent adapters must handle output format changes through parser versioning, not contract versioning.
+Contract versioning is based on **Amir's expectations**, not agent stdout shape. Agent adapters handle output format changes through ParserRegistry strategy versioning, not by changing business contracts.
 
-### Semantic Validation Gap (All 17 Audits)
+### Semantic Validation
 
-Structural validation is first-class. Semantic validation is available via pluggable validators with timeout and budget constraints. Both are part of the core design.
+Structural validation and semantic validation are both first-class. Semantic validators are pluggable with timeout and budget constraints; results are `ValidationResult` contracts.
 
-### Schema Language (Kimi)
+### Schema Language
 
-Using YAML Schema for human readability in GitOps. JSON Schema export available for tooling. CUE deferred to future consideration.
+YAML Schema for human readability in GitOps. JSON Schema export available for tooling.
 
-### Idempotency (Claude/Kimi)
+### Idempotency
 
-All mutable operations now require idempotency keys. Stored with operation outcome to prevent duplicate side effects on retry.
+All mutable operations require idempotency keys. Stored with operation outcome to prevent duplicate side effects on retry.
 
-### New Contract Types (Round 3)
+### Cost Ceilings
 
-FeedbackArtifact, AgentSession, CostRecord, MatchingDecision, CompiledPrompt, ValidationResult, and SandboxAttestation are new first-class contracts.
+`Task.cost_budget` and session/invocation `resource_limits` structurally require at least one of `max_tokens` or `max_usd` via JSON Schema `anyOf`. Empty budgets are invalid by construction.

@@ -1,15 +1,27 @@
 # Agent Session Schema
-# Durable execution unit with checkpoints, tool calls, and replay metadata
+# Central durable execution aggregate. AgentInvocation is the request DTO that
+# creates a session; runtime truth lives here (checkpoints, cost, validation, workspace).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [session_id, task_id, agent_definition_id, attempt_number, status]
+required:
+  - session_id
+  - task_id
+  - agent_definition_id
+  - attempt_number
+  - status
+  - idempotency_key
+  - resource_limits
 properties:
   session_id:
     type: string
     format: uuid
-    description: "Unique session identifier (also idempotency key)"
+    description: "Unique session identifier"
+
+  idempotency_key:
+    type: string
+    description: "Typically SHA256(task_id + attempt_number)"
   
   task_id:
     type: string
@@ -20,6 +32,11 @@ properties:
     type: string
     format: uuid
     description: "Agent executing in this session"
+
+  matching_decision_id:
+    type: string
+    format: uuid
+    description: "MatchingDecision that selected this agent"
   
   attempt_number:
     type: integer
@@ -33,20 +50,55 @@ properties:
   
   status:
     type: string
-    enum: [pending, starting, running, waiting_for_input, producing_artifact, validating, succeeded, failed, compensating, timed_out, cancelled]
+    enum:
+      - pending
+      - starting
+      - running
+      - waiting_for_input
+      - producing_artifact
+      - validating
+      - succeeded
+      - failed
+      - compensating
+      - timed_out
+      - cancelled
   
   workspace_id:
     type: string
     format: uuid
+    description: "Exclusive workspace for this session (Task 1 → * Workspace via sessions)"
   
   sandbox_id:
     type: string
     format: uuid
+
+  sandbox_attestation_id:
+    type: string
+    format: uuid
+    description: "SandboxAttestation recorded at session start"
   
   compiled_prompt_id:
     type: string
     format: uuid
-    description: "Reference to compiled prompt artifact"
+    description: "Reference to CompiledPrompt artifact"
+
+  # Hard resource ceilings (structurally enforced)
+  resource_limits:
+    type: object
+    required: [timeout_seconds]
+    properties:
+      max_tokens:
+        type: integer
+        minimum: 1
+      max_usd:
+        type: number
+        minimum: 0
+      timeout_seconds:
+        type: integer
+        minimum: 1
+    anyOf:
+      - required: [max_tokens]
+      - required: [max_usd]
   
   checkpoints:
     type: array
@@ -66,7 +118,7 @@ properties:
           type: object
         workspace_snapshot:
           type: string
-          description: "Git commit hash at this checkpoint"
+          description: "Git commit or tree hash at this checkpoint"
   
   tool_calls:
     type: array
@@ -92,30 +144,39 @@ properties:
         status:
           type: string
           enum: [running, completed, failed]
-  
-  validation_result:
+
+  # Interactive prompt handling (CLI agents that request input)
+  pending_input:
     type: object
+    description: "Present when status=waiting_for_input"
     properties:
-      valid:
-        type: boolean
-      error_categories:
-        type: array
-        items:
-          type: object
-          properties:
-            category:
-              type: string
-              enum: [structural, semantic, policy, quality]
-            code:
-              type: string
-            message:
-              type: string
+      prompt_text:
+        type: string
+      input_kind:
+        type: string
+        enum: [clarification, approval, secret, choice, freeform]
+      auto_response_rule:
+        type: string
+        description: "Matched auto-response rule id, if any"
+      timeout_seconds:
+        type: integer
+        minimum: 1
+  
+  validation_result_id:
+    type: string
+    format: uuid
+    description: "Reference to standalone ValidationResult contract"
+
+  validation_result:
+    $ref: "validation-result.schema.yaml"
   
   feedback_artifact:
     $ref: "feedback.schema.yaml"
   
+  # Live metering (sidecar); not the durable CostRecord
   resource_usage:
     type: object
+    description: "Live usage meters; authoritative accounting is CostRecord"
     properties:
       tokens_consumed:
         type: integer
@@ -127,20 +188,11 @@ properties:
         type: number
       memory_peak_mb:
         type: number
-  
-  cost_record:
-    type: object
-    properties:
-      tokens_input:
-        type: integer
-      tokens_output:
-        type: integer
-      cost_usd:
-        type: number
-      orchestration_cost_usd:
-        type: number
-      worker_cost_usd:
-        type: number
+
+  cost_record_id:
+    type: string
+    format: uuid
+    description: "Authoritative CostRecord in Observability Context"
   
   replay_metadata:
     type: object
@@ -158,6 +210,9 @@ properties:
         type: string
       agent_version:
         type: string
+      adapter_type:
+        type: string
+        enum: [cli, mcp, api, remote]
   
   started_at:
     type: string
@@ -166,3 +221,4 @@ properties:
   completed_at:
     type: string
     format: date-time
+

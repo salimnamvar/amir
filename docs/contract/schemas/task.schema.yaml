@@ -1,41 +1,41 @@
 # Task Contract Schema
-# Contract for task definition and execution
-# Updated: Added idempotency key and circuit breaker
+# Work unit awaiting execution. Cost ceiling is structurally required.
+# Circuit breaking is agent-scoped (AgentScorecard), not task-scoped.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [title, objective, assigned_role, idempotency_key]
+required: [title, objective, assigned_role, idempotency_key, cost_budget]
 properties:
   # Core identity
   id:
     type: string
     format: uuid
     description: "Task identifier"
-  
+
   idempotency_key:
     type: string
     description: "Unique key for idempotent task creation"
-  
+
   title:
     type: string
     description: "Human-readable task title"
     maxLength: 200
-  
+
   objective:
     type: string
     description: "Natural language objective"
     minLength: 1
-  
+
   description:
     type: string
     description: "Detailed task description"
-  
+
   # Role assignment
   assigned_role:
     type: string
     description: "Role to perform this task"
-  
+
   # Input artifacts
   inputs:
     type: array
@@ -43,7 +43,7 @@ properties:
       type: string
       format: uuid
     description: "Artifact IDs to provide as input"
-  
+
   # Expected outputs (typed contract references)
   expected_outputs:
     type: array
@@ -58,7 +58,7 @@ properties:
           type: string
           description: "Expected contract version"
     description: "Expected artifact contract types with versions"
-  
+
   # Constraints
   constraints:
     type: object
@@ -74,23 +74,32 @@ properties:
         type: array
         items:
           type: string
-  
+      required_tools:
+        type: array
+        items:
+          type: string
+        description: "Hard filter: agent must declare these tools"
+      max_file_size_bytes:
+        type: integer
+        minimum: 1
+
   # Dependencies
   depends_on:
     type: array
     items:
       type: string
       format: uuid
-  
+
   # Priority
   priority:
     type: string
     enum: [critical, high, normal, low, background]
     default: "normal"
-  
-  # Cost controls
+
+  # Cost controls — at least one ceiling is mandatory (cost is a runtime invariant)
   cost_budget:
     type: object
+    description: "Hard cost ceiling; at least one of max_tokens or max_usd is required"
     properties:
       max_tokens:
         type: integer
@@ -98,8 +107,17 @@ properties:
       max_usd:
         type: number
         minimum: 0
-  
-  # Retry policy
+      reservation_buffer_pct:
+        type: number
+        minimum: 0
+        maximum: 50
+        default: 10
+        description: "Extra headroom reserved beyond estimate to reduce mid-flight kills"
+    anyOf:
+      - required: [max_tokens]
+      - required: [max_usd]
+
+  # Retry policy (task-scoped attempt accounting — NOT a circuit breaker)
   retry_policy:
     type: object
     properties:
@@ -119,27 +137,43 @@ properties:
         type: array
         items:
           type: string
-        default: ["FAILED", "TIMEOUT"]
+        default: ["FAILED", "TIMEOUT", "VALIDATION_FAILED"]
       escalate_after:
         type: integer
         minimum: 1
         default: 2
         description: "Escalate to different agent after N failures"
-  
-  # Circuit breaker
-  circuit_breaker:
+
+  # Task-scoped attempt state (distinct from agent-level circuit breaker)
+  retry_state:
     type: object
+    description: "Per-task retry bookkeeping. Circuit breakers live on AgentScorecard only."
     properties:
-      state:
-        type: string
-        enum: [closed, open, half_open]
-        default: "closed"
+      attempts:
+        type: integer
+        minimum: 0
+        default: 0
       consecutive_failures:
         type: integer
+        minimum: 0
         default: 0
-      failure_threshold:
-        type: integer
-        default: 5
-      recovery_timeout_seconds:
-        type: integer
-        default: 300
+      last_failure_category:
+        type: string
+        enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled]
+      last_session_id:
+        type: string
+        format: uuid
+      escalated:
+        type: boolean
+        default: false
+
+  # Workspace lineage: Task 1 → 1..* Workspace (one per AgentSession attempt)
+  active_workspace_id:
+    type: string
+    format: uuid
+    description: "Workspace for the current attempt; prior attempts retain their own workspaces until cleaned"
+
+  matching_decision_id:
+    type: string
+    format: uuid
+    description: "MatchingDecision that selected the current agent"

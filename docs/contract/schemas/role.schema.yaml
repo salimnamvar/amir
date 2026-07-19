@@ -80,6 +80,8 @@ properties:
               type: number
               default: 0.10
   
+  # Capability requirements are objective hard filters + soft scoring inputs.
+  # Subjective proficiency enums are prohibited; use tools/constraints instead.
   required_capabilities:
     type: array
     items:
@@ -88,9 +90,19 @@ properties:
       properties:
         skill:
           type: string
-        minimum_proficiency:
-          type: string
-          enum: [novice, intermediate, expert]
+          description: "Hierarchical skill id (e.g., code.generate.python)"
+        required_tools:
+          type: array
+          items:
+            type: string
+          description: "Hard filter: agent must declare these tools"
+        max_file_size_bytes:
+          type: integer
+          minimum: 1
+        requires_network:
+          type: boolean
+          default: true
+          description: "Whether this capability needs egress (package registries / LLM API)"
   
   prompt_template_ref:
     type: string

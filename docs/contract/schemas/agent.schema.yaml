@@ -72,6 +72,8 @@ properties:
         default: 3600
   
   # Security Profile
+  # Maps to sandbox network_mode: none → none, proxy → proxy.
+  # Unrestricted/host networking is not permitted.
   security_profile:
     type: object
     properties:
@@ -80,8 +82,33 @@ properties:
         default: true
       network_access:
         type: string
-        enum: [none, limited, full]
-        default: "limited"
+        enum: [none, proxy]
+        default: "proxy"
+        description: "none = no egress; proxy = all egress via Amir egress proxy"
+      network_allowlist:
+        type: array
+        items:
+          type: string
+        description: >
+          Default destinations permitted through the egress proxy when network_access=proxy.
+          Empty array means deny-all except platform-injected LLM provider routes.
+          Coding agents should include package registries they require (e.g. pypi.org, registry.npmjs.org).
+      default_network_allowlist_profile:
+        type: string
+        enum: [llm_only, coding_standard, custom]
+        default: coding_standard
+        description: >
+          coding_standard expands to LLM provider + common package registries;
+          llm_only is provider endpoints only; custom uses network_allowlist as-is.
+  # Supported output modes (control-plane extraction strategies)
+  supported_output_modes:
+    type: array
+    items:
+      type: string
+      enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    minItems: 1
+    default: [json_schema, workspace_observation]
+    description: "Extraction modes this agent/adapter supports; free_text is not a control-plane mode"
   
   # Runtime Contract Support
   supported_contracts:

@@ -1,39 +1,95 @@
 # Workspace Contract Schema
-# Complete schema for workspace isolation
+# Ephemeral execution filesystem. Owned by Execution Context.
+# Cardinality: Task 1 → 1..* Workspace (one Workspace per AgentSession attempt).
+# Security Context enforces policy; it does not own the Workspace aggregate.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [repo_url, branch]
+required: [workspace_id, task_id, session_id, repo_url, branch, status]
 properties:
+  workspace_id:
+    type: string
+    format: uuid
+    description: "Unique workspace identifier"
+
+  task_id:
+    type: string
+    format: uuid
+    description: "Parent task (many workspaces per task across retries)"
+
+  session_id:
+    type: string
+    format: uuid
+    description: "Owning AgentSession (exactly one session per workspace)"
+
   # Git configuration
   repo_url:
     type: string
     format: uri
     description: "Git repository URL"
-  
+
   branch:
     type: string
-    description: "Git branch for this workspace"
-  
+    description: "Git branch for this workspace (amir/{task_id}/{role_name} pattern recommended)"
+
   workdir:
     type: string
     description: "Working directory path (default: /workspace)"
     default: "/workspace"
-  
+
+  # Lifecycle
+  status:
+    type: string
+    enum: [created, active, observed, cleaned, failed]
+    description: "Workspace lifecycle state"
+
   # Isolation markers
   sandbox_id:
     type: string
     format: uuid
-    description: "Sandbox this workspace belongs to"
-  
+    description: "Sandbox this workspace is mounted into"
+
+  # Observation baselines (ground truth for artifact synthesis)
+  baseline_commit:
+    type: string
+    description: "Git HEAD (or tree hash) recorded before agent execution"
+
+  current_commit:
+    type: string
+    description: "Git HEAD (or tree hash) after agent execution / observation"
+
+  baseline_tree_hash:
+    type: string
+    description: "Full tree hash for observation even if agent does not commit"
+
+  # Durable side-effect handles (survive workspace cleanup; used by compensation)
+  durable_effects:
+    type: object
+    description: "References to durable repo/PR state produced while workspace was active"
+    properties:
+      branch_name:
+        type: string
+      head_commit:
+        type: string
+      pr_number:
+        type: integer
+      remote_url:
+        type: string
+        format: uri
+
   # Cleanup settings
   ephemeral:
     type: boolean
     default: true
-    description: "Workspace deleted after task completion"
-  
-  # Security context
+    description: "Local sandbox filesystem deleted after session terminal state"
+
+  cleaned_at:
+    type: string
+    format: date-time
+    description: "When ephemeral filesystem was destroyed; durable_effects remain for compensation"
+
+  # Security context (enforced by Security Context policies at creation)
   security_context:
     type: object
     properties:
@@ -46,3 +102,20 @@ properties:
       user_id:
         type: integer
         default: 65534
+      network_mode:
+        type: string
+        enum: [proxy, none]
+        default: proxy
+      network_allowlist:
+        type: array
+        items:
+          type: string
+        description: "Effective allowlist after policy merge"
+
+  created_at:
+    type: string
+    format: date-time
+
+  observed_at:
+    type: string
+    format: date-time

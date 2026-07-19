@@ -1,40 +1,45 @@
 # Agent Invocation Request Schema
-# Request contract for invoking an agent to perform work
-# Updated: AgentSession model with retry context and output contract
+# Request DTO that creates an AgentSession. AgentSession is the durable aggregate;
+# this schema is the immutable request boundary into the runtime.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [task_id, agent_definition_id, contract, workspace, idempotency_key]
+required: [task_id, agent_definition_id, contract, workspace, idempotency_key, resource_limits]
 properties:
   # References
   task_id:
     type: string
     format: uuid
     description: "Parent task identifier"
-  
+
   agent_definition_id:
     type: string
     format: uuid
     description: "Agent to invoke"
-  
+
+  matching_decision_id:
+    type: string
+    format: uuid
+    description: "MatchingDecision that authorized this assignment"
+
   # Idempotency
   idempotency_key:
     type: string
-    description: "Unique key for idempotent execution"
-  
+    description: "Unique key for idempotent execution (typically SHA256(task_id + attempt_number))"
+
   # Session chain (for retries)
   attempt_number:
     type: integer
     minimum: 1
     default: 1
     description: "Current attempt number (1-indexed)"
-  
+
   previous_session_id:
     type: string
     format: uuid
     description: "Previous session ID (for retry chain)"
-  
+
   # Contract to execute
   contract:
     type: object
@@ -49,7 +54,7 @@ properties:
       data:
         type: object
         description: "Contract input data"
-  
+
   # Expected output contract
   expected_output_contract:
     type: object
@@ -61,18 +66,18 @@ properties:
       version:
         type: string
         description: "Expected contract version"
-  
-  # Output mode negotiation
+
+  # Output mode — Amir owns extraction; free_text is not a control-plane mode
   output_mode:
     type: string
-    enum: [json_schema, tool_use, markdown_yaml, free_text]
-    description: "Preferred output mode for agent"
-  
+    enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    description: "How Amir will extract the artifact (control plane decides, not the agent)"
+
   # Feedback from previous attempt
   feedback:
     $ref: "feedback.schema.yaml"
-  
-  # Workspace configuration
+
+  # Workspace configuration (new workspace per attempt)
   workspace:
     type: object
     required: [repo_url, branch, workdir]
@@ -87,8 +92,8 @@ properties:
       workdir:
         type: string
         description: "Working directory in sandbox"
-  
-  # Resource constraints
+
+  # Resource constraints — at least one cost ceiling required
   resource_limits:
     type: object
     required: [timeout_seconds]
@@ -105,7 +110,10 @@ properties:
         type: integer
         minimum: 1
         description: "Execution timeout in seconds"
-  
+    anyOf:
+      - required: [max_tokens]
+      - required: [max_usd]
+
   # Replay metadata
   replay_metadata:
     type: object

@@ -1,0 +1,99 @@
+# SandboxAttestation Contract Schema
+# Cryptographic proof of sandbox runtime integrity for an AgentSession
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required:
+  - attestation_id
+  - session_id
+  - sandbox_id
+  - runtime
+  - image_hash
+  - sandbox_profile_hash
+  - attestation_signature
+  - signing_key_ref
+  - attested_at
+properties:
+  attestation_id:
+    type: string
+    format: uuid
+
+  session_id:
+    type: string
+    format: uuid
+    description: "AgentSession executed under this attestation"
+
+  sandbox_id:
+    type: string
+    format: uuid
+
+  task_id:
+    type: string
+    format: uuid
+
+  runtime:
+    type: string
+    enum: [gvisor, firecracker]
+    description: "Production runtimes only; docker is not attestable for production"
+
+  image_hash:
+    type: string
+    description: "SHA256 of the container/rootfs image"
+
+  sandbox_profile_hash:
+    type: string
+    description: "SHA256 of effective sandbox policy (network, mounts, user, limits)"
+
+  network_mode:
+    type: string
+    enum: [proxy, none]
+
+  egress_proxy_fingerprint:
+    type: string
+    description: "Identity fingerprint of the egress proxy endpoint used"
+
+  policy_refs:
+    type: array
+    items:
+      type: string
+    description: "AccessPolicy / SandboxPolicy identifiers enforced at start"
+
+  # Cryptographic material
+  attestation_signature:
+    type: string
+    description: "Signature over canonical attestation payload"
+
+  signing_key_ref:
+    type: string
+    description: "KMS/HSM key reference used to sign (e.g., kms://amir/sandbox-attestor/v3)"
+
+  signature_algorithm:
+    type: string
+    enum: [ed25519, ecdsa-p256, rsa-pss-4096]
+    default: ed25519
+
+  # Key lifecycle (referenced, not embedded secrets)
+  key_lifecycle:
+    type: object
+    properties:
+      key_id:
+        type: string
+      rotated_at:
+        type: string
+        format: date-time
+      previous_key_ref:
+        type: string
+        description: "Prior key still valid for verification during rotation window"
+      compromise_revoked:
+        type: boolean
+        default: false
+
+  attested_at:
+    type: string
+    format: date-time
+
+  expires_at:
+    type: string
+    format: date-time
+    description: "Attestation validity end; sessions past this must re-attest"

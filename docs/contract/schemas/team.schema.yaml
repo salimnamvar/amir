@@ -52,7 +52,7 @@ properties:
           format: uuid
           description: "AgentDefinition ID"
   
-  # Budget and quotas (Phase 2)
+  # Budget and quotas (hierarchical cost gate)
   budget:
     type: object
     properties:

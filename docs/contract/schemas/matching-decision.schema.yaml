@@ -1,0 +1,175 @@
+# MatchingDecision Contract Schema
+# Auditable agent selection decision produced by capability scoring + contract negotiation
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required:
+  - decision_id
+  - task_id
+  - selected_agent_id
+  - score
+  - dimension_scores
+  - hard_filters
+  - candidates
+  - decided_at
+properties:
+  decision_id:
+    type: string
+    format: uuid
+
+  task_id:
+    type: string
+    format: uuid
+
+  selected_agent_id:
+    type: string
+    format: uuid
+    description: "Winning agent after hard filters + scoring + contract negotiation"
+
+  selected_agent_version:
+    type: string
+    description: "AgentDefinition version selected (scorecards are version-aware)"
+
+  score:
+    type: number
+    minimum: 0
+    maximum: 1
+    description: "Weighted composite score of the selected agent"
+
+  dimension_scores:
+    type: object
+    required:
+      - skill_match
+      - language_match
+      - tool_match
+      - historical_success
+      - cost_efficiency
+      - latency
+      - availability
+    properties:
+      skill_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      language_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      tool_match:
+        type: number
+        minimum: 0
+        maximum: 1
+      historical_success:
+        type: number
+        minimum: 0
+        maximum: 1
+      cost_efficiency:
+        type: number
+        minimum: 0
+        maximum: 1
+      latency:
+        type: number
+        minimum: 0
+        maximum: 1
+      availability:
+        type: number
+        minimum: 0
+        maximum: 1
+
+  weights:
+    type: object
+    description: "Weights used for this decision (must sum to 1.0)"
+    additionalProperties:
+      type: number
+      minimum: 0
+      maximum: 1
+
+  # Composition order: hard filters → score → contract negotiate top-N
+  hard_filters:
+    type: object
+    required: [passed]
+    properties:
+      passed:
+        type: boolean
+      rejected_agents:
+        type: array
+        items:
+          type: object
+          required: [agent_id, reason]
+          properties:
+            agent_id:
+              type: string
+              format: uuid
+            reason:
+              type: string
+              enum:
+                - circuit_breaker_open
+                - missing_required_tools
+                - missing_required_skill
+                - network_constraints
+                - sandbox_constraints
+                - contract_incompatible
+                - budget_infeasible
+                - health_unhealthy
+      filter_notes:
+        type: string
+
+  contract_negotiation:
+    type: object
+    description: "Result of negotiate_contract() on the selected agent"
+    properties:
+      negotiated_type:
+        type: string
+      negotiated_version:
+        type: string
+      compatible:
+        type: boolean
+      fallback_used:
+        type: boolean
+        description: "True when top-scored agent was skipped for contract incompatibility"
+
+  candidates:
+    type: array
+    description: "Ranked candidates after scoring (pre- or post-negotiation)"
+    items:
+      type: object
+      required: [agent_id, score, rank]
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        score:
+          type: number
+        rank:
+          type: integer
+          minimum: 1
+        eliminated_reason:
+          type: string
+          description: "If not selected, why (e.g., contract_incompatible)"
+
+  explanation:
+    type: string
+    description: "Human-readable rationale for the selection"
+
+  projected_cost_usd:
+    type: number
+    minimum: 0
+
+  projected_latency_seconds:
+    type: number
+    minimum: 0
+
+  scorecard_staleness_seconds:
+    type: integer
+    minimum: 0
+    description: "Age of AgentScorecard used; routing may prefer static weights if stale"
+
+  scorecard_warm_start:
+    type: boolean
+    default: false
+    description: "True when historical metrics were carried from a prior agent version"
+
+  decided_at:
+    type: string
+    format: date-time

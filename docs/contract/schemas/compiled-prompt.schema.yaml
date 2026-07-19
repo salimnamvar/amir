@@ -1,0 +1,122 @@
+# CompiledPrompt Contract Schema
+# Versioned, reproducible prompt artifact produced by PromptCompiler
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required:
+  - prompt_id
+  - version
+  - template_ref
+  - template_hash
+  - system_prompt
+  - user_prompt
+  - output_contract
+  - session_id
+  - task_id
+properties:
+  prompt_id:
+    type: string
+    format: uuid
+    description: "Unique compiled prompt identifier"
+
+  version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    description: "SemVer of the compiler/template pipeline that produced this prompt"
+
+  template_ref:
+    type: string
+    description: "Reference to prompt template in amir-config/prompts/"
+
+  template_hash:
+    type: string
+    description: "SHA256 of template source + resolved inputs (excludes secrets)"
+
+  system_prompt:
+    type: string
+    description: "Rendered system prompt text"
+
+  user_prompt:
+    type: string
+    description: "Rendered user prompt text"
+
+  output_contract:
+    type: object
+    required: [type, version]
+    properties:
+      type:
+        type: string
+        description: "Expected artifact contract type"
+      version:
+        type: string
+      json_schema:
+        type: object
+        description: "Embedded JSON Schema for structured output modes"
+
+  tools_allowed:
+    type: array
+    items:
+      type: string
+    description: "Tools the agent may use for this invocation"
+
+  context_budget:
+    type: integer
+    minimum: 1
+    description: "Maximum tokens allocated for prompt context"
+
+  estimated_tokens:
+    type: integer
+    minimum: 0
+    description: "Estimated token count of the compiled prompt"
+
+  # Session linkage
+  session_id:
+    type: string
+    format: uuid
+    description: "AgentSession that will consume this prompt"
+
+  task_id:
+    type: string
+    format: uuid
+
+  agent_definition_id:
+    type: string
+    format: uuid
+
+  role_name:
+    type: string
+
+  # Feedback injection (retry chain)
+  feedback_injected:
+    type: boolean
+    default: false
+    description: "True when a FeedbackArtifact was compiled into this prompt"
+
+  previous_session_id:
+    type: string
+    format: uuid
+    description: "Prior session when this is a re-invocation"
+
+  # Workspace snapshot referenced at compile time
+  workspace_snapshot:
+    type: object
+    properties:
+      workspace_id:
+        type: string
+        format: uuid
+      baseline_commit:
+        type: string
+      relevant_paths:
+        type: array
+        items:
+          type: string
+
+  output_mode:
+    type: string
+    enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    description: "Output mode the adapter will prefer; Amir owns extraction, not the agent"
+
+  created_at:
+    type: string
+    format: date-time

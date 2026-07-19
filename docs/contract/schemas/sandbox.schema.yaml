@@ -31,17 +31,39 @@ properties:
     description: "Workspaces mounted as tmpfs"
   
   # Network configuration (host mode REMOVED)
+  # Default posture: proxy mode with deny-by-default allowlist.
+  # Empty allowlist means deny all destinations except platform-managed LLM routes
+  # injected by the egress proxy for cost attribution.
   network_mode:
     type: string
     enum: [proxy, none]
     default: "proxy"
-    description: "Network access mode (all traffic through egress proxy)"
+    description: >
+      proxy = all outbound via Amir egress proxy (required for LLM agents);
+      none = no network (offline tools only; incompatible with cloud LLM CLIs)
   
   network_allowlist:
     type: array
     items:
       type: string
-    description: "Allowed network destinations (CIDR notation)"
+    default: []
+    description: >
+      Allowed destinations (hostname, domain, or CIDR). Default empty = deny-all
+      except platform LLM provider routes. For coding agents, include package
+      registries required by the task (pypi.org, registry.npmjs.org, proxy.golang.org, etc.).
+  
+  network_allowlist_profile:
+    type: string
+    enum: [llm_only, coding_standard, custom]
+    default: coding_standard
+    description: "Preset expanded before enforcement; custom uses network_allowlist only"
+  
+  # Production constraint: docker runtime is invalid when environment=production
+  environment:
+    type: string
+    enum: [development, staging, production]
+    default: production
+    description: "deployment environment; production rejects runtime=docker"
   
   # Resource limits
   resource_limits:

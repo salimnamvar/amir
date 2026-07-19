@@ -72,7 +72,38 @@ properties:
   observation_method:
     type: string
     enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
-    description: "How artifact was derived from agent output"
+    description: "How artifact was derived; workspace_diff and synthesized are preferred ground truth"
+
+  # Parser-claim vs workspace reconciliation
+  claim_reconciliation:
+    type: object
+    description: "Records whether agent/parser claims match workspace observation"
+    properties:
+      claims_match_observation:
+        type: boolean
+      parser_strategy_used:
+        type: string
+        enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
+      baseline_commit:
+        type: string
+      current_commit:
+        type: string
+      divergence_summary:
+        type: string
+      authoritative_source:
+        type: string
+        enum: [workspace, parser, synthesized]
+        description: "Which source won when claims diverged; workspace always preferred for code changes"
+
+  validation_result_id:
+    type: string
+    format: uuid
+    description: "Reference to ValidationResult for this artifact"
+
+  sandbox_attestation_id:
+    type: string
+    format: uuid
+    description: "SandboxAttestation under which this artifact was produced"
   
   # Status
   status:
