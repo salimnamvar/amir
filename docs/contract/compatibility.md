@@ -29,11 +29,27 @@ This means:
 | Contract Type | Backward Compatibility | Breaking Changes |
 |---------------|---------------------|-----------------|
 | AgentContract | N-1 minor | Removed required field, changed field type, removed capability |
-| TaskContract | N-1 minor | Changed objective format, removed role reference |
-| ArtifactContract | N-1 minor | Schema structure change, required field removal |
-| WorkflowContract | N-1 minor | Removed state, changed transition structure |
+| TaskContract | N-1 minor | Changed objective format, removed role reference, removed idempotency_key |
+| ArtifactContract | N-1 minor | Schema structure change, required field removal, removed lineage fields |
+| WorkflowContract | N-1 minor | Removed state, changed transition structure, removed compensation config |
 | RoleContract | N-1 minor | Changed inputs/outputs structure |
-| TeamContract | N-1 minor | Changed budget/quota structure |
+| TeamContract | N-1 minor | Changed budget/quota structure, removed scoring_weights |
+| FeedbackContract | N-1 minor | Changed error category enum, removed correction suggestions |
+| AgentSessionContract | N-1 minor | Changed status enum, removed checkpoint structure |
+| CostRecordContract | N-1 minor | Changed attribution fields, removed cost hierarchy |
+| MatchingDecisionContract | N-1 minor | Changed scoring dimensions, removed explanation |
+
+## New Contract Types (Round 3)
+
+| Contract Type | Purpose | Key Fields |
+|--------------|---------|------------|
+| FeedbackArtifact | Validation failure → re-invocation | error_context, corrections, suggested_strategy |
+| AgentSession | Durable execution lifecycle | session_id, checkpoints, tool_calls, replay_metadata |
+| CostRecord | Multi-dimensional cost tracking | orchestration_cost_usd, worker_cost_usd, team_id |
+| MatchingDecision | Agent selection audit | score, dimension_scores, explanation, projected_cost |
+| CompiledPrompt | Reproducible prompt artifact | template_hash, system_prompt, output_contract |
+| ValidationResult | Structured validation output | valid, error_categories, validation_duration_ms |
+| SandboxAttestation | Runtime integrity | image_hash, attestation_signature, signing_key_ref |
 
 ## Breaking Change Rules
 
@@ -44,6 +60,7 @@ This means:
 - Removing contract types from outputs
 - Removing capabilities from agent definitions
 - Changing state machine structure
+- Removing idempotency_key from required fields
 
 ### Allowed (MINOR version)
 
@@ -51,6 +68,8 @@ This means:
 - Adding new contract types to outputs
 - Adding new capabilities to agents
 - Relaxing validation rules (optional → required NOT allowed)
+- Adding new enum values to output_mode fields
+- Adding new compensation action types
 
 ## Version Negotiation
 
@@ -75,7 +94,7 @@ def negotiate_contract(agent: AgentDefinition, task: Task) -> str:
     """Negotiate best compatible contract version."""
     required = task.expected_outputs[0]
     for supported in agent.supported_contracts:
-        if supported.type == required:
+        if supported.type == required.type:
             if version_satisfies(supported.version_range, required.version):
                 return supported.version
     raise ContractNotCompatible()
@@ -126,6 +145,12 @@ ContractRegistry
 ├── CodeChangeArtifact v1.0.0 (Published)
 ├── CodeChangeArtifact v1.1.0 (Published)
 ├── TestResultArtifact v1.0.0 (Published)
+├── FeedbackArtifact v1.0.0 (Published)
+├── AgentSession v1.0.0 (Published)
+├── CostRecord v1.0.0 (Published)
+├── MatchingDecision v1.0.0 (Published)
+├── CompiledPrompt v1.0.0 (Published)
+├── ValidationResult v1.0.0 (Published)
 └── ...
 ```
 
@@ -144,6 +169,10 @@ class ContractRegistry:
     def validate(self, artifact: dict, contract_type: str, version: str) -> ValidationResult:
         """Validate artifact against schema."""
         pass
+    
+    def validate_semantic(self, artifact: dict, contract_type: str, validator_ref: str) -> ValidationResult:
+        """Run semantic validator against artifact."""
+        pass
 ```
 
 ---
@@ -154,10 +183,18 @@ class ContractRegistry:
 
 Contract versioning is based on **Amir's expectations**, not agent output. Agent adapters must handle output format changes through parser versioning, not contract versioning.
 
-### Semantic Validation Gap (DeepSeek)
+### Semantic Validation Gap (All 17 Audits)
 
-Phase 1 implements structural validation only. Semantic validation (running tests, checking quality criteria) is Phase 2. The schema includes `quality_criteria` but these are informational in MVP.
+Structural validation is first-class. Semantic validation is available via pluggable validators with timeout and budget constraints. Both are part of the core design.
 
 ### Schema Language (Kimi)
 
-Using YAML Schema for human readability in GitOps. JSON Schema export available for tooling. CUE deferred to Phase 2.
+Using YAML Schema for human readability in GitOps. JSON Schema export available for tooling. CUE deferred to future consideration.
+
+### Idempotency (Claude/Kimi)
+
+All mutable operations now require idempotency keys. Stored with operation outcome to prevent duplicate side effects on retry.
+
+### New Contract Types (Round 3)
+
+FeedbackArtifact, AgentSession, CostRecord, MatchingDecision, CompiledPrompt, ValidationResult, and SandboxAttestation are new first-class contracts.

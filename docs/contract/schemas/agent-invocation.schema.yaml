@@ -1,10 +1,11 @@
 # Agent Invocation Request Schema
 # Request contract for invoking an agent to perform work
+# Updated: AgentSession model with retry context and output contract
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [task_id, agent_definition_id, contract, workspace]
+required: [task_id, agent_definition_id, contract, workspace, idempotency_key]
 properties:
   # References
   task_id:
@@ -16,6 +17,23 @@ properties:
     type: string
     format: uuid
     description: "Agent to invoke"
+  
+  # Idempotency
+  idempotency_key:
+    type: string
+    description: "Unique key for idempotent execution"
+  
+  # Session chain (for retries)
+  attempt_number:
+    type: integer
+    minimum: 1
+    default: 1
+    description: "Current attempt number (1-indexed)"
+  
+  previous_session_id:
+    type: string
+    format: uuid
+    description: "Previous session ID (for retry chain)"
   
   # Contract to execute
   contract:
@@ -31,6 +49,28 @@ properties:
       data:
         type: object
         description: "Contract input data"
+  
+  # Expected output contract
+  expected_output_contract:
+    type: object
+    required: [type, version]
+    properties:
+      type:
+        type: string
+        description: "Expected artifact contract type"
+      version:
+        type: string
+        description: "Expected contract version"
+  
+  # Output mode negotiation
+  output_mode:
+    type: string
+    enum: [json_schema, tool_use, markdown_yaml, free_text]
+    description: "Preferred output mode for agent"
+  
+  # Feedback from previous attempt
+  feedback:
+    $ref: "feedback.schema.yaml"
   
   # Workspace configuration
   workspace:
@@ -65,3 +105,14 @@ properties:
         type: integer
         minimum: 1
         description: "Execution timeout in seconds"
+  
+  # Replay metadata
+  replay_metadata:
+    type: object
+    properties:
+      model_identifier:
+        type: string
+      seed:
+        type: integer
+      agent_version:
+        type: string

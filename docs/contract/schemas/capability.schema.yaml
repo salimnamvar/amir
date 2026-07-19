@@ -1,31 +1,77 @@
 # Capability Contract Schema
-# Pure schema for capability definitions
+# Multi-dimensional scoring with hierarchical skill taxonomy
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
 required: [skill]
 properties:
-  # Unique skill identifier
+  # Unique skill identifier (hierarchical dot notation)
   skill:
     type: string
-    description: "Unique skill identifier"
+    description: "Hierarchical skill identifier"
     pattern: "^[a-z][a-z0-9-\\.]*$"
-    examples: ["code-generation", "testing.unit", "code-review.security"]
+    examples:
+      - "code-generation"
+      - "testing.unit"
+      - "code-review.security"
+      - "code.generate.python.fastapi"
+  
+  version:
+    type: string
+    description: "Skill version (SemVer)"
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
   
   description:
     type: string
     description: "Human-readable skill description"
   
-  # Proficiency level
-  proficiency:
-    type: string
-    enum: [novice, intermediate, expert]
-    description: "Skill proficiency level"
-  
-  # Supported languages
-  languages:
+  # Skill composition
+  parent_skills:
     type: array
     items:
       type: string
-    description: "Supported programming languages"
+    description: "Parent skills this skill inherits from"
+  
+  # Output contracts this skill can produce
+  output_contracts:
+    type: array
+    items:
+      type: string
+    description: "Contract types this skill can produce"
+  
+  # Required tools for this skill
+  required_tools:
+    type: array
+    items:
+      type: string
+    description: "Tools required to exercise this skill"
+  
+  # Evaluation
+  eval_suite_ref:
+    type: string
+    description: "Reference to evaluation suite for this skill"
+  
+  # Constraints (machine-readable)
+  constraints:
+    type: object
+    properties:
+      max_file_size_bytes:
+        type: integer
+        description: "Maximum file size this skill can handle"
+      requires_network:
+        type: boolean
+        default: false
+      requires_gpu:
+        type: boolean
+        default: false
+      allowed_tools:
+        type: array
+        items:
+          type: string
+        description: "Tools this skill is allowed to use"
+      blocked_paths:
+        type: array
+        items:
+          type: string
+        description: "File paths this skill cannot access"

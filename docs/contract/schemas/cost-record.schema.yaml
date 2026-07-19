@@ -1,0 +1,96 @@
+# Cost Record Schema
+# Multi-dimensional cost tracking with orchestration/worker separation
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [id, task_id, agent_session_id, team_id, tokens_total, cost_usd]
+properties:
+  id:
+    type: string
+    format: uuid
+  
+  task_id:
+    type: string
+    format: uuid
+  
+  agent_session_id:
+    type: string
+    format: uuid
+  
+  agent_definition_id:
+    type: string
+    format: uuid
+  
+  team_id:
+    type: string
+    format: uuid
+  
+  # Consumption
+  tokens_input:
+    type: integer
+    minimum: 0
+    default: 0
+  
+  tokens_output:
+    type: integer
+    minimum: 0
+    default: 0
+  
+  tokens_total:
+    type: integer
+    minimum: 0
+  
+  cost_usd:
+    type: number
+    minimum: 0
+  
+  # Attribution
+  orchestration_cost_usd:
+    type: number
+    minimum: 0
+    default: 0
+    description: "Amir platform overhead cost"
+  
+  worker_cost_usd:
+    type: number
+    minimum: 0
+    description: "Agent/LLM provider cost"
+  
+  # Timing
+  duration_seconds:
+    type: number
+    minimum: 0
+  
+  started_at:
+    type: string
+    format: date-time
+  
+  completed_at:
+    type: string
+    format: date-time
+  
+  # Context
+  contract_type:
+    type: string
+  
+  workflow_instance_id:
+    type: string
+    format: uuid
+  
+  step_index:
+    type: integer
+  
+  # Metadata
+  model_identifier:
+    type: string
+    description: "LLM model used"
+  
+  parser_strategy_used:
+    type: string
+    description: "Parser strategy that succeeded"
+  
+  retry_count:
+    type: integer
+    minimum: 0
+    default: 0

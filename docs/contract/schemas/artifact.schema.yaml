@@ -1,10 +1,11 @@
 # Artifact Contract Schema
 # Machine-readable contract for artifacts produced by agents
+# Updated: Added lineage, observation method, and idempotency
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [contract_type, contract_version, content]
+required: [contract_type, contract_version, content, idempotency_key]
 properties:
   # Contract identity
   contract_type:
@@ -14,6 +15,11 @@ properties:
   contract_version:
     type: string
     description: "Artifact contract version"
+  
+  # Idempotency
+  idempotency_key:
+    type: string
+    description: "Unique key for idempotent artifact production"
   
   # Artifact content (contract-specific)
   content:
@@ -31,6 +37,9 @@ properties:
       task_id:
         type: string
         format: uuid
+      agent_session_id:
+        type: string
+        format: uuid
       workflow_instance_id:
         type: string
         format: uuid
@@ -45,6 +54,31 @@ properties:
   checksum:
     type: string
     description: "SHA256 of content for tamper detection"
+  
+  # Lineage
+  derived_from:
+    type: array
+    items:
+      type: string
+      format: uuid
+    description: "Artifact IDs this artifact was derived from"
+  
+  supersedes:
+    type: string
+    format: uuid
+    description: "Artifact ID this artifact replaces"
+  
+  # Observation method
+  observation_method:
+    type: string
+    enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
+    description: "How artifact was derived from agent output"
+  
+  # Status
+  status:
+    type: string
+    enum: [produced, validated, accepted, rejected]
+    default: "produced"
 
 # CodeChangeArtifact - produced by developer agents
 definitions:

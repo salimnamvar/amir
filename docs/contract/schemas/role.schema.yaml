@@ -1,5 +1,6 @@
 # Role Contract Schema
 # Machine-readable contract for role definitions
+# Updated: Added prompt_template_ref
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -57,9 +58,27 @@ properties:
         type: integer
         minimum: 0
         maximum: 100
+      max_cyclomatic_complexity:
+        type: integer
       required_approvals:
         type: integer
         minimum: 0
+      semantic_validators:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+            type:
+              type: string
+              enum: [structural, test_execution, quality, behavioral]
+            timeout_seconds:
+              type: integer
+              default: 300
+            budget_usd:
+              type: number
+              default: 0.10
   
   required_capabilities:
     type: array
@@ -72,3 +91,7 @@ properties:
         minimum_proficiency:
           type: string
           enum: [novice, intermediate, expert]
+  
+  prompt_template_ref:
+    type: string
+    description: "Reference to prompt template in amir-config/prompts/"

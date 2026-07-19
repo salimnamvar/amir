@@ -20,6 +20,7 @@ Acceptance:
 - Workflow with states: impl → test → review
 - Tasks auto-created per state
 - Workflow progresses on task completion
+- Compensation actions defined per step
 ```
 
 ### US-WORKFLOW-002: Workflow State Persistence
@@ -29,21 +30,23 @@ I want workflow state durable
 So that restarts don't lose state
 
 Acceptance:
-- State saved after each transition
-- Workflow resumes after restart
-- No duplicate task creation
+- Event-sourced WorkflowInstance
+- State derived from events (not stored directly)
+- Recovery via event replay
+- Checkpointing after each state transition
 ```
 
-### US-WORKFLOW-003: Auto-Approve Transitions (MVP)
+### US-WORKFLOW-003: Compensation on Failure
 ```
-As a Developer
-I want auto-approval in MVP
-So that workflows run without human intervention
+As a Platform Operator
+- I want failed workflows to compensate
+- So that system remains consistent
 
 Acceptance:
-- All transitions auto-approved
-- No Approval entity used
-- Workflow completes automatically
+- Compensation stack (LIFO) maintained
+- Git-native compensation: git revert, branch delete, PR close
+- Best-effort: all actions attempted even if some fail
+- Compensation events emitted for audit
 ```
 
 ### US-WORKFLOW-004: Task Dependencies
@@ -56,6 +59,7 @@ Acceptance:
 - Hard dependencies block execution
 - Workflow waits for dependencies
 - Cycle detection prevents deadlock
+- DAG support with dependency enforcement
 ```
 
 ### US-WORKFLOW-005: Workflow Recovery
@@ -68,13 +72,51 @@ Acceptance:
 - Failed workflow can be retried
 - Workflow state can be inspected
 - Manual intervention supported
+- Compensation can be re-triggered
 ```
 
----
+### US-WORKFLOW-006: Auto-Approve Transitions
+```
+As a Developer
+I want auto-approval in automated workflows
+So that workflows run without human intervention
+
+Acceptance:
+- All transitions auto-approved by default
+- Approval entity used only for manual gates
+- Workflow completes automatically
+```
+
+### US-WORKFLOW-007: Idempotent Step Execution
+```
+As a System
+I want step execution to be idempotent
+So that retries don't cause duplicate side effects
+
+Acceptance:
+- Each step uses idempotency key
+- Duplicate execution returns stored result
+- No duplicate artifacts produced
+- No duplicate cost records
+```
+
+### US-WORKFLOW-008: Durable Execution Primitives
+```
+As a System
+I want workflow steps to have timeouts and heartbeats
+So that hung steps are detected
+
+Acceptance:
+- start_to_close_timeout_seconds per step
+- heartbeat_timeout_seconds for long-running steps
+- Steps that exceed timeout are killed
+- Workflow transitions to failed/compensating
+```
 
 ## Implementation Notes
 
-- MVP: Internal state machine with SQLite
-- Phase 2: Temporal integration
-- Approval gates are auto-approved in MVP
-- All transitions emit Workflow.Transitioned events
+- Event-sourced WorkflowInstance with compensation stack
+- Git-native compensation for code workflows
+- Idempotent step execution via idempotency keys
+- Durable execution with timeouts and heartbeats
+- Recovery via event replay on restart

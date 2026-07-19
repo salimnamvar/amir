@@ -10,7 +10,7 @@ Amir follows Clean Architecture principles with explicit boundaries:
 │  API Gateway │ Orchestration │ Governance │ Monitoring      │
 ├─────────────────────────────────────────────────────────────┤
 │                    Execution Plane                           │
-│  Agent Adapters │ Sandboxes │ Runtime Sessions              │
+│  PromptCompiler │ AgentExecutor │ OutputParser │ Sidecar    │
 ├─────────────────────────────────────────────────────────────┤
 │                    External Agents                          │
 │  Claude Code CLI │ Codex CLI │ OpenCode │ Gemini CLI       │
@@ -25,8 +25,8 @@ Amir follows Clean Architecture principles with explicit boundaries:
 
 ### Ports and Adapters
 
-- **Ports**: WorkflowEngine, AgentAdapter, SandboxManager, ArtifactValidator, EventPublisher
-- **Adapters**: ClaudeCodeAdapter, CodexAdapter, APIAgentAdapter, DockerSandbox, FirecrackerSandbox
+- **Ports**: WorkflowEngine, AgentAdapter, SandboxManager, ArtifactValidator, EventPublisher, OutputParser, PromptCompiler, CostGate, PolicyEngine
+- **Adapters**: ClaudeCodeAdapter, CodexAdapter, APIAgentAdapter, DockerSandbox, GVisorSandbox, FirecrackerSandbox, OPAEngine, FileEventStore
 - All ports defined in `domain/protocols/` as abstract base classes
 
 ## 2. Domain-Driven Design
@@ -35,28 +35,28 @@ Amir follows Clean Architecture principles with explicit boundaries:
 
 Five explicit bounded contexts prevent conceptual leakage:
 1. **Configuration**: GitOps-managed definitions
-2. **Execution**: Runtime task orchestration
-3. **Workflow**: State machines and approvals
-4. **Security**: Sandboxing, secrets, access control
-5. **Observability**: Metrics, tracing, cost tracking
+2. **Execution**: Runtime task orchestration and agent sessions
+3. **Workflow**: State machines, approvals, and compensation
+4. **Security**: Sandboxing, secrets, access control, egress, and audit
+5. **Observability**: Metrics, cost tracking, quality measurement, agent performance
 
 ### Aggregate Roots
 
-Each entity belongs to exactly one aggregate root.
+Each entity belongs to exactly one aggregate root. Cross-aggregate consistency via domain events and outbox pattern.
 
 ## 3. Contract-First Design
 
 ### Contract Properties
 
 All contracts declare:
-- **Schema**: JSON Schema or YAML Schema
+- **Schema**: JSON Schema 2020-12 (primary) with YAML frontend
 - **Version**: SemVer with MAJOR.MINOR.PATCH
 - **Compatibility**: N-1 minor version backward compatibility
-- **Validation**: Structural + semantic validation via validators
+- **Validation**: Structural + semantic validation via pluggable validators
 
 ### Contract Types
 
-- AgentContract, TaskContract, ArtifactContract, WorkflowContract, RoleContract
+- AgentContract, TaskContract, ArtifactContract, WorkflowContract, RoleContract, FeedbackContract, ValidationResultContract, CostRecordContract, MatchingDecisionContract, CompiledPromptContract
 
 ## 4. Two-Track Entity Lifecycle
 
@@ -87,56 +87,90 @@ Pending → Running → Completed / Failed / Cancelled
 - **Domain Events**: State changes (Permanent)
 - **Integration Events**: Cross-context communication (90-day retention)
 - **Audit Events**: Security/compliance relevant (Permanent)
+- **Cost Events**: Financial tracking (365-day retention)
 
 ### Event Envelope
 
 All events use `DomainEvent` with:
 - event_id, event_type, aggregate_id, aggregate_type
 - correlation_id, causation_id, producer, version, timestamp, payload
+- sequence, prev_hash (for Merkle chain)
+
+### Outbox Pattern
+
+Domain events published via outbox for reliable delivery. Delivery semantics by category.
 
 ## 6. Security Principles
 
 ### Zero Trust Execution
 
 - Every agent execution is fully isolated
-- No network access unless explicitly required
-- Secrets never stored with code
-- All actions logged and traceable
+- All outbound traffic through egress proxy (host mode eliminated)
+- Secrets never stored with code; injected via tmpfs with TTL
+- All actions logged and traceable via Merkle-chained audit
 
 ### Defense in Depth
 
-1. Container isolation (non-root, read-only root)
-2. Filesystem isolation (ephemeral workspace)
-3. Network isolation (default-deny egress)
-4. Runtime monitoring (suspicious behavior detection)
+1. Container isolation (gVisor mandatory in production, non-root, read-only root)
+2. Filesystem isolation (ephemeral workspace with baseline/current tracking)
+3. Network isolation (egress proxy with domain allowlist, mTLS)
+4. Runtime monitoring (attestation, circuit breaker, agent scorecard)
+5. Cost isolation (hierarchical cost gate with reservation protocol)
 
 ### Just-In-Time Secrets
 
 - Secrets fetched from vault at execution start
 - Injected into sandbox via tmpfs (memory-only)
-- Revoked immediately after execution completes
+- API keys routed through egress proxy for cost attribution
+- Revoked immediately after execution completes (TTL-based)
 
-## 7. Evolution Paths
+## 7. Workspace Observation
+
+**Principle**: Agent output is untrusted narrative. The filesystem is ground truth.
+
+Artifacts are derived from workspace state (`git diff`, `git status`, file reads) rather than agent stdout claims. This is the single most important reliability mechanism for controlling non-deterministic agents.
+
+## 8. Idempotency by Default
+
+**Principle**: All mutable operations require idempotency keys. Retry is safe.
+
+Every operation that causes side effects (task creation, agent execution, artifact production, compensation) uses idempotency keys to prevent duplicate execution on retry.
+
+## 9. Hierarchical Cost Control
+
+**Principle**: Cost is a runtime invariant, not an advisory limit.
+
+Four-level enforcement: per-invocation → per-team-hourly → per-tenant-daily → per-org-monthly. Pre-flight estimation before execution. Reservation protocol for concurrent tasks.
+
+## 10. Evolution Paths
 
 Each major component has documented migration paths:
 
 | Component | Default | Alternative Options |
 |-----------|---------|-------------------|
-| Workflow | Internal state machine | Temporal-compatible interface |
-| Sandbox | Docker + seccomp | gVisor, Firecracker |
-| Storage | SQLite | PostgreSQL |
-| Events | File (JSONL) | Kafka-compatible interface |
+| Workflow | Internal state machine (SQLite) | Temporal-compatible interface |
+| Sandbox | gVisor (production), Docker (dev) | Firecracker for maximum security |
+| Storage | SQLite | PostgreSQL, sharded PostgreSQL |
+| Events | File (JSONL) + Outbox | Kafka-compatible interface |
 | Observability | File logs | Prometheus, OpenTelemetry |
+| Policy Engine | Static AllowDeny | OPA/Rego |
+| Parser | ParserRegistry strategy chain | Custom parsers per agent type |
 
 ---
 
 ## Addressing Audit Concerns
 
 ### CLI Parsing Risk (All Audits)
-The architecture isolates CLI parsing behind `AgentAdapter.ParseOutput()`. Acknowledged technical debt.
+Three-layer runtime (PromptCompiler → AgentExecutor → OutputParser) with ParserRegistry strategy chain. Workspace observation as ground truth.
 
 ### Aggregate Boundary Clarity (All Audits)
-Workspace is now a separate aggregate root, not owned by Task.
+Workspace promoted to its own aggregate root. Cross-aggregate consistency via events and outbox.
 
 ### Over-Engineering Prevention (All Audits)
-Two-Track Lifecycle prevents applying full CI/CD to ephemeral runtime entities.
+Two-Track Lifecycle prevents applying full CI/CD to ephemeral runtime entities. Static rules as default; OPA as extension.
+
+### Agent Non-Determinism (All 17 Audits)
+AgentSession with full checkpointing. Circuit breaker with quarantine. AgentScorecard for historical routing.
+
+### Cost as First-Class (All 17 Audits)
+Hierarchical cost gate. Reservation protocol. Sidecar proxy for real-time enforcement. CostRecord with multi-dimensional attribution.

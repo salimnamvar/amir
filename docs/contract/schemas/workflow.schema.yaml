@@ -1,5 +1,6 @@
 # Workflow Contract Schema
 # Complete schema for workflow templates
+# Updated: Added compensation specs and step results
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -43,6 +44,16 @@ properties:
                 type: string
               constraints:
                 type: object
+              compensation:
+                type: object
+                properties:
+                  action_type:
+                    type: string
+                    enum: [git_revert, branch_delete, pr_close, artifact_delete, resource_cleanup, custom]
+                  target:
+                    type: string
+                  parameters:
+                    type: object
         approval_gate:
           type: boolean
           default: false
@@ -63,4 +74,24 @@ properties:
           type: string
         trigger:
           type: string
-          enum: [on_complete, on_approve, on_timeout]
+          enum: [on_complete, on_approve, on_timeout, on_fail, on_compensate]
+  
+  # Compensation configuration
+  compensation:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      strategy:
+        type: string
+        enum: [reverse_order, parallel, selective]
+        default: "reverse_order"
+      max_compensation_attempts:
+        type: integer
+        minimum: 1
+        default: 3
+      continue_on_compensation_failure:
+        type: boolean
+        default: true
+        description: "Continue compensating even if some actions fail"

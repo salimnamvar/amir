@@ -1,0 +1,168 @@
+# Agent Session Schema
+# Durable execution unit with checkpoints, tool calls, and replay metadata
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required: [session_id, task_id, agent_definition_id, attempt_number, status]
+properties:
+  session_id:
+    type: string
+    format: uuid
+    description: "Unique session identifier (also idempotency key)"
+  
+  task_id:
+    type: string
+    format: uuid
+    description: "Parent task identifier"
+  
+  agent_definition_id:
+    type: string
+    format: uuid
+    description: "Agent executing in this session"
+  
+  attempt_number:
+    type: integer
+    minimum: 1
+    description: "Attempt number (1-indexed)"
+  
+  previous_session_id:
+    type: string
+    format: uuid
+    description: "Previous session ID (for retry chain)"
+  
+  status:
+    type: string
+    enum: [pending, starting, running, waiting_for_input, producing_artifact, validating, succeeded, failed, compensating, timed_out, cancelled]
+  
+  workspace_id:
+    type: string
+    format: uuid
+  
+  sandbox_id:
+    type: string
+    format: uuid
+  
+  compiled_prompt_id:
+    type: string
+    format: uuid
+    description: "Reference to compiled prompt artifact"
+  
+  checkpoints:
+    type: array
+    items:
+      type: object
+      required: [checkpoint_id, state, timestamp]
+      properties:
+        checkpoint_id:
+          type: string
+          format: uuid
+        state:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        payload:
+          type: object
+        workspace_snapshot:
+          type: string
+          description: "Git commit hash at this checkpoint"
+  
+  tool_calls:
+    type: array
+    items:
+      type: object
+      required: [tool_call_id, tool_name, started_at, status]
+      properties:
+        tool_call_id:
+          type: string
+          format: uuid
+        tool_name:
+          type: string
+        tool_input:
+          type: object
+        tool_output:
+          type: object
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [running, completed, failed]
+  
+  validation_result:
+    type: object
+    properties:
+      valid:
+        type: boolean
+      error_categories:
+        type: array
+        items:
+          type: object
+          properties:
+            category:
+              type: string
+              enum: [structural, semantic, policy, quality]
+            code:
+              type: string
+            message:
+              type: string
+  
+  feedback_artifact:
+    $ref: "feedback.schema.yaml"
+  
+  resource_usage:
+    type: object
+    properties:
+      tokens_consumed:
+        type: integer
+      cost_usd:
+        type: number
+      duration_seconds:
+        type: number
+      cpu_seconds:
+        type: number
+      memory_peak_mb:
+        type: number
+  
+  cost_record:
+    type: object
+    properties:
+      tokens_input:
+        type: integer
+      tokens_output:
+        type: integer
+      cost_usd:
+        type: number
+      orchestration_cost_usd:
+        type: number
+      worker_cost_usd:
+        type: number
+  
+  replay_metadata:
+    type: object
+    properties:
+      model_identifier:
+        type: string
+      prompt_hash:
+        type: string
+        description: "SHA256 of compiled prompt"
+      full_prompt:
+        type: string
+      seed:
+        type: integer
+      sandbox_profile_hash:
+        type: string
+      agent_version:
+        type: string
+  
+  started_at:
+    type: string
+    format: date-time
+  
+  completed_at:
+    type: string
+    format: date-time

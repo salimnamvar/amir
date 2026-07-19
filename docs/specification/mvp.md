@@ -2,7 +2,7 @@
 
 ## MVP Goals
 
-The MVP proves the core hypothesis: **reliable orchestration of external AI agents producing validated artifacts**.
+The MVP proves the core hypothesis: **reliable orchestration of external AI agents producing validated artifacts through workspace observation and structured feedback.**
 
 **Target**: 2 months development for single-team, single-adapter, linear workflow.
 
@@ -11,100 +11,137 @@ The MVP proves the core hypothesis: **reliable orchestration of external AI agen
 | Feature | Description |
 |---------|-------------|
 | Single Agent Type | Claude Code CLI only |
-| Agent Execution | Execute in Docker sandbox with seccomp |
-| Contract Validation | Structural validation |
+| Three-Layer Runtime | PromptCompiler → AgentExecutor → OutputParser |
+| AgentSession | Durable execution with checkpoints |
+| Workspace Observation | Artifacts derived from git diff |
+| ParserRegistry | 2 strategies: structured_output + markdown_block |
+| Validation Feedback Loop | Structural validation with retry |
+| Circuit Breaker | Per-agent failure counting (threshold=5) |
 | Task Management | Create, assign, execute, complete tasks |
 | Linear Workflow | 3-state: implement → test → review |
 | File-Based Audit | Append-only JSONL logging |
-| Hard Cost Limits | Token/USD limits enforced at adapter |
+| Cost Tracking | CostRecord with token counting |
 | Non-Root Containers | UID 65534, read-only root |
-| Domain Model | Task, AgentInvocation, Workspace, Artifact |
+| gVisor Sandbox | Mandatory in production |
+| Egress Proxy | All traffic through Amir proxy |
+| Domain Model | Task, AgentSession, Workspace, Artifact, CostRecord |
 | Event Model | DomainEvent with correlation/causation |
 | Adapter Interface | AgentAdapter abstract base class |
+| Idempotency | All mutable operations keyed |
 
 ## Extended Features (Available in Design)
 
 | Feature | Description |
 |---------|-------------|
 | Multiple Agents | Codex, OpenCode, Gemini CLI supported via adapters |
+| Full ParserRegistry | 5 strategies including LLM coercion and tool call interception |
 | DAG Workflows | WorkflowDefinition supports task dependencies |
-| Human Approvals | Approval entity with manual gating |
-| Semantic Validation | Quality metrics and test execution |
+| Compensation | Git-native compensation with saga pattern |
+| Human Approvals | Approval entity with escalation chains |
+| Semantic Validation | Pluggable validators with timeout and budget |
+| Agent Scorecard | Historical performance metrics for routing |
 | Multi-Tenant | Namespace isolation for teams |
 | Advanced Policies | OPA integration option |
 | Temporal Engine | WorkflowEngine interface compatible |
 | Full Observability | Prometheus, OpenTelemetry integration |
+| Merkle-Chained Audit | Hash chain for tamper-evidence |
+| Replay Capability | Full execution replay for debugging |
+| Multi-Dimensional Scoring | Weighted algorithm with 7 dimensions |
 
 ## MVP Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Control Plane                                    │
-│  ┌─────────────┐  ┌──────────────┐             │
-│  │ Amir API    │  │ Orchestrator   │             │
-│  └─────────────┘  └──────────────┘             │
-├─────────────────────────────────────────────────┤
-│  Execution Plane                                  │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────┐│
-│  │Sandbox Mgr  │  │Agent Adapter  │  │ Workspace││
-│  │(Docker)     │  │(Claude CLI)   │  │(isolated││
-│  └─────────────┘  └──────────────┘  │ FS)      ││
-├─────────────────────────────────────────────────┤
-│  Agents                                           │
-│  ┌─────────────────────────────────────────────┐ │
-│  │ Claude Code CLI (structured output mode)      │ │
-│  └─────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  Control Plane                                            │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│  │ Amir API    │  │ Orchestrator   │  │ Cost Gate    │   │
+│  └─────────────┘  └──────────────┘  └──────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│  Execution Plane                                          │
+│  ┌──────────┐ ┌────────────┐ ┌──────────┐ ┌──────────┐ │
+│  │Prompt    │ │Agent       │ │Output    │ │Egress    │ │
+│  │Compiler  │ │Executor    │ │Parser    │ │Proxy     │ │
+│  └──────────┘ └────────────┘ └──────────┘ └──────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  Sandbox (gVisor)                                         │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │ Agent CLI + Sidecar (token counting)                 │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## MVP Data Flow
 
 ```
 1. POST /tasks
-   {objective, role: "developer"}
+   {objective, role: "developer", idempotency_key: "..."}
 
 2. Orchestrator
    → Create Task entity
-   → Assign to Claude agent
-   → Emit Task.Created
+   → MatchingDecision.Made (score agent)
+   → Emit Task.Assigned
 
-3. Sandbox Manager
-   → Create Docker container (non-root)
+3. PromptCompiler
+   → Render CompiledPrompt from Task + Role + Agent
+   → Store CompiledPrompt artifact
+
+4. Sandbox Manager (gVisor)
+   → Create sandbox (non-root, read-only root)
    → Clone repo to /workspace
-   → Mount as tmpfs
+   → Record baseline commit
+   → Inject secrets via tmpfs
+   → Inject API keys via tmpfs (routed through proxy)
 
-4. Agent Adapter
-   → Stream TaskContract to agent
-   → Execute agent with timeout
-   → Enforce cost limits
+5. Agent Executor
+   → Spawn agent process with sidecar
+   → Sidecar counts tokens in real-time
+   → Agent executes work
 
-5. Agent
-   → Produces CodeChangeArtifact
+6. Output Parser (ParserRegistry)
+   → Strategy 1: structured_output (if agent supports)
+   → Strategy 2: markdown_block extraction
+   → If both fail: workspace observation (git diff)
 
-6. Contract Validator
-   → Validate structural schema
-   → Emit Artifact.Validated
+7. Workspace Observation
+   → git diff baseline..current
+   → Derive CodeChangeArtifact from diff
+   → Compare with agent claims
 
-7. Orchestrator
-   → Accept/reject artifact
-   → Complete task
+8. Contract Validator
+   → Structural validation
+   → Emit Artifact.Validated or Artifact.Rejected
+
+9. If REJECTED:
+   → FeedbackArtifact created
+   → Retry within budget (max_attempts=3)
+   → Feedback injected into PromptCompiler
+
+10. If VALID:
+    → Artifact accepted
+    → CostRecord emitted
+    → Task.Completed
 ```
 
 ## Success Criteria
 
 | Metric | Target |
 |--------|--------|
-| Task completion rate | 90% |
+| Task completion rate | 90% (via retry) |
 | Contract validation success | 95% (structural) |
-| Sandbox isolation | 100% non-root |
-| Cost limit enforcement | 100% (hard limits) |
+| Workspace observation reliability | 90% (fallback for parsing) |
+| Sandbox isolation | 100% non-root, gVisor |
+| Cost limit enforcement | 100% (hierarchical) |
 | Audit trail completeness | 100% events logged |
+| Idempotent operations | 100% (all mutable ops) |
 
 ## Risks and Mitigations
 
 | Risk | Mitigation |
 |------|------------|
-| CLI parsing fails | Deterministic extraction, no regex fallback |
-| Sandbox escape | Non-root containers, read-only root, security review |
-| Cost explosion | Hard limits enforced at adapter, 95% threshold kill |
-| Workflow durability | SQLite persistence on each state change |
+| CLI parsing fails | ParserRegistry with fallback chain + workspace observation |
+| Agent produces invalid output | Validation feedback loop with budgeted retry |
+| Sandbox escape | Mandatory gVisor, non-root, read-only root |
+| Cost explosion | Hierarchical cost gate with reservation protocol |
+| Agent cascades failures | Circuit breaker with quarantine |
+| Workflow durability | Event-sourced state with checkpointing |
+| Duplicate side effects | Idempotency keys on all mutable operations |

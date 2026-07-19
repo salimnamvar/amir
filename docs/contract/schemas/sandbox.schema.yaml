@@ -1,16 +1,18 @@
 # Sandbox Contract Schema
 # Complete schema for sandbox configuration
+# Updated: Mandatory gVisor, egress proxy, attestation
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
 required: [runtime, network_mode]
 properties:
-  # Runtime type
+  # Runtime type (gVisor mandatory in production)
   runtime:
     type: string
-    enum: [docker, gvisor, firecracker]
-    description: "Sandbox runtime type"
+    enum: [gvisor, firecracker, docker]
+    description: "Sandbox runtime type (gvisor default for production)"
+    default: "gvisor"
   
   # User and filesystem security
   user:
@@ -21,19 +23,19 @@ properties:
   read_only_root:
     type: boolean
     default: true
-    description: "Root filesystem is read-only"
+    description: "Root filesystem is read-only (MUST be true)"
   
   tmpfs_workspaces:
     type: boolean
     default: true
     description: "Workspaces mounted as tmpfs"
   
-  # Network configuration
+  # Network configuration (host mode REMOVED)
   network_mode:
     type: string
-    enum: [none, host, restricted]
-    default: "none"
-    description: "Network access mode"
+    enum: [proxy, none]
+    default: "proxy"
+    description: "Network access mode (all traffic through egress proxy)"
   
   network_allowlist:
     type: array
@@ -61,3 +63,18 @@ properties:
     enum: [baseline, hardened]
     default: "baseline"
     description: "Security profile preset"
+  
+  # Runtime attestation
+  attestation:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: true
+      signing_key_ref:
+        type: string
+        description: "Reference to signing key for attestation"
+      image_verification:
+        type: boolean
+        default: true
+        description: "Verify container image signature"

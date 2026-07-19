@@ -18,6 +18,7 @@ So that an agent executes the work
 
 Acceptance:
 - Task created with PENDING status
+- Idempotency key required
 - Event Task.Created emitted
 - Task appears in task list
 ```
@@ -29,9 +30,11 @@ I want to match tasks to capable agents
 So that work is distributed efficiently
 
 Acceptance:
-- Agent invocation created
-- Event Task.Assigned emitted
-- Agent receives TaskContract
+- MatchingDecision emitted with dimension scores
+- Multi-dimensional scoring algorithm used
+- AgentScorecard consulted for historical metrics
+- Circuit breaker checked (open = reject)
+- AgentSession created for selected agent
 ```
 
 ### US-ORCH-003: Track Task Progress
@@ -43,51 +46,69 @@ So that I can monitor progress
 Acceptance:
 - Returns current state (PENDING/ASSIGNED/RUNNING/etc)
 - Returns assigned agent
+- Returns AgentSession checkpoints
 - Returns artifact if completed
 ```
 
 ### US-ORCH-004: Handle Task Failure
 ```
 As a System
-I want to retry failed tasks
-So that transient failures are handled
+I want to retry failed tasks with feedback
+So that agents can correct their mistakes
 
 Acceptance:
-- Task transitions to FAILED state
-- Retry count incremented
-- New AgentInvocation created if under limit
+- ValidationResult emitted with error categories
+- FeedbackArtifact created with corrections
+- Retry allowed within max_attempts budget
+- Escalation to different agent after escalate_after
+- Circuit breaker opens after failure_threshold
 ```
 
 ### US-ORCH-005: Enforce Cost Limits
 ```
 As a Platform Owner
 I want hard limits on task costs
-So that runaway agents don't bankrupt us
+So that runaway agents do not bankrupt us
 
 Acceptance:
-- Task has max_tokens and max_usd
-- Adapter kills process at 95% threshold
-- Event Task.Failed emitted on limit breach
+- Hierarchical cost gate (4 levels)
+- Pre-flight cost estimation
+- Sidecar proxy counts tokens in real-time
+- Process killed at 95% threshold
+- CostRecord emitted with attribution
 ```
 
 ### US-ORCH-006: Isolated Workspace
 ```
 As a Security Officer
 I want each task in isolated workspace
-So that agents can't interfere with each other
+So that agents cannot interfere with each other
 
 Acceptance:
 - Each task gets unique workspace
+- Baseline commit recorded before execution
+- Current commit recorded after execution
 - Workspace cleaned after task completion
 - No shared filesystem between tasks
 ```
 
----
+### US-ORCH-007: Idempotent Operations
+```
+As a System
+I want all operations idempotent
+So that retries are safe
+
+Acceptance:
+- Task creation uses idempotency key
+- AgentSession uses idempotency key
+- Artifact production uses idempotency key
+- Duplicate operations return stored result
+```
 
 ## Implementation Notes
-
 - Task aggregate root in Execution Context
 - Assignment is value object within Task
-- AgentInvocation created per attempt
-- Workspace created before invocation
-- Cost limits enforced synchronously
+- AgentSession created per attempt (with checkpoint chain)
+- Workspace created before invocation with baseline tracking
+- Cost limits enforced hierarchically
+- All operations idempotent by default

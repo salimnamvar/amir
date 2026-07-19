@@ -32,6 +32,7 @@ Acceptance:
 - Artifact validated before acceptance
 - Invalid artifacts emit Artifact.Rejected
 - Valid artifacts emit Artifact.Validated
+- ValidationResult includes error categories
 ```
 
 ### US-CONTRACT-003: Negotiate Contract Versions
@@ -50,7 +51,7 @@ Acceptance:
 ```
 As a Developer
 I want contracts to evolve safely
-So that upgrades don't break existing workflows
+So that upgrades do not break existing workflows
 
 Acceptance:
 - MINOR versions add optional fields
@@ -68,13 +69,39 @@ Acceptance:
 - All contracts in amir-config/contracts/
 - SemVer enforced on all changes
 - Compatibility matrix maintained
+- New contract types registered
 ```
 
----
+### US-CONTRACT-006: Semantic Validation
+```
+As a Platform Operator
+I want semantic validation of artifacts
+So that structural validity is not sufficient
+
+Acceptance:
+- Pluggable validator architecture
+- Validators have timeout and budget
+- Test execution validator available
+- Quality criteria validator available
+```
+
+### US-CONTRACT-007: Feedback Contracts
+```
+As Amir
+I want structured feedback for invalid artifacts
+So that agents can retry with context
+
+Acceptance:
+- FeedbackArtifact contract defined
+- Includes error_context, corrections, suggested_strategy
+- Includes parser strategy suggestion
+- Feedback injected into PromptCompiler
+```
 
 ## Implementation Notes
-
 - YAML Schema for human readability
 - JSON Schema export for tooling
 - N-1 minor version compatibility
-- Validation runs before artifact acceptance
+- Structural validation runs first
+- Semantic validation available as pluggable layer
+- FeedbackArtifact drives the retry loop
