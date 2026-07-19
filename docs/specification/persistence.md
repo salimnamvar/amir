@@ -79,38 +79,68 @@ CREATE TABLE tasks (
     status TEXT NOT NULL,
     attempts INTEGER DEFAULT 0,
     max_attempts INTEGER DEFAULT 3,
-    circuit_breaker_state TEXT DEFAULT 'closed',
-    circuit_breaker_failures INTEGER DEFAULT 0,
+    -- retry_state (task-scoped); circuit breakers live on agent_scorecards
+    last_failure_category TEXT,
+    last_session_id UUID,
+    escalated BOOLEAN DEFAULT FALSE,
+    cost_budget_max_tokens INTEGER,
+    cost_budget_max_usd REAL,
+    matching_decision_id UUID,
+    active_workspace_id UUID,
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    CHECK (cost_budget_max_tokens IS NOT NULL OR cost_budget_max_usd IS NOT NULL)
 );
 
 CREATE TABLE agent_sessions (
     session_id UUID PRIMARY KEY,
+    idempotency_key TEXT UNIQUE NOT NULL,
     task_id UUID REFERENCES tasks(id),
     agent_definition_id UUID,
+    matching_decision_id UUID,
     attempt_number INTEGER NOT NULL,
     previous_session_id UUID,
     status TEXT NOT NULL,
     workspace_id UUID,
     sandbox_id UUID,
+    sandbox_attestation_id UUID,
     compiled_prompt_id UUID,
+    validation_result_id UUID,
+    cost_record_id UUID,
+    max_tokens INTEGER,
+    max_usd REAL,
+    timeout_seconds INTEGER NOT NULL,
     started_at TIMESTAMP,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    CHECK (max_tokens IS NOT NULL OR max_usd IS NOT NULL)
 );
 
 CREATE TABLE workspaces (
     id UUID PRIMARY KEY,
     task_id UUID REFERENCES tasks(id),
-    assigned_session_id UUID,
+    session_id UUID UNIQUE NOT NULL,  -- 1 session : 1 workspace
     repo_url TEXT,
     branch TEXT,
     workdir TEXT,
+    status TEXT NOT NULL,
     baseline_commit TEXT,
     current_commit TEXT,
+    baseline_tree_hash TEXT,
+    durable_effects JSONB,  -- commit/branch/PR targets for compensation
     ephemeral BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP,
+    observed_at TIMESTAMP,
     cleaned_at TIMESTAMP
+);
+
+-- Circuit breaker lives with agent performance, not tasks
+CREATE TABLE agent_scorecards (
+    agent_definition_id UUID PRIMARY KEY,
+    success_rate REAL,
+    circuit_breaker_state TEXT DEFAULT 'closed',
+    circuit_breaker_failures INTEGER DEFAULT 0,
+    warm_started BOOLEAN DEFAULT FALSE,
+    last_updated TIMESTAMP
 );
 
 CREATE TABLE artifacts (

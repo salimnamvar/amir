@@ -85,7 +85,7 @@ class TaskSpec(BaseModel):
 
 ### CompensationSpec
 
-Each workflow step defines its compensation action upfront:
+Each workflow step declares compensation **intent** upfront. Concrete git/PR/artifact actions are resolved when the step records `durable_effects` on its Workspace. Compensation never depends on the ephemeral sandbox filesystem still existing.
 
 ```yaml
 CompensationSpec:
@@ -95,18 +95,27 @@ CompensationSpec:
     action_type:
       type: string
       enum:
-        - git_revert          # Revert commits made by this step
-        - branch_delete       # Delete branch created by this step
-        - pr_close            # Close PR created by this step
-        - artifact_delete     # Delete artifacts produced by this step
-        - resource_cleanup    # Clean up cloud resources
-        - custom              # Custom compensation logic
-    target:
+        - rollback_workspace_effects
+        - delete_artifacts
+        - revoke_access
+        - notify
+        - custom
+    concrete_effect_types:
+      type: array
+      description: "Resolved at step completion from Workspace.durable_effects"
+      items:
+        type: string
+        enum:
+          - git_revert
+          - branch_delete
+          - pr_close
+          - artifact_delete
+          - resource_cleanup
+    target_ref:
       type: string
-      description: "Target specification (commit range, branch pattern, etc.)"
+      description: "task_id or step_id owning durable_effects"
     parameters:
       type: object
-      description: "Additional parameters for compensation"
 ```
 
 ### StepResult

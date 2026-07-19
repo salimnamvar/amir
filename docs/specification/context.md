@@ -4,6 +4,8 @@
 
 Amir is organized into five bounded contexts, each with clear ownership and responsibilities. Contexts communicate via domain events and maintain their own consistency boundaries.
 
+**Execution-first rule:** runtime truth lives in the Execution Context (`AgentSession` as the central aggregate). Other contexts configure, secure, orchestrate, or observe that execution.
+
 ## 1. Configuration Context
 
 **Purpose**: GitOps-managed, immutable definitions
@@ -30,35 +32,45 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - All agent_bindings must reference valid AgentDefinitions
 - Budget limits must be non-negative
 - Scoring weights must sum to 1.0
+- Subjective proficiency enums are prohibited on capability requirements
 
 ## 2. Execution Context
 
-**Purpose**: Runtime task orchestration and agent management
+**Purpose**: Runtime task orchestration and agent session management
 
-**Owner**: Task (aggregate root)
+**Owner**: **AgentSession** is the central runtime aggregate; Task is the unit of work that spawns sessions
 
 **Entities**:
-- Task - Work unit awaiting execution (with idempotency key and circuit breaker)
-- AgentSession - Full execution lifecycle with checkpoints, tool calls, and replay metadata
-- Workspace - Isolated filesystem for agent execution (with baseline/current commit tracking)
-- Artifact - Produced output with lineage (derived_from, supersedes) and observation method
+- Task - Work unit with required cost_budget, retry_state, matching_decision_id
+- AgentSession - Central durable execution aggregate (checkpoints, tool calls, limits, workspace)
+- AgentInvocation - Request DTO that creates a session (not an aggregate root)
+- Workspace - Per-session filesystem with baseline observation and durable_effects
+- Artifact - Produced output with lineage, observation_method, claim_reconciliation
 - CompiledPrompt - Versioned prompt artifact for reproducibility
-- ValidationResult - Structured error categories for feedback loop
+- ValidationResult - Structured validation + claim reconciliation
 - FeedbackArtifact - Corrections and suggested strategy for retry
-- MatchingDecision - Agent selection with dimension scores and explanation
-- AgentScorecard - Historical performance metrics (read model, derived from events)
+- MatchingDecision - Agent selection audit (hard filters + scores + negotiation)
 
-**Lifecycle**: Pending → Running → Completed / Failed / Cancelled
+**Lifecycle (Task)**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
+
+**Lifecycle (AgentSession)**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / Compensating / TimedOut / Cancelled
 
 **Storage**: SQLite / PostgreSQL
 
-**Events**: Task.Created, Task.Assigned, Task.Started, Task.Completed, Task.Failed, AgentSession.Started, AgentSession.Progress, AgentSession.Completed, AgentSession.Checkpoint, Artifact.Produced, Artifact.Validated, Artifact.Rejected, MatchingDecision.Made, CircuitBreaker.Opened
+**Events**: Task.Created, Task.Assigned, Task.Started, Task.Completed, Task.Failed, AgentSession.Started, AgentSession.Progress, AgentSession.WaitingForInput, AgentSession.Completed, AgentSession.Checkpoint, Artifact.Produced, Artifact.Validated, Artifact.Rejected, MatchingDecision.Made, Workspace.Observed
 
 **Integration Points**:
 - Configuration Context: Reads definitions, skills, capabilities
 - Workflow Context: Receives task completion events, emits Task.Created
-- Security Context: Requests workspace creation, secret injection
-- Observability Context: Emits metrics, cost records, quality metrics
+- Security Context: Requests sandbox policy evaluation, secret injection, attestation
+- Observability Context: Emits metrics, cost records, quality metrics, scorecard updates
+
+### Workspace Ownership
+
+- **Execution Context owns Workspace** as an aggregate root.
+- Cardinality: **Task 1 → 1..* Workspace** via **AgentSession 1 → 1 Workspace**.
+- Each retry attempt creates a new session and a new workspace.
+- Security Context provides **SandboxPolicy** and evaluates it before workspace/sandbox creation (admission-control pattern). Security does **not** own Workspace.
 
 ## 3. Workflow Context
 
@@ -70,10 +82,10 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - WorkflowDefinition - Template for workflow patterns (immutable)
 - WorkflowInstance - Live workflow execution (event-sourced)
 - Approval - Approval tracking (binary with escalation)
-- CompensationAction - Rollback action for failed workflows (LIFO stack)
+- CompensationAction - Abstract rollback intent with concrete effect mapping
 - StepResult - Ordered execution history with compensation info
 
-**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated
+**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / Rejected
 
 **Storage**: PostgreSQL (durable state) + Event Store (event sourcing)
 
@@ -92,23 +104,34 @@ type WorkflowEngine interface {
 }
 ```
 
+**Compensation boundary**: Workflow emits abstract compensation intents. Execution maps them to durable resources recorded in `Workspace.durable_effects` (commits, branches, PRs, artifact IDs). Compensating an already-cleaned ephemeral workspace filesystem is a no-op; durable effects remain the target.
+
 ## 4. Security Context
 
-**Purpose**: Workspace isolation, secrets, access control, audit, and egress control
+**Purpose**: Sandbox policy, secrets, access control, audit, and egress control
 
-**Owner**: Workspace (isolation), AccessPolicy (authorization), EgressProxy (network)
+**Owner**: AccessPolicy, EgressProxy, SecretBinding (not Workspace)
 
 **Entities**:
-- Workspace - Execution isolation primitive (with security context)
+- SandboxPolicy - Rules evaluated before sandbox/workspace creation
 - AccessPolicy - RBAC/ABAC rules (static or OPA)
-- SecretBinding - Per-task secret grants with TTL
+- SecretBinding - Per-session secret grants with TTL
 - AuditEvent - Security-relevant state changes (Merkle-chained)
 - EgressProxy - Network egress control and token counting
 - SandboxAttestation - Runtime integrity verification
 
 **Storage**: PostgreSQL for policies; Vault for secrets; Append-only log for audit; Object Storage for permanent audit
 
-**Events**: Workspace.Created, Workspace.Cleaned, Access.Denied, Secret.Accessed, Egress.RequestLogged, Sandbox.Attested
+**Events**: Sandbox.PolicyEvaluated, Access.Denied, Secret.Accessed, Egress.RequestLogged, Sandbox.Attested, Workspace.Created (observed; ownership in Execution), Workspace.Cleaned (observed)
+
+### Key Management (Attestation & Audit)
+
+Platform signing keys for SandboxAttestation and Merkle audit roots:
+
+- Stored in KMS/HSM; referenced by `signing_key_ref` (never embedded private keys).
+- Rotation: dual-valid window where `previous_key_ref` verifies historical signatures.
+- Compromise: mark key revoked; re-sign only new events; historical chain remains verifiable with revoked-but-known public keys.
+- Algorithm default: Ed25519.
 
 ## 5. Observability Context
 
@@ -118,16 +141,20 @@ type WorkflowEngine interface {
 
 **Entities**:
 - Metric - Time-series data point
-- CostRecord - Token/cost consumption with multi-dimensional attribution
+- CostRecord - Token/cost consumption with multi-dimensional attribution (authoritative)
 - CostSummary - Aggregated cost by period/team/agent
 - QualityMetric - Artifact quality assessment
-- AgentScorecard - Historical performance metrics (read model)
+- AgentScorecard - Historical performance metrics + **circuit breaker state**
 - ValidationMetric - Validation pipeline performance
 - ReplayMetadata - Agent execution reproduction data
 
 **Storage**: Prometheus (metrics), PostgreSQL (cost records, scorecards), Object Storage (replay data)
 
-**Events**: Metric.Recorded, Artifact.Validated, Cost.Recorded, Cost.BudgetExceeded, AgentScorecard.Updated
+**Events**: Metric.Recorded, Artifact.Validated, Cost.Recorded, Cost.BudgetExceeded, Cost.ReservationCreated, Cost.ReservationCommitted, AgentScorecard.Updated, CircuitBreaker.Opened, CircuitBreaker.Closed
+
+### Circuit Breaker Ownership
+
+Circuit breakers are **agent-scoped** and live only on `AgentScorecard`. Tasks use `retry_state` for attempt accounting. Open breakers are hard filters during assignment.
 
 ---
 
@@ -136,12 +163,14 @@ type WorkflowEngine interface {
 ### Task Creation Flow
 
 ```
-API → ExecutionContext(Task.Created)
+API → ExecutionContext(Task.Created with cost_budget required)
     → ConfigurationContext(read AgentDefinition, RoleDefinition)
-    → ExecutionContext(MatchingDecision.Made via scoring algorithm)
-    → SecurityContext(Workspace.Created)
-    → SecurityContext(SecretBroker.inject_for_task)
-    → ExecutionContext(AgentSession.Started)
+    → ExecutionContext(hard_filter → score → negotiate_contract)
+    → ExecutionContext(MatchingDecision.Made)
+    → SecurityContext(SandboxPolicy.Evaluate)
+    → ExecutionContext(Workspace.Created for session)
+    → SecurityContext(SecretBroker.inject_for_session)
+    → ExecutionContext(AgentSession.Started + SandboxAttestation)
 ```
 
 ### Agent Execution Flow
@@ -149,13 +178,14 @@ API → ExecutionContext(Task.Created)
 ```
 ExecutionContext(AgentSession.Started)
     → PromptCompiler(CompiledPrompt created)
-    → AgentExecutor(Agent process spawned with sidecar)
-    → OutputParser(Output parsed via ParserRegistry)
+    → AgentAdapter.pump until completed | needs_input | failed
+    → If needs_input: auto-response rules or WaitingForInput escalation
+    → OutputParser(strategy chain)
+    → Workspace observation + claim reconciliation
     → ExecutionContext(ValidationResult emitted)
-    → If INVALID: FeedbackArtifact created → new AgentSession
+    → If INVALID: FeedbackArtifact → new AgentSession + new Workspace
     → If VALID: Artifact.Produced → Artifact.Validated
-    → ExecutionContext(CostRecord emitted)
-    → ObservabilityContext(AgentScorecard updated)
+    → ObservabilityContext(CostRecord committed; AgentScorecard updated)
 ```
 
 ### Workflow Execution Flow
@@ -163,10 +193,11 @@ ExecutionContext(AgentSession.Started)
 ```
 WorkflowContext(Workflow.Created)
     → ExecutionContext(Task.Created x N)
-    → SecurityContext(Workspace.Created x N)
+    → ExecutionContext(Workspace.Created x N sessions)
     → ExecutionContext(Task.Completed events)
-    → WorkflowContext(Workflow.Transitioned)
-    → If step failed: WorkflowContext(Compensation started)
+    → WorkflowContext(Workflow.Transitioned; durable_effects recorded)
+    → If step failed: WorkflowContext(Compensation abstract intents)
+    → ExecutionContext(maps intents → git/PR/artifact actions)
     → WorkflowContext(Workflow.Completed or Workflow.Failed)
 ```
 
@@ -175,10 +206,10 @@ WorkflowContext(Workflow.Created)
 ```
 WorkflowContext(Workflow.StepFailed)
     → WorkflowContext(Workflow.Compensating)
-    → WorkflowContext(Compensation.Executed step N)
-    → SecurityContext(Workspace cleaned for step N)
-    → WorkflowContext(Compensation.Executed step N-1)
-    → SecurityContext(Workspace cleaned for step N-1)
+    → For each completed step N..1 (LIFO):
+        → Read durable_effects for step N (commit/branch/PR/artifact)
+        → ExecutionContext(execute concrete compensation)
+        → Ephemeral Workspace cleanup is independent and usually already done
     → WorkflowContext(Workflow.Failed)
     → ObservabilityContext(Compensation metrics recorded)
 ```
@@ -187,12 +218,11 @@ WorkflowContext(Workflow.StepFailed)
 
 ```
 ExecutionContext(Task.Assigned)
-    → ObservabilityContext(Cost.ReservationCreated)
+    → ObservabilityContext(Cost.ReservationCreated with buffer)
     → ExecutionContext(AgentSession.Started)
-    → AgentExecutor(Sidecar token counting)
-    → ObservabilityContext(Cost.Recorded per token batch)
-    → If budget exceeded: ExecutionContext(Cost.LimitReached)
-    → ExecutionContext(Task.Completed or Task.Failed)
-    → ObservabilityContext(Cost.Committed actual amount)
-    → ObservabilityContext(AgentScorecard cost metrics updated)
+    → Sidecar + Egress (token counting)
+    → ObservabilityContext(Cost.Recorded per batch)
+    → If invocation hard limit: kill process
+    → If team/tenant/org hard limit: cancel in-flight + reject new
+    → ObservabilityContext(Cost.Committed or Released)
 ```

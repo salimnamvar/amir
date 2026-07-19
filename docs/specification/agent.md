@@ -29,7 +29,9 @@ The Agent Runtime executes external CLI agents in isolated environments, extract
 
 ## AgentSession as Core Runtime Entity
 
-AgentSession replaces the simple AgentInvocation model. It tracks the full lifecycle of agent execution including partial progress, tool calls, checkpoints, and feedback iterations.
+**Execution-first design:** AgentSession is the central durable aggregate of the runtime. AgentInvocation is an immutable request DTO that *creates* a session; it is not an alternate source of truth. Cost, validation, workspace observation, checkpoints, and compensation hooks all hang off the session.
+
+AgentSession tracks the full lifecycle of agent execution including partial progress, tool calls, interactive prompts, checkpoints, and feedback iterations.
 
 ### AgentSession State Machine
 
@@ -121,42 +123,95 @@ class ReplayMetadata(BaseModel):
     agent_version: str
 ```
 
-## AgentAdapter Interface
+## Adapter / Runtime Boundary
+
+CLI agents are unreliable: they may hang on interactive prompts, rewrite history, emit free-form text, or lose session state. The Adapter is the **only** process that speaks agent-specific protocols; the control plane speaks only AgentSession contracts.
+
+### Responsibilities Split
+
+| Concern | Owner | Notes |
+|---------|-------|-------|
+| Prompt rendering | PromptCompiler | Produces versioned CompiledPrompt |
+| Process lifecycle, PTY, signals | AgentAdapter + AgentExecutor | Agent-specific |
+| Interactive prompts | AgentAdapter | Auto-response rules or escalate to `waiting_for_input` |
+| Feedback re-injection | AgentAdapter | Compiles FeedbackArtifact into next turn / stdin |
+| Token metering & kill | Sidecar + Egress proxy | Hard ceilings from session.resource_limits |
+| Artifact extraction | OutputParser + Workspace Observation | Control plane owns strategy |
+| Session continuity | AgentSession checkpoints | Adapter may map native agent session IDs |
+| Replay | ReplayMetadata + CompiledPrompt | Adapter records raw I/O under session_id |
+
+### AgentAdapter Interface
 
 ```python
 class AgentAdapter(ABC):
-    """Abstract interface for agent execution."""
-    
+    """Boundary between Amir runtime and an external agent process/API."""
+
     @abstractmethod
-    async def start_session(self, session: AgentSession) -> None:
-        """Start agent execution session. Non-blocking."""
+    async def start_session(self, session: AgentSession, prompt: CompiledPrompt) -> None:
+        """Spawn or attach agent. Non-blocking. Must record sandbox_attestation_id."""
         pass
-    
+
     @abstractmethod
-    async def get_result(self, session_id: UUID, timeout: float = 30.0) -> RawAgentOutput:
-        """Get execution result. Returns raw output or error."""
+    async def pump(self, session_id: UUID) -> AdapterEvent:
+        """
+        Drive the agent until the next control-plane event:
+        - output_chunk | tool_call | needs_input | completed | failed | timed_out
+        """
         pass
-    
+
     @abstractmethod
-    async def cancel(self, session_id: UUID) -> None:
-        """Cancel running session. Best-effort."""
+    async def respond_input(self, session_id: UUID, response: str) -> None:
+        """Answer an interactive prompt when status=waiting_for_input."""
         pass
-    
+
     @abstractmethod
     async def inject_feedback(self, session_id: UUID, feedback: FeedbackArtifact) -> None:
-        """Inject corrective feedback into running agent."""
+        """
+        For multi-turn adapters: inject corrections into the live conversation.
+        For single-turn CLI: no-op; control plane starts a new session with feedback compiled in.
+        """
         pass
-    
+
+    @abstractmethod
+    async def cancel(self, session_id: UUID) -> None:
+        """Cancel running session. Best-effort SIGTERM then SIGKILL."""
+        pass
+
+    @abstractmethod
+    async def get_raw_output(self, session_id: UUID) -> RawAgentOutput:
+        """Return captured stdout/stderr/tool stream for OutputParser."""
+        pass
+
     @abstractmethod
     def supports_contract(self, contract_type: str, version: str) -> bool:
-        """Check if adapter supports given contract."""
         pass
-    
+
     @abstractmethod
     def supports_output_mode(self, mode: OutputMode) -> bool:
-        """Check if adapter supports output mode."""
+        pass
+
+    @abstractmethod
+    def map_native_session(self, session_id: UUID) -> str | None:
+        """Optional native agent session/conversation id for continuity."""
         pass
 ```
+
+### Interactive Prompt Protocol
+
+When a CLI agent blocks on stdin (confirmations, choices, clarifications):
+
+1. Adapter detects prompt pattern → emits `needs_input` → session status `waiting_for_input`.
+2. Control plane evaluates **auto-response rules** (role/task scoped, deny-by-default for destructive ops).
+3. If a rule matches → `respond_input` immediately.
+4. If no rule → escalate per task policy (timeout, human approval, or fail).
+5. Secrets are never auto-answered into agent stdin; they flow only via SecretBinding tmpfs / proxy.
+
+### Session Continuity and Replay
+
+- Each Amir AgentSession has its own workspace and sandbox.
+- Adapters that support native multi-turn sessions may map `session_id → native_id` for in-attempt continuity only.
+- Retries always create a **new** AgentSession (and workspace); feedback is compiled into a new CompiledPrompt, not mutated into the prior prompt.
+- Replay uses CompiledPrompt + ReplayMetadata + recorded tool_calls; adapters must not depend on unreproducible host state.
 
 ## PromptCompiler
 
@@ -237,6 +292,8 @@ class OutputParser(ABC):
 
 ### Strategy Chain (Fallback Order)
 
+Parser strategy is a **state machine owned by the control plane**, never by the agent:
+
 ```
 1. Structured Output Mode (JSON schema enforced by agent)
    └─ Agent returns JSON conforming to schema
@@ -248,38 +305,38 @@ class OutputParser(ABC):
    └─ Confidence: 0.90
 
 3. Markdown Block Extraction
-   └─ Strip ```json...``` or ```yaml...``` code blocks
+   └─ Strip fenced json/yaml code blocks
    └─ Parse first valid block
    └─ Confidence: 0.70
 
-4. Workspace Observation (ground truth)
-   └─ Derive artifact from `git diff`, `git status`, file reads
+4. Workspace Observation (ground truth for code/filesystem work)
+   └─ Derive artifact from git diff / tree hash / file reads
    └─ Ignore agent stdout narrative
    └─ Confidence: 0.85 (for code changes)
 
-5. LLM Coercion (last resort)
-   └─ Cheap model (Llama-3-8B) reformatting
-   └─ Takes raw text + target schema
-   └─ Outputs structured JSON
+5. LLM Coercion (last resort, budgeted)
+   └─ Cheap model reformatting within coercion budget (default $0.05, timeout 30s)
+   └─ Takes raw text + target schema → structured JSON
    └─ Confidence: 0.60
+   └─ Coercion cost billed to orchestration_cost_usd
 
 6. Reject
    └─ All strategies failed
-   └─ Emit Artifact.Rejected
+   └─ Emit Artifact.Rejected + ValidationResult
    └─ Trigger FeedbackLoop
 ```
 
 ### OutputMode Negotiation
 
-Agents declare supported output modes. Adapter selects best available:
+Agents declare supported output modes. Control plane selects best available. **`free_text` is not a control-plane mode** — unstructured stdout may still arrive, but extraction falls through the strategy chain (markdown → workspace → coercion → reject).
 
 ```yaml
 OutputMode:
   enum:
-    - json_schema       # Agent enforces JSON Schema compliance
-    - tool_use          # Agent uses submit_artifact tool
-    - markdown_yaml     # Agent wraps output in markdown code blocks
-    - free_text         # Unstructured text (requires coercion)
+    - json_schema            # Agent enforces JSON Schema compliance
+    - tool_use               # Agent uses submit_artifact tool
+    - markdown_yaml          # Agent wraps output in markdown code blocks
+    - workspace_observation  # Prefer filesystem derivation (coding tasks)
 ```
 
 ## Workspace Observation Layer
@@ -294,30 +351,46 @@ Agent output is treated as untrusted narrative. The filesystem is ground truth.
 
 ```
 1. Before Agent Execution:
-   - Record workspace state (git HEAD, file listing)
-   - Create observation baseline
+   - Record baseline_commit and baseline_tree_hash
+   - Snapshot relevant file listing
 
 2. After Agent Execution:
-   - Run `git diff <baseline>..<current>`
-   - Run `git status`
-   - Read modified files
-   - Derive CodeChangeArtifact from diff
-   - Compare agent's claimed changes with observed changes
+   - Prefer tree-hash / working-tree observation even if agent did not commit
+   - Run git diff (committed and unstaged), git status
+   - Read modified files; handle binaries as opaque blobs (hash only)
+   - Ignore .git mutations by the agent (treat as policy violation)
 
-3. Artifact Construction:
-   - files[] populated from git diff (not agent output)
-   - changes populated from git log
-   - tests populated from file listing + test runner output
-   - commit_message from agent output (if available)
+3. Claim Reconciliation (mandatory for CodeChangeArtifact):
+   - Parse agent/parser claims (if any)
+   - Diff claimed_paths vs observed_paths
+   - If diverge: authoritative_source = workspace; record divergence_summary
+   - Emit ValidationResult.claim_reconciliation
+
+4. Artifact Construction:
+   - files[] from workspace observation (not agent claims)
+   - changes summary from diff
+   - tests from file listing + test runner when configured
+   - commit_message from agent output only if present (non-authoritative)
 ```
+
+### Observation Reliability Rules
+
+| Situation | Behavior |
+|-----------|----------|
+| Agent edits but does not commit | Observe working tree vs baseline_tree_hash |
+| Gitignored paths changed | Include if quality_criteria requires; else note in warnings |
+| Binary files changed | Record path + content hash; skip textual diff |
+| Agent mutates `.git` | Policy failure; session fails; no artifact acceptance |
+| Claims ⊆ observation | Accept; note extra unclaimed changes if policy requires |
+| Claims ⊄ observation | Reject claim paths; synthesize from observation; feedback may cite divergence |
 
 ### Synthetic Artifact Generation
 
-When agent output parsing fails completely:
+When agent output parsing fails or claims diverge:
 
 ```python
 def synthesize_artifact(workspace: Workspace, baseline: str) -> CodeChangeArtifact:
-    """Construct artifact from workspace observation."""
+    """Construct artifact from workspace observation (authoritative)."""
     diff = workspace.git_diff(baseline)
     status = workspace.git_status()
     
@@ -330,11 +403,13 @@ def synthesize_artifact(workspace: Workspace, baseline: str) -> CodeChangeArtifa
             "tests": detect_test_changes(status),
             "commit_message": extract_commit_message(workspace)
         },
-        provenance={
-            "observation_method": "workspace_diff",
+        observation_method="synthesized",
+        claim_reconciliation={
+            "claims_match_observation": False,
+            "authoritative_source": "workspace",
             "baseline_commit": baseline,
-            "current_commit": workspace.current_head()
-        }
+            "current_commit": workspace.current_head(),
+        },
     )
 ```
 
@@ -568,51 +643,44 @@ def score_agent(agent: AgentDefinition, task: Task, context: ExecutionContext, h
         "availability": check_availability(agent)
     }
     
-    total_score = sum(scores[dim] * weights[dim] for dim in scores)
-    
-    # Check circuit breaker
-    if history and history.circuit_breaker.state == "open":
-        total_score *= 0.1  # Heavily penalize quarantined agents
-    
+    # Open circuit breakers are hard-filtered before score_agent is called.
+    # half_open receives a soft penalty only.
+    if history and history.circuit_breaker.state == "half_open":
+        total_score *= 0.5
+
     return MatchingDecision(
-        agent_id=agent.id,
+        selected_agent_id=agent.id,
         score=total_score,
         dimension_scores=scores,
         explanation=generate_explanation(scores, weights),
-        projected_cost=estimate_cost(agent, task),
-        projected_latency=estimate_latency(agent, task, history)
+        projected_cost_usd=estimate_cost(agent, task),
+        projected_latency_seconds=estimate_latency(agent, task, history),
     )
 ```
 
 ### MatchingDecision Artifact
 
+Full schema: `docs/contract/schemas/matching-decision.schema.yaml`.
+
 ```yaml
 MatchingDecision:
-  type: object
-  required: [agent_id, score, dimension_scores]
-  properties:
-    agent_id:
-      type: string
-      format: uuid
-    score:
-      type: number
-      minimum: 0.0
-      maximum: 1.0
-    dimension_scores:
-      type: object
-      additionalProperties:
-        type: number
-    explanation:
-      type: string
-      description: "Human-readable explanation of scoring"
-    projected_cost:
-      type: number
-    projected_latency:
-      type: number
-    rejection_reasons:
-      type: array
-      items:
-        type: string
+  decision_id: UUID
+  task_id: UUID
+  selected_agent_id: UUID
+  score: float  # 0.0-1.0
+  dimension_scores: dict
+  hard_filters:
+    passed: bool
+    rejected_agents: list[{agent_id, reason}]
+  contract_negotiation:
+    negotiated_version: str
+    compatible: bool
+    fallback_used: bool
+  candidates: list[{agent_id, score, rank, eliminated_reason?}]
+  explanation: str
+  projected_cost_usd: float
+  projected_latency_seconds: float
+  scorecard_staleness_seconds: int | null
 ```
 
 ## Sandbox Manager
@@ -642,25 +710,38 @@ MatchingDecision:
 
 ### Hierarchical Cost Gate
 
+Cost ceilings are **structurally required** on Task and AgentSession (`anyOf` max_tokens / max_usd). Empty budgets are invalid by construction.
+
 ```
 Per-Invocation Budget
-    ↓ (if exceeded → kill process)
+    ↓ (if exceeded → kill process via sidecar / egress RST)
 Per-Team Hourly Budget
-    ↓ (if exceeded → reject new invocations)
+    ↓ (if exceeded → reject NEW sessions AND signal cancel on IN-FLIGHT team sessions at soft→hard)
 Per-Tenant Daily Budget
-    ↓ (if exceeded → pause all non-critical tasks)
+    ↓ (if exceeded → pause non-critical; cancel in-flight when hard threshold hit)
 Per-Org Monthly Budget
-    ↓ (if exceeded → system alert, require admin override)
+    ↓ (if exceeded → system alert; require admin override for new work; cancel non-critical in-flight)
 ```
+
+### In-Flight vs New Work on Higher-Level Breach
+
+| Scope | Soft threshold (default 80%) | Hard threshold (default 100%) |
+|-------|------------------------------|--------------------------------|
+| Invocation | Warn / throttle streaming | Kill agent process |
+| Team hourly | Reject new assignments | Cancel in-flight team sessions (graceful → force) |
+| Tenant daily | Pause non-critical new work | Cancel non-critical in-flight; critical requires override |
+| Org monthly | Alert + freeze non-essential | Same as tenant hard + admin page |
+
+Higher-level breach **does** stop in-flight work at hard threshold — not only new assignment. Cancellation emits `Cost.BudgetExceeded` with `scope` and `action=cancel_inflight`.
 
 ### Reservation Protocol
 
 ```
-1. Pre-flight: Estimate cost for task
-2. Reserve: Deduct estimate from team/hourly budget
-3. Execute: Track actual consumption via sidecar
+1. Pre-flight: Estimate cost (prefer p95 historical; apply reservation_buffer_pct, default 10%)
+2. Reserve: Deduct estimate+buffer from team/tenant budgets
+3. Execute: Track actual via sidecar + egress token counting
 4. Commit: On completion, adjust reservation to actual
-5. Release: On failure, release unspent reservation
+5. Release: On failure/cancel, release unspent reservation
 ```
 
 ### Cost Enforcement
@@ -668,18 +749,17 @@ Per-Org Monthly Budget
 ```python
 class CostEnforcer:
     def check_and_enforce(self, session: AgentSession, token_count: int, usd_cost: float) -> None:
-        # Per-invocation check
-        if token_count > session.resource_limits.max_tokens * 0.95:
+        limits = session.resource_limits
+        if limits.max_tokens and token_count > limits.max_tokens * 0.95:
             raise CostLimitExceeded("Token limit threshold reached")
-        if usd_cost > session.resource_limits.max_usd * 0.95:
+        if limits.max_usd is not None and usd_cost > limits.max_usd * 0.95:
             raise CostLimitExceeded("USD limit threshold reached")
-        
-        # Team hourly check
+
         team_usage = get_team_hourly_usage(session.team_id)
-        if team_usage.usd + usd_cost > session.team_budget.hourly_usd:
-            raise TeamBudgetExceeded("Team hourly budget exceeded")
-        
-        # Record consumption
+        if team_usage.at_hard_limit(usd_cost):
+            cancel_inflight_sessions(team_id=session.team_id, reason="team_hourly_hard")
+            raise TeamBudgetExceeded("Team hourly budget hard limit")
+
         emit_cost_event(session.id, token_count, usd_cost)
 ```
 
@@ -719,4 +799,10 @@ Hierarchical cost gate with reservation protocol. Pre-flight estimation. Sidecar
 Artifacts derived from git diff, not agent claims. Synthetic artifact generation when parsing fails completely.
 
 ### Structured Output (Gemini/Xiaomi)
-Output mode negotiation per agent type. Fallback chain from structured to coerced. Adapter selects best available mode.
+Output mode negotiation per agent type. Fallback chain from structured to workspace to coerced. Control plane owns extraction; free_text is not a control-plane mode.
+
+### Adapter Boundary (Round 4)
+Explicit pump/respond_input/inject_feedback contract. Interactive prompts, session continuity, and replay are first-class adapter responsibilities.
+
+### Claim Reconciliation (Round 4)
+Parser claims are always compared to workspace observation for code artifacts; workspace wins on divergence.

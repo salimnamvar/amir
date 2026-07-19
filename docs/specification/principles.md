@@ -44,7 +44,14 @@ Five explicit bounded contexts prevent conceptual leakage:
 
 Each entity belongs to exactly one aggregate root. Cross-aggregate consistency via domain events and outbox pattern.
 
-## 3. Contract-First Design
+## 3. Execution-First, Contract-Governed Design
+
+**Runtime truth is execution; contracts govern and validate it.**
+
+- **AgentSession** is the central durable aggregate (what ran).
+- **Contracts** (schemas, versions, validators) define legal shapes and acceptance rules.
+- **AgentInvocation** is a request DTO into the session, not a parallel source of truth.
+- Configuration entities (Team, Role, Agent) are GitOps-published definitions, not runtime state.
 
 ### Contract Properties
 
@@ -56,7 +63,7 @@ All contracts declare:
 
 ### Contract Types
 
-- AgentContract, TaskContract, ArtifactContract, WorkflowContract, RoleContract, FeedbackContract, ValidationResultContract, CostRecordContract, MatchingDecisionContract, CompiledPromptContract
+- AgentContract, TaskContract, ArtifactContract, WorkflowContract, RoleContract, FeedbackContract, ValidationResultContract, CostRecordContract, MatchingDecisionContract, CompiledPromptContract, SandboxAttestationContract, WorkspaceContract, AgentSessionContract
 
 ## 4. Two-Track Entity Lifecycle
 
@@ -164,13 +171,16 @@ Each major component has documented migration paths:
 Three-layer runtime (PromptCompiler → AgentExecutor → OutputParser) with ParserRegistry strategy chain. Workspace observation as ground truth.
 
 ### Aggregate Boundary Clarity (All Audits)
-Workspace promoted to its own aggregate root. Cross-aggregate consistency via events and outbox.
+Workspace is an Execution aggregate root (not Security). Security evaluates SandboxPolicy at admission. AgentSession is the central runtime aggregate.
 
 ### Over-Engineering Prevention (All Audits)
 Two-Track Lifecycle prevents applying full CI/CD to ephemeral runtime entities. Static rules as default; OPA as extension.
 
-### Agent Non-Determinism (All 17 Audits)
-AgentSession with full checkpointing. Circuit breaker with quarantine. AgentScorecard for historical routing.
+### Agent Non-Determinism (All Audits)
+AgentSession with full checkpointing. Agent-scoped circuit breaker with quarantine. AgentScorecard for historical routing with version warm-start.
 
-### Cost as First-Class (All 17 Audits)
-Hierarchical cost gate. Reservation protocol. Sidecar proxy for real-time enforcement. CostRecord with multi-dimensional attribution.
+### Cost as First-Class (All Audits)
+Hierarchical cost gate with structural ceilings. Reservation protocol. In-flight cancel at higher-level hard thresholds. Sidecar + egress real-time enforcement.
+
+### Adapter Reliability (Round 4)
+Explicit adapter pump loop, interactive prompt protocol, feedback injection, and replay metadata. Control plane owns parser strategy and workspace ground truth.

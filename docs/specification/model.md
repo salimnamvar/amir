@@ -12,18 +12,23 @@ Each aggregate root owns its invariants and is updated transactionally. Cross-ag
 | RoleDefinition | Configuration | All output contracts must be Published |
 | AgentDefinition | Configuration | If sandbox_required=true, network must be limited |
 | ContractDefinition | Configuration | Schema must be valid, N-1 compatibility maintained |
-| Task | Execution | Must have Assignment before Running; cost budget enforced |
-| AgentSession | Execution | Must belong to exactly one Task; checkpoint integrity |
-| Workspace | Execution | Must be assigned to exactly one AgentSession at a time |
+| Task | Execution | Must have Assignment before Running; cost budget structurally required |
+| AgentSession | Execution | Central runtime aggregate; one Task, one Workspace, one attempt |
+| Workspace | Execution | Exactly one AgentSession; Task may own many workspaces (retries) |
 | WorkflowInstance | Workflow | State transitions must follow WorkflowDefinition |
-| Artifact | Execution | Must have valid provenance; checksum integrity |
+| Artifact | Execution | Must have valid provenance; checksum integrity; observation method |
+
+### Execution-First Aggregate Model
+
+**AgentSession is the central runtime aggregate.** Configuration contracts (Role, Agent, Team) describe *what may run*; AgentSession records *what ran*. AgentInvocation is a request DTO that creates a session — it is not an aggregate root. Cost accounting, validation, checkpoints, and workspace observation all hang off the session.
 
 ### Cross-Aggregate Consistency
 
-- **Task → AgentSession**: Task emits `Task.Assigned` event; AgentSession consumes and creates checkpoint
-- **AgentSession → Artifact**: AgentSession emits `Artifact.Produced`; Artifact created in same transaction
+- **Task → AgentSession**: Task emits `Task.Assigned` with MatchingDecision; new AgentSession + Workspace created per attempt
+- **AgentSession → Artifact**: AgentSession emits `Artifact.Produced` after OutputParser + workspace reconciliation
 - **WorkflowInstance → Task**: Workflow emits `Task.Created`; Task created via event handler
-- **AgentSession → CostRecord**: CostRecord emitted on every state transition; eventually consistent with Task
+- **AgentSession → CostRecord**: Authoritative CostRecord owned by Observability; session holds `cost_record_id` + live meters
+- **Workflow compensation → durable effects**: Compensation targets commit/branch/PR/artifact IDs recorded on Workspace.durable_effects, never the cleaned ephemeral filesystem
 
 ### Idempotency Protocol
 
@@ -152,11 +157,11 @@ Task (Aggregate Root)
 ├── expected_outputs: list[ContractType]
 ├── constraints: dict
 ├── assignment: Assignment
-├── cost_budget: CostBudget
+├── cost_budget: CostBudget  # anyOf max_tokens | max_usd REQUIRED
 ├── status: TaskStatus
-├── attempts: int
-├── max_attempts: int  # Default: 3
-├── circuit_breaker: CircuitBreakerState  # NEW
+├── retry_state: RetryState  # task-scoped attempts — NOT a circuit breaker
+├── active_workspace_id: UUID | None
+├── matching_decision_id: UUID | None
 └── metadata: TaskMetadata
 ```
 
@@ -164,31 +169,36 @@ Task (Aggregate Root)
 
 **Invariants**:
 - Must have Assignment before Running
+- `cost_budget` must include at least one of `max_tokens` or `max_usd`
 - Cost budget must not be exceeded
 - Expected outputs must have valid ContractDefinitions
-- attempts must not exceed max_attempts
-- circuit_breaker.state == "open" prevents new assignments
+- `retry_state.attempts` must not exceed `retry_policy.max_attempts`
+- Agent circuit breaker lives on AgentScorecard only (never on Task)
 
-### AgentSession Aggregate (Execution)
+### AgentSession Aggregate (Execution) — Central Runtime Unit
 
 ```
 AgentSession (Aggregate Root)
-├── session_id: UUID (idempotency key)
+├── session_id: UUID
+├── idempotency_key: str  # SHA256(task_id + attempt_number)
 ├── task_id: UUID
 ├── agent_definition_id: UUID
+├── matching_decision_id: UUID
 ├── attempt_number: int
 ├── previous_session_id: UUID | None
 ├── status: SessionStatus
-├── workspace_id: UUID
+├── workspace_id: UUID  # exclusive to this session
 ├── sandbox_id: UUID
+├── sandbox_attestation_id: UUID
 ├── compiled_prompt_id: UUID
+├── resource_limits: ResourceLimits  # anyOf max_tokens | max_usd REQUIRED
 ├── checkpoints: list[Checkpoint]
 ├── tool_calls: list[ToolCall]
-├── partial_outputs: list[PartialOutput]
-├── validation_result: ValidationResult | None
+├── pending_input: PendingInput | None  # waiting_for_input
+├── validation_result_id: UUID | None
 ├── feedback_artifact: FeedbackArtifact | None
-├── resource_usage: ResourceUsage
-├── cost_record: CostRecord
+├── resource_usage: ResourceUsage  # live meters
+├── cost_record_id: UUID  # authoritative CostRecord ref
 └── replay_metadata: ReplayMetadata
 ```
 
@@ -196,32 +206,41 @@ AgentSession (Aggregate Root)
 
 **Invariants**:
 - Must belong to exactly one Task
+- Owns exactly one Workspace for its lifetime
 - attempt_number must be >= 1
 - Each checkpoint must reference valid session state
-- cost_record must not exceed session budget
+- resource_limits must include at least one cost ceiling
+- Live resource_usage must not exceed resource_limits (sidecar enforces)
 
 ### Workspace Aggregate (Execution)
 
 ```
 Workspace (Aggregate Root)
-├── id: UUID
+├── workspace_id: UUID
+├── task_id: UUID  # parent; many workspaces per task across retries
+├── session_id: UUID  # exclusive owner (1:1 with AgentSession)
 ├── repo_url: str
 ├── branch: str
 ├── workdir: str
+├── status: WorkspaceStatus  # created | active | observed | cleaned | failed
 ├── ephemeral: bool
 ├── sandbox_id: UUID | None
-├── assigned_session_id: UUID | None  # NEW
-├── baseline_commit: str  # NEW: git HEAD before agent execution
-├── current_commit: str  # NEW: git HEAD after agent execution
+├── baseline_commit: str
+├── current_commit: str
+├── baseline_tree_hash: str
+├── durable_effects: DurableEffects  # survive cleanup; used by compensation
 └── security_context: WorkspaceSecurityContext
 ```
 
 **Lifecycle**: Created → Active → Observed → Cleaned
 
 **Invariants**:
-- assigned_session_id must reference a valid AgentSession
-- baseline_commit must be set before agent execution
-- current_commit updated after agent execution completes
+- session_id must reference exactly one AgentSession
+- Task 1 → 1..* Workspace (one new workspace per retry attempt)
+- baseline_commit / baseline_tree_hash set before agent execution
+- current_commit updated after observation
+- Ephemeral filesystem may be cleaned while durable_effects remain for saga compensation
+- Security Context enforces SandboxPolicy at creation; does not own the Workspace
 
 ### Artifact Aggregate (Execution)
 
@@ -281,24 +300,28 @@ RoleDefinition ──→ * Capability (referenced)
 AgentDefinition ──→ * Capability (declared)
 AgentDefinition ──→ AgentScorecard (derived)
 
-Task 1 ──→ 1 Workspace
-Task 1 ──→ 1..* AgentSession (for retries)
+Task 1 ──→ 1..* AgentSession (one session per attempt)
+Task 1 ──→ 1..* Workspace (via AgentSession; one workspace per attempt)
 Task ──→ * Artifact (outputs)
-Task ──→ CircuitBreakerState (derived)
+Task ──→ RetryState (task-scoped attempt bookkeeping)
 
-AgentSession ──→ 1 Workspace
+AgentSession 1 ──→ 1 Workspace
 AgentSession ──→ * Checkpoint
 AgentSession ──→ * ToolCall
-AgentSession ──→ CompiledPrompt
+AgentSession ──→ 1 CompiledPrompt
 AgentSession ──→ ValidationResult
 AgentSession ──→ FeedbackArtifact
-AgentSession ──→ CostRecord
+AgentSession ──→ CostRecord (by id; Observability owns payload)
+AgentSession ──→ SandboxAttestation
+AgentSession ──→ MatchingDecision (selection audit)
+
+AgentScorecard ──→ CircuitBreakerState  # ONLY place circuit breaker lives
 
 Artifact ──→ * Artifact (lineage via derived_from)
 
 WorkflowInstance 1 ──→ * Task
 WorkflowInstance ──→ * Approval
-WorkflowInstance ──→ * CompensationAction (compensation_stack)
+WorkflowInstance ──→ * CompensationAction (abstract; maps to durable_effects)
 ```
 
 ---
@@ -321,7 +344,7 @@ stateDiagram-v2
     Pending --> Cancelled: cancel()
     Assigned --> Cancelled: cancel()
     Running --> Cancelled: cancel()
-    Failed --> Assigned: circuit_breaker_reset()
+    Failed --> Assigned: reassign_after_escalation()
 ```
 
 ### AgentSession States
@@ -371,9 +394,30 @@ stateDiagram-v2
 
 ## Capability Matching
 
+### Composition Order (Hard Filter → Score → Negotiate)
+
+Assignment is a three-stage pipeline. Contract negotiation is **not** a scoring dimension.
+
+```
+1. Hard filters (boolean eliminate)
+   - circuit_breaker.state == open  → reject
+   - missing required tools/skills → reject
+   - health_status unhealthy       → reject
+   - network/sandbox constraints   → reject
+   - budget_infeasible estimate    → reject
+
+2. Multi-dimensional score (rank survivors)
+
+3. negotiate_contract() top-down
+   - If top-ranked agent is contract-incompatible → try next
+   - If none compatible → assignment fails
+```
+
+See `docs/contract/compatibility.md` for full `assign_agent()` pseudocode.
+
 ### Multi-Dimensional Scoring
 
-Replace flat `proficiency` enum with weighted scoring algorithm:
+Subjective `proficiency` enums are prohibited. Routing uses objective constraints and historical metrics:
 
 ```python
 def score_agent(
@@ -383,7 +427,8 @@ def score_agent(
     history: AgentScorecard
 ) -> MatchingDecision:
     weights = context.scoring_weights or DEFAULT_WEIGHTS
-    
+    history = warm_start_scorecard(agent, history)  # carry metrics across agent versions
+
     scores = {
         "skill_match": compute_skill_match(agent, task),
         "language_match": compute_language_match(agent, task),
@@ -395,20 +440,28 @@ def score_agent(
     }
     
     total = sum(scores[d] * weights[d] for d in scores)
-    
-    # Circuit breaker penalty
-    if history and history.circuit_breaker.state == "open":
-        total *= 0.1
+
+    # Open circuit breakers are hard-filtered earlier; half_open gets a soft penalty
+    if history and history.circuit_breaker.state == "half_open":
+        total *= 0.5
+
+    staleness = history.staleness_seconds if history else None
     
     return MatchingDecision(
-        agent_id=agent.id,
+        selected_agent_id=agent.id,
         score=total,
         dimension_scores=scores,
         explanation=generate_explanation(scores, weights),
-        projected_cost=estimate_cost(agent, task),
-        projected_latency=estimate_latency(agent, task, history)
+        projected_cost_usd=estimate_cost(agent, task),
+        projected_latency_seconds=estimate_latency(agent, task, history),
+        scorecard_staleness_seconds=staleness,
+        scorecard_warm_start=history.warm_started if history else False,
     )
 ```
+
+### Scorecard Version Warm-Start
+
+When an `AgentDefinition` publishes a new version, the scorecard **inherits** rolling metrics from the previous version of the same agent name (marked `warm_start=true`) until the new version accumulates its own history. Cold-start default `historical_success=0.5` applies only to brand-new agents.
 
 ### Skill Matching
 
@@ -459,17 +512,18 @@ ScoringWeights:
 
 ### Session-Level Retry
 
-- Each retry creates a new AgentSession with `attempt_number` incremented
+- Each retry creates a **new AgentSession** with `attempt_number` incremented
 - `previous_session_id` links to prior attempt for audit trail
-- Workspace is cloned from Task.inputs (new workspace per attempt)
+- Each attempt gets a **new Workspace** (Task 1 → 1..* Workspace)
+- Prior workspaces transition to `cleaned` after observation; durable_effects retained
 - FeedbackArtifact injected into PromptCompiler for next attempt
 
-### Circuit Breaker
+### Circuit Breaker (Agent-Scoped Only)
 
-Per-agent failure counting with quarantine:
+Circuit breakers live **only** on `AgentScorecard` (Observability read model). Tasks carry `retry_state` for attempt bookkeeping; they do **not** host a circuit breaker.
 
 ```yaml
-CircuitBreakerState:
+CircuitBreakerState:  # on AgentScorecard
   type: object
   properties:
     state:
@@ -489,32 +543,45 @@ CircuitBreakerState:
 ```
 
 Behavior:
-- **Closed**: Normal operation. Failures counted.
-- **Open**: Agent quarantined. New tasks rejected. After recovery_timeout → half_open.
-- **Half_open**: One test task allowed. If succeeds → closed. If fails → open.
+- **Closed**: Normal operation. Failures counted across tasks for that agent.
+- **Open**: Agent quarantined. Hard filter rejects assignment. After recovery_timeout → half_open.
+- **Half_open**: One probe task allowed. Success → closed. Failure → open.
+- Scorecard update lag is a known limitation under burst load; hard filter still rejects agents whose last known state is `open`.
 
 ### Workflow-Level Compensation
 
-Each completed workflow step pushes a `CompensationAction` onto the compensation stack:
+Compensation targets **durable side effects**, not ephemeral Workspace filesystems (which are usually already cleaned when a later step fails).
+
+Two-layer model:
+1. **Abstract** (Workflow Context): `rollback_workspace_effects`, `delete_artifacts`, `revoke_access`, `notify`, `custom`
+2. **Concrete** (Execution Context): resolved at step completion into `git_revert`, `branch_delete`, `pr_close`, etc. against `Workspace.durable_effects`
 
 ```yaml
 CompensationAction:
   type: object
-  required: [action_type, target, parameters]
+  required: [action_type, target_ref]
   properties:
     action_type:
       type: string
-      enum: [git_revert, branch_delete, pr_close, resource_cleanup, artifact_delete]
-    target:
+      enum: [rollback_workspace_effects, delete_artifacts, revoke_access, notify, custom]
+    target_ref:
       type: string
-      description: "Target of compensation (commit hash, branch name, etc.)"
-    parameters:
-      type: object
+      description: "task_id or step_id whose durable_effects are compensated"
+    concrete_actions:
+      type: array
+      items:
+        type: object
+        properties:
+          effect_type:
+            type: string
+            enum: [git_revert, branch_delete, pr_close, resource_cleanup, artifact_delete]
+          target:
+            type: string
+            description: "Commit SHA, branch name, PR number, or artifact id"
     executed_at:
       type: string
       format: date-time
-    executed_by:
-      type: string
 ```
 
-On workflow failure, compensation executes in reverse order (LIFO).
+On workflow failure, compensation executes in reverse order (LIFO) against durable targets.
+

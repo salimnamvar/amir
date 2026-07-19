@@ -224,33 +224,45 @@ class SecretBroker:
 
 ### Runtime Attestation
 
-Sandbox integrity verified via signed attestation:
+Sandbox integrity verified via signed attestation. Full schema: `docs/contract/schemas/sandbox-attestation.schema.yaml`.
 
 ```yaml
 SandboxAttestation:
-  type: object
-  properties:
-    sandbox_id:
-      type: string
-      format: uuid
-    runtime:
-      type: string
-    image_hash:
-      type: string
-      description: "SHA256 of container image"
-    rootfs_hash:
-      type: string
-      description: "SHA256 of root filesystem"
-    started_at:
-      type: string
-      format: date-time
-    attestation_signature:
-      type: string
-      description: "Cryptographic signature over sandbox state"
-    signing_key_ref:
-      type: string
-      description: "Reference to signing key"
+  attestation_id: UUID
+  session_id: UUID
+  sandbox_id: UUID
+  runtime: gvisor | firecracker   # docker not attestable in production
+  image_hash: str
+  sandbox_profile_hash: str
+  network_mode: proxy | none
+  attestation_signature: str
+  signing_key_ref: str            # kms://... never embed private keys
+  signature_algorithm: ed25519
+  key_lifecycle:
+    key_id: str
+    rotated_at: datetime | null
+    previous_key_ref: str | null  # dual-valid verification window
+    compromise_revoked: bool
+  attested_at: datetime
 ```
+
+### Platform Key Lifecycle
+
+| Event | Behavior |
+|-------|----------|
+| Generation | Keys created in KMS/HSM; only public material leaves the HSM |
+| Rotation | New key becomes primary; previous_key_ref remains valid for verification window |
+| Signing | Attestations and Merkle roots use current primary key |
+| Compromise | Mark key revoked; stop signing; historical events verify with known public keys |
+| Audit | All key ops emit AuditEvents |
+
+### Network Default Allowlists
+
+- `network_mode: proxy` is required for cloud LLM CLIs.
+- `network_mode: none` is only for offline/local tools (no provider API).
+- Empty allowlist = **deny-all** except platform-injected LLM provider routes for cost attribution.
+- `coding_standard` profile expands to LLM provider + common package registries (PyPI, npm, crates, Go proxy, etc.).
+- Security evaluates SandboxPolicy; Execution owns the Workspace aggregate.
 
 ---
 

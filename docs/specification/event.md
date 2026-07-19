@@ -39,7 +39,7 @@ class DomainEvent(BaseModel):
 | Task.Assigned | Orchestrator | task_id, agent_id, role, matching_decision |
 | Task.Started | Orchestrator | task_id, session_id |
 | Task.Completed | Orchestrator | task_id, artifact_ids |
-| Task.Failed | Orchestrator | task_id, error, circuit_breaker_state |
+| Task.Failed | Orchestrator | task_id, error, retry_state, agent_circuit_breaker_state |
 | Task.Cancelled | Orchestrator | task_id, reason |
 | AgentSession.Started | AgentExecutor | session_id, agent_id, attempt_number |
 | AgentSession.Completed | AgentExecutor | session_id, artifact_id |
