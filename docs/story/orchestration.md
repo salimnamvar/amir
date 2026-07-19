@@ -30,11 +30,12 @@ I want to match tasks to capable agents
 So that work is distributed efficiently
 
 Acceptance:
-- MatchingDecision emitted with dimension scores
-- Multi-dimensional scoring algorithm used
-- AgentScorecard consulted for historical metrics
-- Circuit breaker checked (open = reject)
-- AgentSession created for selected agent
+- Pipeline: hard filters → multi-dimensional score → negotiate_contract top-down
+- MatchingDecision records hard_filters, scores, contract_negotiation, candidates
+- AgentScorecard consulted; open circuit breaker is a hard reject
+- Contract-incompatible top agent falls back to next-ranked candidate
+- Task requires cost_budget (max_tokens and/or max_usd)
+- AgentSession + exclusive Workspace created for selected agent
 ```
 
 ### US-ORCH-003: Track Task Progress
@@ -57,11 +58,12 @@ I want to retry failed tasks with feedback
 So that agents can correct their mistakes
 
 Acceptance:
-- ValidationResult emitted with error categories
+- ValidationResult emitted with error categories and claim_reconciliation
 - FeedbackArtifact created with corrections
-- Retry allowed within max_attempts budget
+- New AgentSession + new Workspace per retry attempt
+- Retry allowed within max_attempts budget (task retry_state)
 - Escalation to different agent after escalate_after
-- Circuit breaker opens after failure_threshold
+- Agent circuit breaker opens after failure_threshold (on AgentScorecard only)
 ```
 
 ### US-ORCH-005: Enforce Cost Limits
@@ -71,10 +73,12 @@ I want hard limits on task costs
 So that runaway agents do not bankrupt us
 
 Acceptance:
+- Structural cost ceilings required on Task and session
 - Hierarchical cost gate (4 levels)
-- Pre-flight cost estimation
+- Pre-flight estimation with buffer; reservation/commit/release
 - Sidecar proxy counts tokens in real-time
-- Process killed at 95% threshold
+- Process killed at 95% of invocation limit
+- Higher-level hard breach cancels in-flight work
 - CostRecord emitted with attribution
 ```
 

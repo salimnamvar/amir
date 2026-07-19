@@ -44,7 +44,9 @@ As a Platform Operator
 
 Acceptance:
 - Compensation stack (LIFO) maintained
-- Git-native compensation: git revert, branch delete, PR close
+- Abstract intents (rollback_workspace_effects, …) mapped to durable_effects
+- Concrete actions: git revert, branch delete, PR close, artifact delete
+- Targets durable commits/branches/PRs — not already-cleaned workspaces
 - Best-effort: all actions attempted even if some fail
 - Compensation events emitted for audit
 ```

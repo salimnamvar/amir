@@ -116,7 +116,7 @@ Acceptance:
 ```
 
 ## Implementation Notes
-- MVP: File-based JSONL logging with outbox
+- Default: File-based JSONL logging with outbox; Kafka-compatible interface available
 - All events include correlation_id/causation_id
 - CostRecord with orchestration/worker separation
 - AgentScorecard derived from cost and quality events

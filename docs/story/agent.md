@@ -26,14 +26,16 @@ Acceptance:
 ### US-AGENT-002: Agent Executes Task
 ```
 As an Agent
-I want to receive TaskContract via stdin
-So that I can perform work
+I want to receive a CompiledPrompt via the adapter
+So that I can perform work inside an AgentSession
 
 Acceptance:
-- AgentSession created with attempt_number=1
-- Agent receives structured input
+- AgentSession is the durable aggregate (not AgentInvocation)
+- AgentSession created with attempt_number=1 and exclusive Workspace
+- Adapter pump loop drives the agent until terminal or needs_input
 - Agent produces Artifact via workspace observation
 - Checkpoints recorded at state transitions
+- resource_limits require max_tokens and/or max_usd
 ```
 
 ### US-AGENT-003: Parse Agent Output
@@ -43,8 +45,9 @@ I want to extract structured artifact from agent output
 So that I can validate the result
 
 Acceptance:
-- Output parsed via ParserRegistry strategy chain
+- Control plane owns ParserRegistry strategy chain (not the agent)
 - Strategy order: structured_output → tool_call → markdown_block → workspace_observation → llm_coercion
+- free_text is not a control-plane output mode
 - Artifact validated against schema
 - Invalid output triggers feedback loop
 ```
@@ -56,10 +59,11 @@ I want to derive artifacts from workspace state
 So that agent claims are verified against ground truth
 
 Acceptance:
-- Baseline commit recorded before execution
+- Baseline commit/tree hash recorded before execution
 - Current commit recorded after execution
-- CodeChangeArtifact derived from git diff
-- Agent's claimed changes compared with observed changes
+- CodeChangeArtifact derived from workspace observation
+- Claim reconciliation recorded; workspace is authoritative on divergence
+- Each retry gets a new Workspace (Task 1 → many Workspaces)
 ```
 
 ### US-AGENT-005: Validation Feedback Loop
@@ -83,8 +87,10 @@ So that routing decisions are data-driven
 
 Acceptance:
 - AgentScorecard tracks success rate, cost, latency
+- Circuit breaker lives only on AgentScorecard (not Task)
 - Circuit breaker quarantines after 5 consecutive failures
-- Score feeds capability matching algorithm
+- Score feeds capability matching; open breaker is a hard filter
+- Scorecard warm-starts across agent versions of the same name
 - Scorecard updated after each AgentSession completes
 ```
 
@@ -109,10 +115,11 @@ I want token limits enforced at runtime
 So that costs are predictable
 
 Acceptance:
+- cost_budget / resource_limits require max_tokens and/or max_usd structurally
 - Hierarchical cost gate (invocation → team-hourly → tenant-daily → org-monthly)
-- Pre-flight cost estimation before execution
-- Sidecar proxy counts tokens in real-time
-- Process killed at 95% threshold
+- Pre-flight estimation with reservation buffer
+- Sidecar proxy counts tokens in real-time; process killed at 95% of invocation limit
+- Team/tenant/org hard thresholds cancel in-flight sessions (not only new work)
 - CostRecord emitted with orchestration/worker separation
 ```
 
@@ -136,10 +143,10 @@ I want to negotiate output mode with agents
 So that parsing is reliable
 
 Acceptance:
-- Agent declares supported output modes
-- Adapter selects best available mode
+- Agent declares supported modes (json_schema, tool_use, markdown_yaml, workspace_observation)
+- Control plane selects best available mode
 - Fallback chain per agent type
-- Output mode recorded in AgentSession
+- Output mode recorded on CompiledPrompt / AgentSession
 ```
 
 ### US-AGENT-011: Replay Metadata
@@ -170,7 +177,7 @@ Acceptance:
 
 ## Implementation Notes
 
-- AgentSession replaces simple AgentInvocation as core runtime entity
+- AgentSession is the central runtime aggregate; AgentInvocation is a request DTO only
 - ParserRegistry with 5-strategy fallback chain (no single point of failure)
 - Workspace observation as ground truth (artifacts from git diff, not agent claims)
 - Circuit breaker per agent prevents cascading failures

@@ -43,8 +43,8 @@ So that data exfiltration is prevented
 
 Acceptance:
 - network_mode: host eliminated
-- All outbound through Amir proxy
-- Domain allowlist enforced
+- All outbound through Amir proxy (or network_mode: none for offline tools)
+- Default-deny allowlist; coding_standard profile includes package registries
 - mTLS to external services
 - Token counting for cost attribution
 - PII/secret scrubbing
@@ -71,8 +71,10 @@ So that tampering is detectable
 
 Acceptance:
 - Events chained via prev_hash
-- Each event signed with platform key
+- Each event signed with KMS/HSM platform key (signing_key_ref)
+- Key rotation with dual-valid verification window
 - Periodic root-commit to transparency log
+- SandboxAttestation required per production session
 - Verification endpoint available
 ```
 

@@ -42,9 +42,11 @@ I want compatible contract negotiation
 So that agents and tasks interoperate
 
 Acceptance:
-- Task finds compatible contract version
+- Assignment pipeline: hard filter → score → negotiate top-down
+- Contract negotiation is post-score with fallback to next agent
 - Agent receives correct schema version
-- No compatibility errors at runtime
+- MatchingDecision records negotiation outcome
+- No silent compatibility errors at runtime
 ```
 
 ### US-CONTRACT-004: Contract Backward Compatibility
