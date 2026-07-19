@@ -123,11 +123,11 @@ The internal state machine MUST persist state transitions synchronously to maint
 
 ### Approval Gates
 
-MVP auto-approves all transitions (`status: AUTO_APPROVED`). Manual approval is supported via external signal handling when `auto_approve: false` is configured.
+All transitions use binary approval: `auto_approve: true` for automated workflows, `auto_approve: false` for manual approval via signals.
 
-### DAG vs Linear
+### DAG Support
 
-The WorkflowDefinition supports DAG structure but MVP only implements linear execution. The DAG features remain available for future use without breaking compatibility.
+The WorkflowDefinition supports DAG structure for workflow design. Linear execution is the default mode.
 
 ### Signal Handling
 
