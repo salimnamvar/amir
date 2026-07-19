@@ -58,10 +58,11 @@ I want to retry failed tasks with feedback
 So that agents can correct their mistakes
 
 Acceptance:
-- ValidationResult emitted with error categories and claim_reconciliation
-- FeedbackArtifact created with corrections
+- ValidationResult emitted with error categories and canonical claim_reconciliation
+- FeedbackArtifact references validation_result_id (no duplicated claim shape)
 - New AgentSession + new Workspace per retry attempt
-- Retry allowed within max_attempts budget (task retry_state)
+- Retry eligibility uses shared retry_on / last_failure_category vocabulary
+- Retry allowed within max_attempts and validation_budget
 - Escalation to different agent after escalate_after
 - Agent circuit breaker opens after failure_threshold (on AgentScorecard only)
 ```
@@ -75,10 +76,13 @@ So that runaway agents do not bankrupt us
 Acceptance:
 - Structural cost ceilings required on Task and session
 - Hierarchical cost gate (4 levels)
+- CostLease sync hard-kill gate (sidecar/egress checks every tick ≤100ms)
 - Pre-flight estimation with buffer; reservation/commit/release
 - Sidecar proxy counts tokens in real-time
 - Process killed at 95% of invocation limit
-- Higher-level hard breach cancels in-flight work
+- Higher-level hard breach cancels in-flight work via lease revoke
+- budget_exceeded is not retried by default; team+ emits EscalationSignal
+- validation_budget partitioned from execution budget
 - CostRecord emitted with attribution
 ```
 

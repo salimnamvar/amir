@@ -30,7 +30,8 @@ So that kernel-level isolation is enforced
 
 Acceptance:
 - gVisor is default runtime in production
-- Docker available only in dev mode
+- Docker is structurally illegal when environment=production (JSON Schema if/then)
+- Docker available only in development/staging
 - Firecracker available for maximum security
 - Runtime verified via attestation
 ```
@@ -44,10 +45,12 @@ So that data exfiltration is prevented
 Acceptance:
 - network_mode: host eliminated
 - All outbound through Amir proxy (or network_mode: none for offline tools)
-- Default-deny allowlist; coding_standard profile includes package registries
+- Default-deny allowlist; coding_standard profile expansion is fixed (registries listed in security.md)
+- Effective allowlist = intersection of agent ∩ sandbox [∩ role if set]; never union
 - mTLS to external services
 - Token counting for cost attribution
 - PII/secret scrubbing
+- SecretBinding schema with TTL for ephemeral grants
 ```
 
 ### US-SEC-004: Secrets Injection
