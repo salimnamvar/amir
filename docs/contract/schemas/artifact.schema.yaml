@@ -1,140 +1,138 @@
 # Artifact Contract Schema
 # Machine-readable contract for artifacts produced by agents
 
-schema:
-  type: object
-  required: [contract_type, contract_version, content]
-  properties:
-    # Contract identity
-    contract_type:
-      type: string
-      description: "Artifact contract type"
-    
-    contract_version:
-      type: string
-      description: "Artifact contract version"
-    
-    # Artifact content (contract-specific)
-    content:
-      type: object
-      description: "Artifact payload - structure defined by contract_type"
-    
-    # Provenance (immutable)
-    provenance:
-      type: object
-      required: [produced_by_agent_id, task_id]
-      properties:
-        produced_by_agent_id:
-          type: string
-          format: uuid
-        task_id:
-          type: string
-          format: uuid
-        workflow_instance_id:
-          type: string
-          format: uuid
-        timestamp:
-          type: string
-          format: date-time
-        sandbox_id:
-          type: string
-          format: uuid
-    
-    # Integrity
-    checksum:
-      type: string
-      description: "SHA256 of content for tamper detection"
+$schema: "https://json-schema.org/draft/2020-12/schema"
 
-# Specific artifact types
+type: object
+required: [contract_type, contract_version, content]
+properties:
+  # Contract identity
+  contract_type:
+    type: string
+    description: "Artifact contract type"
+  
+  contract_version:
+    type: string
+    description: "Artifact contract version"
+  
+  # Artifact content (contract-specific)
+  content:
+    type: object
+    description: "Artifact payload - structure defined by contract_type"
+  
+  # Provenance (immutable)
+  provenance:
+    type: object
+    required: [produced_by_agent_id, task_id]
+    properties:
+      produced_by_agent_id:
+        type: string
+        format: uuid
+      task_id:
+        type: string
+        format: uuid
+      workflow_instance_id:
+        type: string
+        format: uuid
+      timestamp:
+        type: string
+        format: date-time
+      sandbox_id:
+        type: string
+        format: uuid
+  
+  # Integrity
+  checksum:
+    type: string
+    description: "SHA256 of content for tamper detection"
 
 # CodeChangeArtifact - produced by developer agents
-code_change_artifact:
-  allOf:
-    - $ref: "#/schema"
-    - properties:
-        contract_type:
-          const: "CodeChangeArtifact"
-        content:
-          type: object
-          required: [files, changes]
-          properties:
-            files:
-              type: array
-              items:
-                type: object
-                required: [path, operation]
-                properties:
-                  path:
-                    type: string
-                  operation:
-                    type: string
-                    enum: [create, modify, delete]
-                  content:
-                    type: string
-                  diff:
-                    type: string
-            changes:
-              type: string
-              description: "Summary of changes made"
-            tests:
+definitions:
+  CodeChangeArtifact:
+    type: object
+    required: [contract_type, contract_version, content]
+    properties:
+      contract_type:
+        const: "CodeChangeArtifact"
+      content:
+        type: object
+        required: [files, changes]
+        properties:
+          files:
+            type: array
+            items:
               type: object
+              required: [path, operation]
               properties:
-                added:
-                  type: array
-                  items:
-                    type: string
-                modified:
-                  type: array
-                  items:
-                    type: string
-                command:
+                path:
                   type: string
-                  description: "Test command to run"
-            commit_message:
-              type: string
-
-# TestResultArtifact - produced by tester agents
-test_result_artifact:
-  allOf:
-    - $ref: "#/schema"
-    - properties:
-        contract_type:
-          const: "TestResultArtifact"
-        content:
-          type: object
-          required: [passed, failed, skipped]
-          properties:
-            passed:
-              type: integer
-            failed:
-              type: integer
-            skipped:
-              type: integer
-            output:
-              type: string
-            coverage:
-              type: number
-              minimum: 0
-              maximum: 100
-
-# ReviewResultArtifact - produced by reviewer agents
-review_result_artifact:
-  allOf:
-    - $ref: "#/schema"
-    - properties:
-        contract_type:
-          const: "ReviewResultArtifact"
-        content:
-          type: object
-          required: [approved, comments]
-          properties:
-            approved:
-              type: boolean
-            comments:
-              type: array
-              items:
+                operation:
+                  type: string
+                  enum: [create, modify, delete]
+                content:
+                  type: string
+                diff:
+                  type: string
+          changes:
+            type: string
+            description: "Summary of changes made"
+          tests:
+            type: object
+            properties:
+              added:
+                type: array
+                items:
+                  type: string
+              modified:
+                type: array
+                items:
+                  type: string
+              command:
                 type: string
-            score:
-              type: number
-              minimum: 0
-              maximum: 100
+                description: "Test command to run"
+          commit_message:
+            type: string
+
+  TestResultArtifact:
+    type: object
+    required: [contract_type, contract_version, content]
+    properties:
+      contract_type:
+        const: "TestResultArtifact"
+      content:
+        type: object
+        required: [passed, failed, skipped]
+        properties:
+          passed:
+            type: integer
+          failed:
+            type: integer
+          skipped:
+            type: integer
+          output:
+            type: string
+          coverage:
+            type: number
+            minimum: 0
+            maximum: 100
+
+  ReviewResultArtifact:
+    type: object
+    required: [contract_type, contract_version, content]
+    properties:
+      contract_type:
+        const: "ReviewResultArtifact"
+      content:
+        type: object
+        required: [approved, comments]
+        properties:
+          approved:
+            type: boolean
+          comments:
+            type: array
+            items:
+              type: string
+          score:
+            type: number
+            minimum: 0
+            maximum: 100

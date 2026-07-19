@@ -1,118 +1,60 @@
 # Agent Contract Schema
 # Machine-readable contract for agent registration and invocation
 
-schema:
-  type: object
-  required: [name, adapter_type, adapter_config]
-  properties:
-    # Core Identity
-    name:
-      type: string
-      description: "Unique agent name (lowercase, no spaces)"
-      pattern: "^[a-z0-9-]+$"
-      maxLength: 100
-    
-    description:
-      type: string
-      description: "Human-readable description of agent capabilities"
-    
-    version:
-      type: string
-      description: "Agent version (SemVer format)"
-      pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
-    
-    # Adapter Configuration
-    adapter_type:
-      type: string
-      enum: [cli, mcp, api, remote]
-      description: "How to communicate with this agent"
-    
-    adapter_config:
-      type: object
-      required: []
-      properties:
-        binary_path:
-          type: string
-          description: "Path to CLI binary"
-        working_directory:
-          type: string
-          description: "Working directory for execution"
-        endpoint:
-          type: string
-          description: "API endpoint URL"
-        protocol:
-          type: string
-          enum: [http, grpc, jsonrpc]
-        auth_method:
-          type: string
-          enum: [none, api_key, oauth, jwt]
-          default: "none"
-    
-    # Capabilities (for routing)
-    capabilities:
-      type: array
-      items:
-        $ref: "#/definitions/capability"
-      description: "Skills and tools this agent can perform"
-    
-    # Resource Limits
-    resource_limits:
-      $ref: "#/definitions/resource_limits"
-    
-    # Security Profile
-    security_profile:
-      $ref: "#/definitions/security_profile"
-    
-    # Runtime Contract Support
-    supported_contracts:
-      type: array
-      items:
-        type: object
-        required: [type, version]
-        properties:
-          type:
-            type: string
-            description: "Contract type this agent supports"
-          version:
-            type: string
-            description: "Minimum version required"
-          max_version:
-            type: string
-            description: "Maximum supported version (optional)"
+$schema: "https://json-schema.org/draft/2020-12/schema"
 
-definitions:
-  capability:
-    type: object
-    required: [skill]
-    properties:
-      skill:
-        type: string
-        description: "Skill name (e.g., 'code-generation', 'testing', 'refactoring')"
-      proficiency:
-        type: string
-        enum: [novice, intermediate, expert]
-        default: "intermediate"
-      languages:
-        type: array
-        items:
-          type: string
-        description: "Supported programming languages"
-      tools:
-        type: array
-        items:
-          $ref: "#/definitions/tool_availability"
+type: object
+required: [name, adapter_type, adapter_config]
+properties:
+  # Core Identity
+  name:
+    type: string
+    description: "Unique agent name (lowercase, no spaces)"
+    pattern: "^[a-z0-9-]+$"
+    maxLength: 100
   
-  tool_availability:
-    type: object
-    required: [name]
-    properties:
-      name:
-        type: string
-        description: "Tool name"
-      available:
-        type: boolean
-        default: true
+  description:
+    type: string
+    description: "Human-readable description of agent capabilities"
   
+  version:
+    type: string
+    description: "Agent version (SemVer format)"
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  
+  # Adapter Configuration (strict)
+  adapter_type:
+    type: string
+    enum: [cli, mcp, api, remote]
+    description: "How to communicate with this agent"
+  
+  adapter_config:
+    type: object
+    required: [binary_path]
+    properties:
+      binary_path:
+        type: string
+        description: "Path to CLI binary (REQUIRED for cli type)"
+      working_directory:
+        type: string
+        description: "Working directory for execution"
+      endpoint:
+        type: string
+        description: "API endpoint URL (REQUIRED for api type)"
+        pattern: "^https?://"
+      protocol:
+        type: string
+        enum: [http, grpc, jsonrpc]
+        default: "http"
+  
+  # Capabilities (for routing)
+  capabilities:
+    type: array
+    items:
+      $ref: "capability.schema.yaml"
+    description: "Skills and tools this agent can perform"
+  
+  # Resource Limits
   resource_limits:
     type: object
     properties:
@@ -129,6 +71,7 @@ definitions:
         minimum: 1
         default: 3600
   
+  # Security Profile
   security_profile:
     type: object
     properties:
@@ -139,7 +82,19 @@ definitions:
         type: string
         enum: [none, limited, full]
         default: "limited"
-      privileged_actions:
-        type: array
-        items:
+  
+  # Runtime Contract Support
+  supported_contracts:
+    type: array
+    items:
+      type: object
+      required: [type, version]
+      properties:
+        type:
+          type: string
+          description: "Contract type this agent supports"
+        version:
+          type: string
+          description: "Minimum version required"
+        max_version:
           type: string
