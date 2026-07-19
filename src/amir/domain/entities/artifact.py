@@ -61,7 +61,7 @@ class Artifact(BaseModel):
     # Validation results
     validation_errors: list[str] = Field(default_factory=list)
 
-    @field_validator("checksum", always=True)
+    @field_validator("checksum")
     @classmethod
     def compute_checksum(cls, v, info):
         """Auto-compute checksum if not provided."""

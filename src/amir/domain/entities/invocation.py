@@ -80,7 +80,7 @@ class AgentInvocation(BaseModel):
         self.resource_usage = usage
         self.completed_at = datetime.utcnow()
 
-    def mark_failed(self, error: str, code: str = None) -> None:
+    def mark_failed(self, error: str, code: str | None = None) -> None:
         """Mark invocation as failed."""
         self.status = InvocationStatus.FAILED
         self.error_message = error

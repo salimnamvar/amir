@@ -143,7 +143,7 @@ class AgentDefinition(BaseModel):
             raise ValueError("Agent name must be lowercase")
         return v
 
-    def supports_skill(self, skill: str, minimum_proficiency: Proficiency = None) -> bool:
+    def supports_skill(self, skill: str, minimum_proficiency: Proficiency | None = None) -> bool:
         """Check if agent has required skill at required level."""
         proficiency_order = {Proficiency.NOVICE: 1, Proficiency.INTERMEDIATE: 2, Proficiency.EXPERT: 3}
 
