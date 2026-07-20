@@ -1,0 +1,140 @@
+# Shared Enumerations
+# Single source of truth for cross-schema vocabularies.
+# Other schemas SHOULD $ref these definitions rather than re-declaring enums.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/schemas/shared-enums"
+
+$defs:
+  FailureCategory:
+    type: string
+    enum:
+      - structural
+      - semantic
+      - policy
+      - quality
+      - timeout
+      - infrastructure
+      - cancelled
+      - budget_exceeded
+      - circuit_breaker_open
+      - behavioral
+      - test_execution
+    description: "Shared failure / error category vocabulary for Task, ValidationResult, Feedback"
+
+  RetryableFailureCategory:
+    type: string
+    enum:
+      - structural
+      - semantic
+      - policy
+      - quality
+      - timeout
+      - infrastructure
+    description: "Default Task.retry_policy.retry_on set"
+
+  ObservationMethod:
+    type: string
+    enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
+    description: "How an artifact was derived relative to workspace ground truth"
+
+  ParserStrategy:
+    type: string
+    enum:
+      - structured_output
+      - tool_call_interception
+      - markdown_block
+      - workspace_observation
+      - llm_coercion
+    description: "ParserRegistry strategy identifiers"
+
+  OutputMode:
+    type: string
+    enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    description: "Agent/control-plane extraction modes (map to ParserStrategy)"
+
+  BudgetPool:
+    type: string
+    enum: [execution, validation, compensation, orchestration]
+    description: "Cost attribution pool"
+
+  CostLeaseStatus:
+    type: string
+    enum: [active, revoked, expired, released]
+
+  CostLeaseScope:
+    type: string
+    enum: [invocation, team, tenant, org]
+
+  CancellationReason:
+    type: string
+    enum:
+      - invocation_budget_exceeded
+      - team_budget_exceeded
+      - tenant_budget_exceeded
+      - org_budget_exceeded
+      - validation_budget_exceeded
+      - session_timeout
+      - manual_revocation
+
+  NetworkMode:
+    type: string
+    enum: [proxy, none]
+
+  SandboxRuntime:
+    type: string
+    enum: [gvisor, firecracker, docker]
+
+  ProductionSandboxRuntime:
+    type: string
+    enum: [gvisor, firecracker]
+
+  AgentSessionStatus:
+    type: string
+    enum:
+      - pending
+      - starting
+      - running
+      - waiting_for_input
+      - producing_artifact
+      - validating
+      - succeeded
+      - failed
+      - timed_out
+      - cancelled
+
+  TaskStatus:
+    type: string
+    enum:
+      - pending
+      - assigned
+      - running
+      - validating
+      - succeeded
+      - failed
+      - cancelled
+      - escalated
+
+  ApprovalStatus:
+    type: string
+    enum: [pending, auto_approved, granted, rejected, expired, cancelled]
+
+  CompensationConcreteEffect:
+    type: string
+    enum:
+      - git_revert
+      - branch_delete
+      - pr_close
+      - artifact_delete
+      - resource_cleanup
+      - revoke_access_token
+      - send_notification
+
+  CompensationAbstractIntent:
+    type: string
+    enum:
+      - rollback_workspace_effects
+      - delete_artifacts
+      - revoke_access
+      - notify
+      - custom

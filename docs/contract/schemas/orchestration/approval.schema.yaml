@@ -77,6 +77,25 @@ properties:
     format: date-time
     description: "When a granted approval expires (especially for coercion)"
 
+  # Audit trail for coercion / multi-approver decisions
+  audit_trail:
+    type: array
+    description: "Append-only audit entries (required for approval_type=coercion when granted)"
+    items:
+      type: object
+      required: [at, actor, action]
+      properties:
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+          enum: [requested, granted, rejected, expired, cancelled, escalated]
+        note:
+          type: string
+
   # Escalation chain for multi-approver / critical gates
   escalation:
     type: object
@@ -108,3 +127,15 @@ properties:
     description: >
       Non-authoritative display payload for the approver UI.
       MUST NOT be used for authorization decisions.
+
+# Coercion approvals require role + TTL + audit when granted
+allOf:
+  - if:
+      properties:
+        approval_type:
+          const: coercion
+        status:
+          const: granted
+      required: [approval_type, status]
+    then:
+      required: [approver_role, expires_at, audit_trail]

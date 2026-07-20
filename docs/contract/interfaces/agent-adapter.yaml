@@ -73,8 +73,10 @@ properties:
 # pump(handle) -> event stream chunks: output_chunk | tool_call | needs_input | completed | failed | timed_out
 # respond_input(handle, text) -> void  (only when waiting_for_input)
 # inject_feedback(handle, feedback_artifact) -> void
-# cancel(handle, cancellation_reason, grace_period_seconds=5) -> { cancel_acknowledged: bool }
+# cancel(handle, cancellation_reason, grace_period_seconds?) -> { cancel_acknowledged: bool }
 #   - cancellation_reason from CostLease.cancellation_reason or operator
-#   - SIGTERM then wait grace_period_seconds then SIGKILL; reap orphans
-#   - MUST return within grace_period_seconds + 2s
+#   - grace_period_seconds parameter OVERRIDES process_supervision.sigterm_grace_period_seconds
+#     when provided; otherwise uses config default (5s)
+#   - SIGTERM then wait grace period then SIGKILL; reap orphans
+#   - MUST return within grace_period_seconds + 2s (synchronous best-effort bound)
 # health() -> healthy | degraded | unhealthy

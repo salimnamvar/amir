@@ -180,11 +180,61 @@ properties:
     default: true
     description: "If lease service is unreachable, deny further metered consumption"
 
-# When revoked, cancellation_reason and revocation_revision are required
+# Structural conditionals (lease protocol invariants)
 allOf:
+  # When revoked: reason + revision + timestamp required
   - if:
       properties:
         status:
           const: revoked
+      required: [status]
     then:
       required: [cancellation_reason, revocation_revision, revocation_timestamp]
+  # When not revoked: revocation fields must be absent
+  - if:
+      properties:
+        status:
+          enum: [active, expired, released]
+      required: [status]
+    then:
+      not:
+        anyOf:
+          - required: [revocation_revision]
+          - required: [revocation_timestamp]
+  # Non-retryable reasons force retryable=false
+  - if:
+      properties:
+        cancellation_reason:
+          enum:
+            - team_budget_exceeded
+            - tenant_budget_exceeded
+            - org_budget_exceeded
+            - validation_budget_exceeded
+            - manual_revocation
+      required: [cancellation_reason]
+    then:
+      properties:
+        retryable:
+          const: false
+  # Scope hierarchy IDs required by scope
+  - if:
+      properties:
+        scope:
+          const: team
+      required: [scope]
+    then:
+      required: [team_id]
+  - if:
+      properties:
+        scope:
+          const: tenant
+      required: [scope]
+    then:
+      required: [tenant_id]
+  - if:
+      properties:
+        scope:
+          const: org
+      required: [scope]
+    then:
+      required: [org_id]

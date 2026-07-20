@@ -1,0 +1,100 @@
+# Lease Protocol Contract Schema
+# Machine-readable state machine for CostLease create / heartbeat / commit / revoke / ACK.
+# Complements cost-lease.schema.yaml with atomic transition rules.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/schemas/runtime/lease-protocol"
+
+type: object
+required:
+  - lease_id
+  - lease_revision
+  - status
+  - fail_closed_on_unavailable
+  - sidecar_ack_deadline_ms
+properties:
+  lease_id:
+    type: string
+    format: uuid
+  lease_revision:
+    type: integer
+    minimum: 0
+    description: "Monotonic; every mutation increments by exactly 1"
+  revocation_revision:
+    type: integer
+    minimum: 0
+    description: "Set once when status becomes revoked; equals lease_revision at revoke"
+  revocation_timestamp:
+    type: string
+    format: date-time
+  sidecar_ack_deadline_ms:
+    type: integer
+    minimum: 100
+    maximum: 30000
+    default: 5000
+    description: >
+      Sidecar MUST ack_revocation within this window. On miss with
+      fail_closed_on_unavailable=true, check_lease returns cancel for new consumption.
+  fail_closed_on_unavailable:
+    type: boolean
+    default: true
+  service_health_hint:
+    type: string
+    enum: [healthy, degraded, unavailable]
+    description: "Lease service health observed by checker"
+  status:
+    type: string
+    enum: [active, revoked, expired, released]
+
+  # Allowed atomic transitions (normative for implementers)
+  allowed_transitions:
+    type: array
+    description: "Closed set of legal status transitions"
+    items:
+      type: object
+      required: [from, to, operation]
+      properties:
+        from:
+          type: string
+          enum: [active, revoked, expired, released]
+        to:
+          type: string
+          enum: [active, revoked, expired, released]
+        operation:
+          type: string
+          enum:
+            - reserve_lease
+            - heartbeat
+            - revoke_lease
+            - commit_lease
+            - expire_lease
+            - ack_revocation
+    default:
+      - { from: active, to: active, operation: heartbeat }
+      - { from: active, to: revoked, operation: revoke_lease }
+      - { from: active, to: released, operation: commit_lease }
+      - { from: active, to: expired, operation: expire_lease }
+      - { from: revoked, to: revoked, operation: ack_revocation }
+
+  # ACK record
+  sidecar_ack:
+    type: object
+    properties:
+      session_id:
+        type: string
+        format: uuid
+      acked_revision:
+        type: integer
+        minimum: 0
+      acked_at:
+        type: string
+        format: date-time
+      within_deadline:
+        type: boolean
+
+# Normative rules (enforced by CostEnforcer + schema conditionals on CostLease):
+# 1. lease_revision is strictly monotonic per lease_id.
+# 2. revoke_lease sets status=revoked, increments lease_revision, sets revocation_revision.
+# 3. ack_revocation(lease_id, session_id, acked_revision) required within sidecar_ack_deadline_ms.
+# 4. If lease service unavailable and fail_closed_on_unavailable=true → check_lease returns cancel.
+# 5. status=revoked is the sole hard-kill signal (no parallel cancelled boolean).

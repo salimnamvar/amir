@@ -51,7 +51,7 @@ CREATE TABLE secret_bindings (
     idempotency_key TEXT UNIQUE NOT NULL,
     task_id UUID,
     session_id UUID,
-    sandbox_attestation_id UUID,
+    sandbox_attestation_id UUID NOT NULL,  -- required: attestation before injection
     secrets_hash TEXT,
     secret_name TEXT,
     secret_ref TEXT,

@@ -30,6 +30,9 @@ properties:
       kill_threshold_pct_default:
         type: number
         const: 95
+        description: >
+          Default value only. Callers MAY override within [50, 100] per
+          CostLease.kill_threshold_pct schema.
 
   methods:
     type: array

@@ -134,6 +134,10 @@ properties:
           format: uuid
         step_id:
           type: string
+        step_result_id:
+          type: string
+          format: uuid
+          description: "StepResult that recorded step completion (explicit linkage)"
         session_id:
           type: string
           format: uuid

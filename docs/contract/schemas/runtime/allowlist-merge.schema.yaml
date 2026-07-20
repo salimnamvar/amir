@@ -1,0 +1,72 @@
+# Allowlist Merge Contract Schema
+# Machine-enforced intersection algorithm for effective network allowlists.
+# Profile expansion sources: docs/contract/allowlists/*.yaml
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/schemas/runtime/allowlist-merge"
+
+type: object
+required:
+  - merge_algorithm
+  - inputs
+  - effective_allowlist
+  - effective_allowlist_hash
+properties:
+  merge_algorithm:
+    type: string
+    const: intersection
+    description: "MUST be intersection of agent/sandbox/[role]; NEVER union of those layers"
+
+  profile_registry:
+    type: string
+    const: "docs/contract/allowlists/"
+    description: "Canonical location for profile expansion files"
+
+  inputs:
+    type: object
+    required:
+      - agent_set
+      - sandbox_set
+      - platform_llm_routes
+    properties:
+      agent_set:
+        type: array
+        items: { type: string }
+        description: "After profile expansion of AgentDefinition.security_profile"
+      sandbox_set:
+        type: array
+        items: { type: string }
+        description: "After profile expansion of Sandbox.network_allowlist_profile"
+      role_set:
+        type: array
+        items: { type: string }
+        description: "Role.required_network; empty/omitted = skip role layer"
+      platform_llm_routes:
+        type: array
+        items: { type: string }
+        description: "Always unioned AFTER intersection for cost attribution"
+
+  # Pseudocode (normative):
+  #   base = agent_set ∩ sandbox_set
+  #   if role_set non-empty: base = base ∩ role_set
+  #   effective = base ∪ platform_llm_routes
+  #   empty base before platform = deny-all except platform LLM routes
+  effective_allowlist:
+    type: array
+    items: { type: string }
+    description: "Computed allowlist stored on Workspace.security_context and SandboxPolicy"
+
+  effective_allowlist_hash:
+    type: string
+    description: "SHA256 of sorted effective_allowlist (sandbox verifies match)"
+
+  security_signature:
+    type: string
+    description: "Optional Security Context signature over (hash, inputs, algorithm)"
+
+  test_vector_refs:
+    type: array
+    items: { type: string }
+    description: "Paths to allowlist test_vectors (e.g. allowlists/coding_standard.yaml#test_vectors)"
+    default:
+      - "docs/contract/allowlists/coding_standard.yaml#test_vectors"

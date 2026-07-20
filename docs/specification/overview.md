@@ -8,7 +8,25 @@
 
 ## Audit Findings Synthesis
 
-### Round 6 Multi-Audit Cleanup (This Pass)
+### Round 7 Residual (Follow-up Audits)
+
+| Priority | Issue | Resolution |
+|----------|-------|------------|
+| P0 | Task.status missing `validating` | Added; diagram + schema aligned |
+| P0 | AgentSession mermaid still had Compensating | Removed; cancel/cost-lease paths documented |
+| P0 | Compatibility listed docker-ban weaken as MINOR | Now MAJOR; explicit prohibited list |
+| P0 | coding_standard included Docker Hub | Removed; optional `container_build` profile |
+| P1 | CostLease conditionals incomplete | retryable / scope IDs / inverse revocation |
+| P1 | SecretBinding attestation optional | `sandbox_attestation_id` required |
+| P1 | claim_reconciliation optional on artifacts | Required when `target_type=artifact` |
+| P1 | last_failure_category optional on terminal | Required when Task failed/cancelled |
+| P1 | Lease/allowlist protocol not machine-readable | `runtime/lease-protocol` + `allowlist-merge` |
+| P1 | Fragmented enums | `shared-enums.schema.yaml` |
+| P1 | Compensation snapshot missing timestamps | `effects_log` with `created_at` |
+| P1 | Session replay incomplete semantics | `replay_status` + retention windows |
+| P2 | CI enforcement surface | `docs/contract/ci/README.md` |
+
+### Round 6 Multi-Audit Cleanup
 
 Cross-audit pass (copilot, deepseek, glm, grok, kimi, minimax, mistral, qwen, sakana, tinker). Not a redesign — contract seam repair + story alignment.
 

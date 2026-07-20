@@ -29,9 +29,9 @@ hosts:
   - repo1.maven.org
   # Ruby
   - rubygems.org
-  # Container images (common)
+  # Container images (ghcr only — Docker Hub excluded from default coding profile;
+  # production sandboxes ban docker runtime; use container_build profile if needed)
   - ghcr.io
-  - registry-1.docker.io
   # Git hosting (clone/push for durable effects)
   - github.com
   - gitlab.com
@@ -56,3 +56,7 @@ test_vectors:
     role_required_network: [pypi.org]
     expected_effective_before_platform:
       - pypi.org
+
+# Separate profile for roles that must pull base images (not default coding_standard).
+# Only assignable when role has explicit container-build capability; still subject to
+# intersection merge and production runtime ban on docker sandbox runtime.

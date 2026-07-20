@@ -1,0 +1,15 @@
+# Optional allowlist profile for container-build roles only
+# Authority: docs/contract/allowlists/container_build.yaml
+# Does NOT permit docker sandbox runtime in production — only registry network reachability.
+# Assign only when role has explicit container-build capability; still subject to intersection merge.
+
+profile: container_build
+version: "1.0.0"
+description: >
+  Network destinations for pulling base images. Not part of coding_standard.
+  Production sandboxes still ban runtime=docker (sandbox.schema.yaml if/then).
+
+hosts:
+  - ghcr.io
+  - registry-1.docker.io
+  - quay.io

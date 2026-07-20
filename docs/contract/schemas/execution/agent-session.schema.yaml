@@ -216,6 +216,32 @@ properties:
   
   replay_metadata:
     $ref: "replay-metadata.schema.yaml"
+
+  # Replay / recovery status when event store is incomplete
+  replay_status:
+    type: string
+    enum: [complete, replay_incomplete, not_applicable]
+    default: not_applicable
+    description: >
+      complete = full event history available for reconstruction;
+      replay_incomplete = older events missing — operator intervention required;
+      not_applicable = session still live / not under replay.
+  event_retention:
+    type: object
+    description: "Retention windows for session-linked streams (days; 0 = permanent)"
+    properties:
+      tool_call_stream_days:
+        type: integer
+        minimum: 0
+        default: 90
+      checkpoint_stream_days:
+        type: integer
+        minimum: 0
+        default: 365
+      cost_meter_stream_days:
+        type: integer
+        minimum: 0
+        default: 365
   
   started_at:
     type: string
@@ -233,3 +259,10 @@ allOf:
           enum: [starting, running, waiting_for_input, producing_artifact, validating]
     then:
       required: [cost_lease_id]
+  # Terminal states should record failure category when failed/cancelled/timed_out
+  - if:
+      properties:
+        status:
+          enum: [failed, cancelled, timed_out]
+    then:
+      required: [last_failure_category]

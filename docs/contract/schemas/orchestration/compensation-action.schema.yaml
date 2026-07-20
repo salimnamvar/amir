@@ -43,7 +43,8 @@ properties:
   parameters:
     type: object
 
-  # Snapshot of durable effects at compensation time (for replay verification)
+  # Snapshot of durable effects at compensation time (for replay verification).
+  # effects_log preserves creation order so compensation can reverse chronologically.
   durable_effects_snapshot:
     type: object
     description: "Copy of Workspace.durable_effects at the moment compensation was planned"
@@ -62,6 +63,21 @@ properties:
         items:
           type: string
           format: uuid
+      effects_log:
+        type: array
+        description: "Ordered creation log (required for correct reverse-order compensation)"
+        items:
+          type: object
+          required: [effect_type, target, created_at]
+          properties:
+            effect_type:
+              type: string
+              enum: [branch_create, commit, pr_open, artifact_publish, other]
+            target:
+              type: string
+            created_at:
+              type: string
+              format: date-time
 
   concrete_actions:
     type: array

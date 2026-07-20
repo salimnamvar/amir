@@ -135,14 +135,24 @@ properties:
         type: array
         items:
           type: string
-        description: "Effective allowlist after SandboxPolicy intersection merge"
+        description: "Effective allowlist after SandboxPolicy intersection merge (alias of effective_allowlist)"
+      effective_allowlist:
+        type: array
+        items:
+          type: string
+        description: >
+          Computed by Security Context via allowlist-merge.schema.yaml (intersection).
+          Authoritative egress surface; sandbox MUST enforce this list.
       effective_allowlist_hash:
         type: string
-        description: "SHA256 of effective allowlist; sandbox must verify match"
+        description: "SHA256 of sorted effective_allowlist; sandbox must verify match"
       sandbox_policy_id:
         type: string
         format: uuid
         description: "SandboxPolicy evaluation that produced this allowlist"
+      allowlist_merge_signature:
+        type: string
+        description: "Security Context signature over effective_allowlist_hash"
 
   created_at:
     type: string

@@ -173,8 +173,16 @@ properties:
     type: string
     format: date-time
 
-# llm_coercion requires approval reference on claim reconciliation
 allOf:
+  # Artifacts always require claim reconciliation (workspace ground truth)
+  - if:
+      properties:
+        target_type:
+          const: artifact
+      required: [target_type]
+    then:
+      required: [claim_reconciliation]
+  # llm_coercion requires approval reference on claim reconciliation
   - if:
       properties:
         claim_reconciliation:

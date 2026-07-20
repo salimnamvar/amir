@@ -99,11 +99,12 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 > **Contract:** [`docs/contract/schemas/task.schema.yaml`](../contract/schemas/task.schema.yaml)
 
-**Lifecycle**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
+**Lifecycle**: Pending → Assigned → Running → Validating → Succeeded / Failed / Cancelled / Escalated
 
 **Invariants**:
 - Must have Assignment before Running
-- `matching_decision_id` required when status is `assigned` or `running`
+- `matching_decision_id` required when status is `assigned`, `running`, or `validating`
+- `retry_state.last_failure_category` required when status is `failed` or `cancelled`
 - `cost_budget` must include at least one of `max_tokens` or `max_usd`
 - `validation_budget` is partitioned; enforced via separate CostLease (`budget_pool=validation`)
 - Cost budget must not be exceeded
@@ -238,6 +239,9 @@ stateDiagram-v2
 
 ### AgentSession States
 
+Compensation is a **WorkflowInstance** concern (durable_effects). AgentSession has no
+`compensating` status — CostLease revocation → `Cancelled` + `budget_exceeded`.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Pending
@@ -246,18 +250,19 @@ stateDiagram-v2
     Running --> ProducingArtifact: agent_output_received()
     Running --> WaitingForInput: agent_needs_input()
     Running --> TimedOut: timeout_exceeded()
+    Running --> Cancelled: cancel_or_cost_lease_revoked()
     WaitingForInput --> Running: input_received()
+    WaitingForInput --> Cancelled: cancel_or_cost_lease_revoked()
     ProducingArtifact --> Validating: output_parsed()
+    ProducingArtifact --> Cancelled: cancel_or_cost_lease_revoked()
     Validating --> Succeeded: validation_passed()
     Validating --> Failed: validation_failed AND retries_exhausted
     Validating --> Running: validation_failed AND retry_allowed
+    Validating --> Cancelled: cancel_or_cost_lease_revoked()
     Succeeded --> [*]
     Failed --> [*]
     TimedOut --> [*]
-    Running --> Cancelled: cancel()
     Cancelled --> [*]
-    Running --> Compensating: compensation_required()
-    Compensating --> [*]: compensated
 ```
 
 ### WorkflowInstance States
@@ -276,6 +281,10 @@ stateDiagram-v2
     Implementation --> Failed: step_failed AND no_compensation
     Implementation --> Compensating: step_failed AND compensation_available
     Compensating --> Failed: compensation_complete
+    Compensating --> CompensationBlocked: compensation_failed AND continue_on_failure_false
+    CompensationBlocked --> Escalated: emit_EscalationSignal
+    CompensationBlocked --> Compensating: human_resume
+    CompensationBlocked --> Failed: human_abort
     [*] --> Escalated
 ```
 

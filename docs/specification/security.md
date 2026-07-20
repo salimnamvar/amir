@@ -181,7 +181,8 @@ Profiles expand **before** merge. Expansion is fixed by Configuration Context (p
 | Profile | Expansion |
 |---------|-----------|
 | `llm_only` | Platform-managed LLM provider routes only (injected by egress for cost attribution; not editable by agents) |
-| `coding_standard` | Canonical host list in [`allowlists/coding_standard.yaml`](../contract/allowlists/coding_standard.yaml) (package registries + git hosts); platform LLM routes unioned after intersection |
+| `coding_standard` | Canonical host list in [`allowlists/coding_standard.yaml`](../contract/allowlists/coding_standard.yaml) (package registries + git hosts; **no** Docker Hub); platform LLM routes unioned after intersection. Optional [`container_build`](../contract/allowlists/container_build.yaml) for image pulls only |
+| Merge algorithm | Machine contract: [`allowlist-merge.schema.yaml`](../contract/schemas/runtime/allowlist-merge.schema.yaml) (`const: intersection`) |
 | `custom` | Use `network_allowlist` as-is (no preset expansion); still subject to merge below |
 
 Platform may extend the coding_standard registry via configuration with audit trail; tenants cannot broaden beyond SandboxPolicy ceiling.

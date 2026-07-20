@@ -48,18 +48,22 @@ properties:
     format: uuid
 
   # Lifecycle status
+  # Aligns with model.md Task state diagram: Pending → Assigned → Running → Validating → terminal
   status:
     type: string
     enum:
       - pending
       - assigned
       - running
+      - validating
       - succeeded
       - failed
       - cancelled
       - escalated
     default: pending
-    description: "Task lifecycle; assigned/running require matching_decision_id"
+    description: >
+      Task lifecycle. matching_decision_id required for assigned/running/validating.
+      last_failure_category required for failed/cancelled.
 
   # Input artifacts
   inputs:
@@ -279,11 +283,22 @@ properties:
     format: uuid
     description: "MatchingDecision that selected the current agent"
 
-# matching_decision_id required when assigned or running
+# Conditional structural requirements
 allOf:
+  # matching_decision_id required once an agent has been selected
   - if:
       properties:
         status:
-          enum: [assigned, running]
+          enum: [assigned, running, validating]
     then:
       required: [matching_decision_id]
+  # Terminal failure/cancel requires category for retry eligibility
+  - if:
+      properties:
+        status:
+          enum: [failed, cancelled]
+    then:
+      required: [retry_state]
+      properties:
+        retry_state:
+          required: [last_failure_category]

@@ -43,7 +43,7 @@ Names match schema files under `schemas/` (see README catalog). Suffix "Contract
 | `matching/matching-decision.schema.yaml` | N-1 minor | Changed scoring dimensions, removed hard_filters, removed explanation |
 | `execution/compiled-prompt.schema.yaml` | N-1 minor | Changed template_hash semantics, removed output_contract |
 | `artifact/validation-result.schema.yaml` | N-1 minor | Changed error category enum, removed claim_reconciliation |
-| `security/sandbox.schema.yaml` | N-1 minor | Weakened production docker ban, removed environment requirement |
+| `security/sandbox.schema.yaml` | N-1 minor | Allowed additional production runtime only if gvisor/firecracker-compatible; **weakening docker ban / removing environment requirement is MAJOR** |
 | `security/sandbox-policy.schema.yaml` | N-1 minor | Changed merge algorithm away from intersection |
 | `security/sandbox-attestation.schema.yaml` | N-1 minor | Changed signature algorithm, removed signing_key_ref / expires_at |
 
@@ -66,6 +66,9 @@ Do not restate field lists here. This file is **versioning policy only**.
 - Changing state machine structure
 - Removing idempotency_key from required fields
 - Removing structural cost ceilings (`anyOf` max_tokens / max_usd)
+- Weakening production Docker ban (allowing `runtime=docker` when `environment=production`)
+- Removing `environment` from Sandbox required fields
+- Changing allowlist merge algorithm from intersection to union
 
 ### Allowed (MINOR version)
 

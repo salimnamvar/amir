@@ -13,7 +13,9 @@ Markdown under `docs/specification/` and `docs/story/` is documentation only and
 | Interface contracts | `interfaces/` | YAML method contracts |
 | Compatibility policy | `compatibility.md` | Versioning rules (policy doc) |
 
-Schema domains: `execution`, `matching`, `orchestration`, `artifact`, `security`, `cost`, `eventing`, `team`.
+Schema domains: `execution`, `matching`, `orchestration`, `artifact`, `security`, `cost`, `eventing`, `team`, `runtime`.
+
+Shared vocabularies: `schemas/shared-enums.schema.yaml`.
 
 Documentation may link here. It must not embed full schemas, DDL, or field dumps.
 
@@ -135,13 +137,35 @@ Team definitions, role bindings, agent bindings, budgets.
 | ParserRegistry | `interfaces/parser-registry.yaml` |
 | CostEnforcer | `interfaces/cost-enforcer.yaml` |
 
+### Runtime (`schemas/runtime/`)
+
+Cross-cutting operational protocols (lease ACK, allowlist merge).
+
+| Contract | File |
+|----------|------|
+| LeaseProtocol | `schemas/runtime/lease-protocol.schema.yaml` |
+| AllowlistMerge | `schemas/runtime/allowlist-merge.schema.yaml` |
+
+### Shared enums
+
+| Contract | File |
+|----------|------|
+| SharedEnums | `schemas/shared-enums.schema.yaml` |
+
 ## Allowlist Profiles (`allowlists/`)
 
 | Profile | File |
 |---------|------|
 | coding_standard | `allowlists/coding_standard.yaml` |
+| container_build | `allowlists/container_build.yaml` (optional; not default) |
 
-Used by SandboxPolicy profile expansion before intersection merge. Platform LLM routes are always unioned after intersection.
+Used by SandboxPolicy profile expansion before intersection merge. Platform LLM routes are always unioned after intersection. Merge algorithm: `schemas/runtime/allowlist-merge.schema.yaml`.
+
+## CI (`ci/`)
+
+| Doc | File |
+|-----|------|
+| Required checks | `ci/README.md` |
 
 ## Rules for Authors
 
