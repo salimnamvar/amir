@@ -293,3 +293,14 @@ allOf:
       properties:
         retry_state:
           required: [last_failure_category]
+  # Retry attempt ceiling must not exceed policy maximum
+  # Note: This is enforced semantically at runtime; schema documents the invariant
+  - if:
+      properties:
+        retry_state:
+          properties:
+            attempts:
+              minimum: 1
+      required: [retry_state]
+    then:
+      description: "Retry attempts must not exceed retry_policy.max_attempts (semantic check)"

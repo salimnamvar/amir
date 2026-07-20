@@ -158,8 +158,7 @@ properties:
         type: integer
         default: 65534
       network_mode:
-        type: string
-        enum: [proxy, none]
+        $ref: "../shared-enums.schema.yaml#/$defs/NetworkMode"
         default: proxy
       network_allowlist:
         type: array
@@ -217,12 +216,20 @@ allOf:
         auto_commit:
           required: [error, attempted]
       required: [auto_commit]
+  # status=observed requires auto_commit.committed=true (durable commit exists for compensation)
+  # If auto_commit.attempted=false (no changes), committed=true still required as sentinel
   - if:
       properties:
         status:
           const: observed
       required: [status]
     then:
-      description: >
-        observed implies durable commit exists (or no changes). Prefer current_commit set.
+      required: [auto_commit]
+      properties:
+        auto_commit:
+          required: [committed]
+          properties:
+            committed:
+              const: true
+              description: "Required when status=observed; compensation needs durable commit target"
 
