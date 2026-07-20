@@ -8,57 +8,112 @@ Markdown under `docs/specification/` and `docs/story/` is documentation only and
 
 | Kind | Location | Formats |
 |------|----------|---------|
-| Data / domain contracts | `schemas/` | JSON Schema (YAML files) |
+| Data / domain contracts | `schemas/<domain>/` | JSON Schema (YAML files) |
 | Database contracts | `sql/` | SQL DDL |
 | Interface contracts | `interfaces/` | YAML method contracts |
 | Compatibility policy | `compatibility.md` | Versioning rules (policy doc) |
+
+Schema domains: `execution`, `matching`, `orchestration`, `artifact`, `security`, `cost`, `eventing`, `team`.
 
 Documentation may link here. It must not embed full schemas, DDL, or field dumps.
 
 ## Data Contracts (`schemas/`)
 
+### Execution (`schemas/execution/`)
+
+Core runtime aggregates — agent lifecycle, task scheduling, workspaces, prompts, checkpoints.
+
 | Contract | File |
 |----------|------|
-| Agent | `schemas/agent.schema.yaml` |
-| AgentInvocation | `schemas/agent-invocation.schema.yaml` |
-| AgentSession | `schemas/agent-session.schema.yaml` |
-| AgentScorecard | `schemas/agent-scorecard.schema.yaml` |
-| Approval | `schemas/approval.schema.yaml` |
-| Artifact | `schemas/artifact.schema.yaml` |
-| AccessPolicy | `schemas/access-policy.schema.yaml` |
-| AuditEvent | `schemas/audit-event.schema.yaml` |
-| Capability | `schemas/capability.schema.yaml` |
-| Checkpoint | `schemas/checkpoint.schema.yaml` |
-| CircuitBreakerState | `schemas/circuit-breaker-state.schema.yaml` |
-| CompiledPrompt | `schemas/compiled-prompt.schema.yaml` |
-| CompensationAction | `schemas/compensation-action.schema.yaml` |
-| CostLease | `schemas/cost-lease.schema.yaml` |
-| CostRecord | `schemas/cost-record.schema.yaml` |
-| CostSummary | `schemas/cost-summary.schema.yaml` |
-| DomainEvent | `schemas/domain-event.schema.yaml` |
-| DurableExecutionConfig | `schemas/durable-execution-config.schema.yaml` |
-| EgressProxy | `schemas/egress-proxy.schema.yaml` |
-| EscalationSignal | `schemas/escalation-signal.schema.yaml` |
-| Feedback | `schemas/feedback.schema.yaml` |
-| IdempotencyKey | `schemas/idempotency-key.schema.yaml` |
-| MatchingDecision | `schemas/matching-decision.schema.yaml` |
-| OutboxEntry | `schemas/outbox-entry.schema.yaml` |
-| PolicyEngine | `schemas/policy-engine.schema.yaml` |
-| QualityMetric | `schemas/quality-metric.schema.yaml` |
-| ReplayMetadata | `schemas/replay-metadata.schema.yaml` |
-| Role | `schemas/role.schema.yaml` |
-| Sandbox | `schemas/sandbox.schema.yaml` |
-| SandboxAttestation | `schemas/sandbox-attestation.schema.yaml` |
-| SecretBinding | `schemas/secret-binding.schema.yaml` |
-| Skill | `schemas/skill.schema.yaml` |
-| StepResult | `schemas/step-result.schema.yaml` |
-| Task | `schemas/task.schema.yaml` |
-| Team | `schemas/team.schema.yaml` |
-| ToolCall | `schemas/tool-call.schema.yaml` |
-| ValidationMetric | `schemas/validation-metric.schema.yaml` |
-| ValidationResult | `schemas/validation-result.schema.yaml` |
-| Workflow | `schemas/workflow.schema.yaml` |
-| Workspace | `schemas/workspace.schema.yaml` |
+| Agent | `schemas/execution/agent.schema.yaml` |
+| AgentInvocation | `schemas/execution/agent-invocation.schema.yaml` |
+| AgentSession | `schemas/execution/agent-session.schema.yaml` |
+| Checkpoint | `schemas/execution/checkpoint.schema.yaml` |
+| CompiledPrompt | `schemas/execution/compiled-prompt.schema.yaml` |
+| DurableExecutionConfig | `schemas/execution/durable-execution-config.schema.yaml` |
+| ReplayMetadata | `schemas/execution/replay-metadata.schema.yaml` |
+| Task | `schemas/execution/task.schema.yaml` |
+| ToolCall | `schemas/execution/tool-call.schema.yaml` |
+| Workspace | `schemas/execution/workspace.schema.yaml` |
+
+### Matching (`schemas/matching/`)
+
+Agent selection, capability scoring, skill taxonomy, role definitions, circuit breakers.
+
+| Contract | File |
+|----------|------|
+| AgentScorecard | `schemas/matching/agent-scorecard.schema.yaml` |
+| Capability | `schemas/matching/capability.schema.yaml` |
+| CircuitBreakerState | `schemas/matching/circuit-breaker-state.schema.yaml` |
+| MatchingDecision | `schemas/matching/matching-decision.schema.yaml` |
+| Role | `schemas/matching/role.schema.yaml` |
+| Skill | `schemas/matching/skill.schema.yaml` |
+
+### Orchestration (`schemas/orchestration/`)
+
+Workflow state machines, step results, compensation, approvals, escalation.
+
+| Contract | File |
+|----------|------|
+| Approval | `schemas/orchestration/approval.schema.yaml` |
+| CompensationAction | `schemas/orchestration/compensation-action.schema.yaml` |
+| EscalationSignal | `schemas/orchestration/escalation-signal.schema.yaml` |
+| StepResult | `schemas/orchestration/step-result.schema.yaml` |
+| Workflow | `schemas/orchestration/workflow.schema.yaml` |
+
+### Artifact (`schemas/artifact/`)
+
+Agent-produced outputs, validation, quality metrics, feedback loops.
+
+| Contract | File |
+|----------|------|
+| Artifact | `schemas/artifact/artifact.schema.yaml` |
+| Feedback | `schemas/artifact/feedback.schema.yaml` |
+| QualityMetric | `schemas/artifact/quality-metric.schema.yaml` |
+| ValidationMetric | `schemas/artifact/validation-metric.schema.yaml` |
+| ValidationResult | `schemas/artifact/validation-result.schema.yaml` |
+
+### Security (`schemas/security/`)
+
+Authorization, sandbox configuration, secret injection, network egress.
+
+| Contract | File |
+|----------|------|
+| AccessPolicy | `schemas/security/access-policy.schema.yaml` |
+| EgressProxy | `schemas/security/egress-proxy.schema.yaml` |
+| PolicyEngine | `schemas/security/policy-engine.schema.yaml` |
+| Sandbox | `schemas/security/sandbox.schema.yaml` |
+| SandboxAttestation | `schemas/security/sandbox-attestation.schema.yaml` |
+| SecretBinding | `schemas/security/secret-binding.schema.yaml` |
+
+### Cost (`schemas/cost/`)
+
+Budgeting, cost leases, cost records, aggregated reporting.
+
+| Contract | File |
+|----------|------|
+| CostLease | `schemas/cost/cost-lease.schema.yaml` |
+| CostRecord | `schemas/cost/cost-record.schema.yaml` |
+| CostSummary | `schemas/cost/cost-summary.schema.yaml` |
+
+### Eventing (`schemas/eventing/`)
+
+Domain events, audit trails, outbox pattern, idempotency.
+
+| Contract | File |
+|----------|------|
+| AuditEvent | `schemas/eventing/audit-event.schema.yaml` |
+| DomainEvent | `schemas/eventing/domain-event.schema.yaml` |
+| IdempotencyKey | `schemas/eventing/idempotency-key.schema.yaml` |
+| OutboxEntry | `schemas/eventing/outbox-entry.schema.yaml` |
+
+### Team (`schemas/team/`)
+
+Team definitions, role bindings, agent bindings, budgets.
+
+| Contract | File |
+|----------|------|
+| Team | `schemas/team/team.schema.yaml` |
 
 ## Database Contracts (`sql/`)
 

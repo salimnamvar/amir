@@ -75,7 +75,7 @@ properties:
 
   # Feedback from previous attempt
   feedback:
-    $ref: "feedback.schema.yaml"
+    $ref: "../artifact/feedback.schema.yaml"
 
   # Workspace configuration (new workspace per attempt)
   workspace:

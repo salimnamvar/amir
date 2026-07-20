@@ -168,10 +168,10 @@ properties:
     description: "Reference to standalone ValidationResult contract"
 
   validation_result:
-    $ref: "validation-result.schema.yaml"
+    $ref: "../artifact/validation-result.schema.yaml"
   
   feedback_artifact:
-    $ref: "feedback.schema.yaml"
+    $ref: "../artifact/feedback.schema.yaml"
   
   # Live metering (sidecar); not the durable CostRecord
   # For long-running sessions, this is the latest snapshot; full history in CostRecord.

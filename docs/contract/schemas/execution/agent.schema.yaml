@@ -51,7 +51,7 @@ properties:
   capabilities:
     type: array
     items:
-      $ref: "capability.schema.yaml"
+      $ref: "../matching/capability.schema.yaml"
     description: "Skills and tools this agent can perform"
   
   # Resource Limits
