@@ -11,7 +11,7 @@
 # Session continuity protocol (normative for CLI agents):
 # - start() returns handle containing { session_id, native_id?, adapter_type }
 # - native_id maps the control-plane session_id to the agent-native session/conversation
-#   (e.g. Claude Code / Codex session file id). Adapter persists this mapping.
+#   (e.g. Claude Code / Codex session file id). Adapter persists this mapping durably.
 # - Between pump() invocations the agent process (or native session) is the continuity
 #   store; the control plane does NOT re-send full history unless reconnecting.
 # - Lost session: if pump() fails with connection_lost or health() unhealthy:
@@ -19,6 +19,11 @@
 #   2. On reconnect: replay from last checkpoint + tool_call_stream_ref via replay_metadata
 #   3. On reconnect failure: emit failed with last_failure_category=infrastructure;
 #      set AgentSession.replay_status=replay_incomplete if history incomplete
+# - Partial replay handling:
+#   * If checkpoint is available but tool_call_stream_ref is incomplete: emit failed
+#     with last_failure_category=infrastructure and replay_status=replay_incomplete.
+#   * The control plane MUST NOT accept artifacts produced from partial replay without
+#     explicit operator override.
 # - replay_metadata full shape is required for reconstruction; invocation seed is expanded
 #   at session start (see agent-invocation.schema.yaml + replay-metadata.schema.yaml)
 
@@ -77,7 +82,7 @@ properties:
     type: array
     items:
       type: object
-      required: [name, purpose]
+      required: [name, purpose, inputs, outputs]
       properties:
         name:
           type: string
@@ -94,22 +99,22 @@ properties:
           type: array
           items:
             type: string
+          description: "Method input parameters (order matters for positional args)"
         outputs:
           type: array
           items:
             type: string
+          description: "Method return values (order matters for positional args)"
 
-# Canonical method semantics (authority for implementers):
+# Method signatures (canonical for implementers):
 # start(session, compiled_prompt, sandbox) -> handle
 #   handle = { session_id, native_id?, adapter_type, reconnect_token? }
-# pump(handle) -> event stream chunks:
-#   output_chunk | tool_call | needs_input | completed | failed | timed_out | connection_lost
-# respond_input(handle, text) -> void  (only when waiting_for_input)
+# pump(handle) -> output_chunk | tool_call | needs_input | completed | failed | timed_out | connection_lost (stream)
+# respond_input(handle, text) -> void
 # inject_feedback(handle, feedback_artifact) -> void
-# cancel(handle, cancellation_reason, grace_period_seconds?) -> { cancel_acknowledged: bool }
-#   - cancellation_reason from CostLease.cancellation_reason or operator
+# cancel(handle, cancellation_reason, grace_period_seconds?) -> { cancel_acknowledged }
+#   - cancellation_reason from CostLease.cancellation_reason enum
 #   - grace_period_seconds parameter OVERRIDES process_supervision.sigterm_grace_period_seconds
-#     when provided; otherwise uses config default (5s)
 #   - SIGTERM then wait grace period then SIGKILL; reap orphans
 #   - MUST return within grace_period_seconds + 2s (synchronous best-effort bound)
-# health() -> healthy | degraded | unhealthy
+# health() -> { status }  status = healthy | degraded | unhealthy

@@ -37,7 +37,7 @@ Normative checks that MUST run on every change under `docs/contract/`.
    Every SandboxPolicy profile enum value (`llm_only`, `coding_standard`, `custom`) must have
    expansion source under `allowlists/` except `custom` (inline).
 
-## Suggested entrypoints (implementation)
+## CI Check Entrypoints
 
 ```bash
 # Validate all YAML schemas parse
@@ -50,4 +50,4 @@ python tools/ci/check_allowlist_merge.py docs/contract/allowlists/*.yaml
 python tools/ci/check_no_schema_dumps.py docs/specification docs/story
 ```
 
-These scripts may be added during implementation; this file defines the **required** check surface for freeze.
+These scripts are provided in `tools/ci/` and run as part of the contract validation pipeline.

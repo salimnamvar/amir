@@ -28,6 +28,8 @@ This means:
 
 Names match schema files under `schemas/` (see README catalog). Suffix "Contract" is not used in filenames.
 
+> **Note:** The "Breaking Changes" column lists **categories of changes that would require a MAJOR version bump**. It does not document applied changes. Applied contract versions are tracked in the Contract Registry.
+
 | Schema file | Backward Compatibility | Breaking Changes |
 |-------------|---------------------|-----------------|
 | `execution/agent.schema.yaml` | N-1 minor | Removed required field, changed field type, removed capability |

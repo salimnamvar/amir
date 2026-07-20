@@ -15,6 +15,7 @@ properties:
   target_type:
     type: string
     enum: [artifact, agent_session, compiled_prompt, workspace_observation]
+    description: "What was validated"
   target_id:
     type: string
     format: uuid
@@ -22,13 +23,7 @@ properties:
     type: string
     format: uuid
   parser_strategy_used:
-    type: string
-    enum:
-      - structured_output
-      - tool_call_interception
-      - markdown_block
-      - workspace_observation
-      - llm_coercion
+    $ref: "../shared-enums.schema.yaml#/$defs/ParserStrategy"
   strategy_attempts:
     type: array
     description: "Per-strategy outcomes from ParserRegistry.parse"
@@ -37,12 +32,12 @@ properties:
       required: [strategy, outcome]
       properties:
         strategy:
-          type: string
+          $ref: "../shared-enums.schema.yaml#/$defs/ParserStrategy"
         outcome:
           type: string
           enum: [success, failed, timed_out, skipped]
         error_category:
-          type: string
+          $ref: "../shared-enums.schema.yaml#/$defs/FailureCategory"
         duration_ms:
           type: integer
           minimum: 0
@@ -62,6 +57,8 @@ properties:
     type: boolean
 
 allOf:
+  # session_id required when target_type is artifact or agent_session (from a session)
+  # optional for standalone workspace_observation without an active session
   - if:
       properties:
         target_type:

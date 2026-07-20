@@ -67,11 +67,11 @@ properties:
         description: "Hard ceiling for the entire strategy chain"
       on_all_strategies_failed:
         type: string
-        enum: [reject, escalate, try_optional]
+        enum: [reject, escalate, try_llm_coercion]
         default: reject
         description: >
           reject = ValidationResult.valid=false with structural error;
-          escalate = emit EscalationSignal; try_optional = only if llm_coercion approved
+          escalate = emit EscalationSignal; try_llm_coercion = fall back to llm_coercion only if approval_ref is present
 
   strategy_outcome:
     type: string

@@ -72,8 +72,7 @@ properties:
   # ParserStrategy (structured_output, tool_call_interception, …) lives on ValidationResult.
   # ObservationMethod describes the ground-truth relationship of the artifact to the workspace.
   observation_method:
-    type: string
-    enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
+    $ref: "../shared-enums.schema.yaml#/$defs/ObservationMethod"
     description: >
       How artifact was derived. workspace_diff is preferred ground truth.
       synthesized requires llm_coercion approval (coercion_approval_id) and is not default.

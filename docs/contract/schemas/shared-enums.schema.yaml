@@ -98,6 +98,16 @@ $defs:
       - llm_coercion
     description: "ParserRegistry strategy identifiers"
 
+  # Parser strategies allowed for feedback hints (excludes llm_coercion which requires Approval)
+  FeedbackStrategy:
+    type: string
+    enum:
+      - structured_output
+      - tool_call_interception
+      - markdown_block
+      - workspace_observation
+    description: "Parser strategies allowed as feedback hints (llm_coercion requires Approval, not hints)"
+
   OutputMode:
     type: string
     enum: [json_schema, tool_use, markdown_yaml, workspace_observation]

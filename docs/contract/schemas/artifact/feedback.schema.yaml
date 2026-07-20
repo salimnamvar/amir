@@ -75,8 +75,7 @@ properties:
   # Advisory only — OutputParser / control plane decides strategy; agent does not.
   # llm_coercion excluded: coercion requires Approval, not a feedback hint.
   parser_strategy_hint:
-    type: string
-    enum: [structured_output, tool_call_interception, markdown_block, workspace_observation]
+    $ref: "../shared-enums.schema.yaml#/$defs/FeedbackStrategy"
     description: "Optional hint for the next parse chain; not binding; llm_coercion not allowed via hint"
 
   validation_result_id:

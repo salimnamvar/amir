@@ -104,8 +104,7 @@ properties:
       This is the single authoritative shape; workspace always wins on divergence.
     properties:
       observation_method:
-        type: string
-        enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
+        $ref: "../shared-enums.schema.yaml#/$defs/ObservationMethod"
       claims_match_observation:
         type: boolean
         description: "True when agent/parser claims are consistent with workspace state"
@@ -142,8 +141,7 @@ properties:
       divergence_summary:
         type: string
       parser_strategy_used:
-        type: string
-        enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
+        $ref: "../shared-enums.schema.yaml#/$defs/ParserStrategy"
         description: "Which ParserRegistry strategy produced the claims being reconciled"
       # Required when parser_strategy_used=llm_coercion
       coercion_approval_id:
