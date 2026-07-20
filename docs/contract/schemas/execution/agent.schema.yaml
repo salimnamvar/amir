@@ -94,8 +94,7 @@ properties:
         type: boolean
         default: true
       network_access:
-        type: string
-        enum: [none, proxy]
+        $ref: "../shared-enums.schema.yaml#/$defs/NetworkMode"
         default: "proxy"
         description: "none = no egress; proxy = all egress via Amir egress proxy"
       network_allowlist:
@@ -120,8 +119,7 @@ properties:
   supported_output_modes:
     type: array
     items:
-      type: string
-      enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+      $ref: "../shared-enums.schema.yaml#/$defs/OutputMode"
     minItems: 1
     default: [json_schema, workspace_observation]
     description: >

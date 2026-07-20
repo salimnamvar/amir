@@ -69,8 +69,7 @@ properties:
 
   # Output mode — Amir owns extraction; free_text is not a control-plane mode
   output_mode:
-    type: string
-    enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    $ref: "../shared-enums.schema.yaml#/$defs/OutputMode"
     description: "How Amir will extract the artifact (control plane decides, not the agent)"
 
   # Feedback from previous attempt

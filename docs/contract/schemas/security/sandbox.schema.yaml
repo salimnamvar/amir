@@ -37,13 +37,12 @@ properties:
   # Empty allowlist means deny all destinations except platform-managed LLM routes
   # injected by the egress proxy for cost attribution.
   network_mode:
-    type: string
-    enum: [proxy, none]
+    $ref: "../shared-enums.schema.yaml#/$defs/NetworkMode"
     default: "proxy"
     description: >
       proxy = all outbound via Amir egress proxy (required for LLM agents);
       none = no network (offline tools only; incompatible with cloud LLM CLIs)
-  
+
   network_allowlist:
     type: array
     items:

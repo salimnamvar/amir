@@ -113,8 +113,7 @@ properties:
           type: string
 
   output_mode:
-    type: string
-    enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    $ref: "../shared-enums.schema.yaml#/$defs/OutputMode"
     description: "Output mode the adapter will prefer; Amir owns extraction, not the agent"
 
   created_at:

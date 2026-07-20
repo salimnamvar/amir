@@ -204,3 +204,15 @@ allOf:
             compatible:
               const: true
               description: "Must be true when selected_agent_id is set"
+  # If no winner selected, hard_filters.passed must be false (no compatible agent found)
+  - if:
+      not:
+        required: [selected_agent_id]
+    then:
+      properties:
+        hard_filters:
+          required: [passed]
+          properties:
+            passed:
+              const: false
+              description: "Must be false when no agent is selected (no compatible alternatives)"
