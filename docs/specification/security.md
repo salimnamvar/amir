@@ -61,7 +61,7 @@ Every agent runs in complete isolation with:
 ### Authorization
 
 
-> **Contract:** [`docs/contract/schemas/access-policy.schema.yaml`](../contract/schemas/access-policy.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/access-policy.schema.yaml`](../contract/schemas/security/access-policy.schema.yaml)
 
 
 ### Pluggable Policy Engine
@@ -69,7 +69,7 @@ Every agent runs in complete isolation with:
 Static AllowDeny rules are the default. OPA/Rego available as extension:
 
 
-> **Contract:** [`docs/contract/schemas/policy-engine.schema.yaml`](../contract/schemas/policy-engine.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/policy-engine.schema.yaml`](../contract/schemas/security/policy-engine.schema.yaml)
 
 
 Policy evaluation occurs at:
@@ -91,7 +91,7 @@ Policy evaluation occurs at:
 ### Sandbox Configuration
 
 
-> **Contract:** [`docs/contract/schemas/sandbox.schema.yaml`](../contract/schemas/sandbox.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/sandbox.schema.yaml`](../contract/schemas/security/sandbox.schema.yaml)
 
 
 ### network_mode: host REMOVED
@@ -106,7 +106,7 @@ The `host` network mode has been eliminated. All outbound traffic routes through
 All agent network traffic routes through the Amir egress proxy:
 
 
-> **Contract:** [`docs/contract/schemas/egress-proxy.schema.yaml`](../contract/schemas/egress-proxy.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/egress-proxy.schema.yaml`](../contract/schemas/security/egress-proxy.schema.yaml)
 
 
 ### Agent API Key Routing
@@ -136,23 +136,28 @@ LLM Provider
 
 ### Workspace Isolation
 
-- Each task gets unique workspace directory
-- Git repository cloned to isolated branch
+- **Task 1 → 1..* Workspace** (one exclusive workspace per AgentSession attempt; retries get a new workspace)
+- Git repository cloned to isolated branch per attempt
 - `.git` directory restricted
 - Symbolic link escape prevented via mount options
 - Baseline commit recorded before agent execution
-- Current commit recorded after agent execution
+- Current commit / auto-commit recorded after agent execution (see workspace contract)
+- Ephemeral FS cleaned only after observation succeeds or auto_commit remediated
 
 ### Secret Injection
 
-> **Contract:** [`docs/contract/schemas/secret-binding.schema.yaml`](../contract/schemas/secret-binding.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/secret-binding.schema.yaml`](../contract/schemas/security/secret-binding.schema.yaml)
 
-SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/proxy, and revokes on session end. Secrets are injected only after SandboxAttestation is verified (`sandbox_attestation_id` on the binding). When `single_use=true`, consumption proof (`consumed_at`, `consumer_session_id`, `consumption_signature`) is required on transition to `status=used`. Storage: [`sql/security.sql`](../contract/sql/security.sql).
+SecretBroker fetches from vault, creates bindings with TTL, and revokes on session end. Secrets are injected only after SandboxAttestation is verified (`sandbox_attestation_id` on the binding).
+
+**Access methods** (`access_method`): `file` (tmpfs preferred), `proxy` (egress-forwarded credentials), or `env` (allowed only via SecretBinding with scrubbing — required by many CLI agents). Prefer file/proxy; env is not a free-for-all host environment dump.
+
+When `single_use=true`, consumption proof (`consumed_at`, `consumer_session_id`, `consumption_signature`) is required on transition to `status=used`. Storage: [`sql/security.sql`](../contract/sql/security.sql).
 
 
 ### Runtime Attestation
 
-> **Contract:** [`docs/contract/schemas/sandbox-attestation.schema.yaml`](../contract/schemas/sandbox-attestation.schema.yaml)
+> **Contract:** [`docs/contract/schemas/security/sandbox-attestation.schema.yaml`](../contract/schemas/security/sandbox-attestation.schema.yaml)
 
 
 ### Platform Key Lifecycle
@@ -180,7 +185,7 @@ Profiles expand **before** merge. Expansion is fixed by Configuration Context (p
 
 | Profile | Expansion |
 |---------|-----------|
-| `llm_only` | Platform-managed LLM provider routes only (injected by egress for cost attribution; not editable by agents) |
+| `llm_only` | Expansion file [`allowlists/llm_only.yaml`](../contract/allowlists/llm_only.yaml) (empty host set); platform LLM routes unioned after intersection |
 | `coding_standard` | Canonical host list in [`allowlists/coding_standard.yaml`](../contract/allowlists/coding_standard.yaml) (package registries + git hosts; **no** Docker Hub); platform LLM routes unioned after intersection. Optional [`container_build`](../contract/allowlists/container_build.yaml) for image pulls only |
 | Merge algorithm | Machine contract: [`allowlist-merge.schema.yaml`](../contract/schemas/runtime/allowlist-merge.schema.yaml) (`const: intersection`) |
 | `custom` | Use `network_allowlist` as-is (no preset expansion); still subject to merge below |
@@ -218,7 +223,7 @@ Principles:
 Events are linear hash-chained for tamper-evidence:
 
 
-> **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
+> **Contract:** [`docs/contract/schemas/eventing/domain-event.schema.yaml`](../contract/schemas/eventing/domain-event.schema.yaml)
 
 
 ### Tamper-Evidence Mechanism
@@ -262,7 +267,7 @@ Events are linear hash-chained for tamper-evidence:
 ## Addressing Audit Concerns
 
 ### CLI Parsing Reliability (All 17 Audits)
-ParserRegistry with 4-strategy fallback chain (structured_output → tool_call → markdown_block → workspace_observation). Workspace observation as ground truth. LLM coercion requires explicit human approval + observation_method=synthesized.
+ParserRegistry with 4-strategy fallback chain (structured_output → tool_call_interception → markdown_block → workspace_observation). Workspace observation as ground truth. LLM coercion requires explicit human approval + observation_method=synthesized.
 
 ### Agent Non-Determinism (All 17 Audits)
 AgentSession with full checkpointing and replay metadata. Circuit breaker prevents cascading failures.

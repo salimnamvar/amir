@@ -191,3 +191,38 @@ properties:
   observed_at:
     type: string
     format: date-time
+
+allOf:
+  # Cannot clean ephemeral FS while auto_commit failed (durable commit incomplete)
+  - if:
+      properties:
+        status:
+          const: cleaned
+      required: [status]
+    then:
+      not:
+        properties:
+          auto_commit:
+            properties:
+              committed:
+                const: false
+            required: [committed]
+  - if:
+      properties:
+        status:
+          const: auto_commit_failed
+      required: [status]
+    then:
+      properties:
+        auto_commit:
+          required: [error, attempted]
+      required: [auto_commit]
+  - if:
+      properties:
+        status:
+          const: observed
+      required: [status]
+    then:
+      description: >
+        observed implies durable commit exists (or no changes). Prefer current_commit set.
+

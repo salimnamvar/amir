@@ -19,7 +19,7 @@ All events use the `DomainEvent` envelope:
 ### Event Envelope Structure
 
 
-> **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
+> **Contract:** [`docs/contract/schemas/eventing/domain-event.schema.yaml`](../contract/schemas/eventing/domain-event.schema.yaml)
 
 
 ### W3C Trace Context
@@ -42,7 +42,7 @@ Append-only store; hash chain computed on write. Envelope: domain-event contract
 Domain events are published via outbox pattern for reliable delivery:
 
 
-> **Contract:** [`docs/contract/schemas/outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml)
+> **Contract:** [`docs/contract/schemas/eventing/outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml)
 
 
 ### Delivery Semantics
@@ -65,7 +65,7 @@ Default publisher may append JSONL; schema is still `DomainEvent`.
 First-class cost entity with multi-dimensional attribution:
 
 
-> **Contract:** [`docs/contract/schemas/cost-record.schema.yaml`](../contract/schemas/cost-record.schema.yaml)
+> **Contract:** [`docs/contract/schemas/cost/cost-record.schema.yaml`](../contract/schemas/cost/cost-record.schema.yaml)
 
 
 ### Cost Hierarchy
@@ -83,7 +83,7 @@ Per-Org Monthly CostSummary
 ### Cost Summary
 
 
-> **Contract:** [`docs/contract/schemas/cost-summary.schema.yaml`](../contract/schemas/cost-summary.schema.yaml)
+> **Contract:** [`docs/contract/schemas/cost/cost-summary.schema.yaml`](../contract/schemas/cost/cost-summary.schema.yaml)
 
 
 ### Agent Performance Metrics
@@ -91,13 +91,13 @@ Per-Org Monthly CostSummary
 AgentScorecard derived from cost and quality events:
 
 
-> **Contract:** [`docs/contract/schemas/agent-scorecard.schema.yaml`](../contract/schemas/agent-scorecard.schema.yaml)
+> **Contract:** [`docs/contract/schemas/matching/agent-scorecard.schema.yaml`](../contract/schemas/matching/agent-scorecard.schema.yaml)
 
 
 ### Quality Metrics
 
 
-> **Contract:** [`docs/contract/schemas/quality-metric.schema.yaml`](../contract/schemas/quality-metric.schema.yaml)
+> **Contract:** [`docs/contract/schemas/artifact/quality-metric.schema.yaml`](../contract/schemas/artifact/quality-metric.schema.yaml)
 
 
 ### Validation Metrics
@@ -105,7 +105,7 @@ AgentScorecard derived from cost and quality events:
 Track validation pipeline performance:
 
 
-> **Contract:** [`docs/contract/schemas/validation-metric.schema.yaml`](../contract/schemas/validation-metric.schema.yaml)
+> **Contract:** [`docs/contract/schemas/artifact/validation-metric.schema.yaml`](../contract/schemas/artifact/validation-metric.schema.yaml)
 
 
 ## Quality Criteria Validation
@@ -113,7 +113,7 @@ Track validation pipeline performance:
 Roles declare quality criteria for artifact validation:
 
 
-> **Contract:** [`docs/contract/schemas/role.schema.yaml#quality_criteria`](../contract/schemas/role.schema.yaml#quality_criteria)
+> **Contract:** [`docs/contract/schemas/matching/role.schema.yaml#quality_criteria`](../contract/schemas/matching/role.schema.yaml#quality_criteria)
 
 
 ## Replay and Debugging
@@ -123,7 +123,7 @@ Roles declare quality criteria for artifact validation:
 Every AgentSession captures replay metadata for debugging:
 
 
-> **Contract:** [`docs/contract/schemas/replay-metadata.schema.yaml`](../contract/schemas/replay-metadata.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/replay-metadata.schema.yaml`](../contract/schemas/execution/replay-metadata.schema.yaml)
 
 
 ### Debug Query API

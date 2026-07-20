@@ -6,7 +6,22 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 type: object
 required: [name]
 properties:
-  # Team identity
+  # Team identity (UUID used by CostLease.team_id / Task.team_id / CostRecord.team_id)
+  team_id:
+    type: string
+    format: uuid
+    description: "Stable team identifier for hierarchical cost attribution"
+
+  tenant_id:
+    type: string
+    format: uuid
+    description: "Parent tenant for 4-level cost hierarchy"
+
+  org_id:
+    type: string
+    format: uuid
+    description: "Parent org for 4-level cost hierarchy"
+
   name:
     type: string
     description: "Team name (lowercase, machine-readable)"
@@ -53,6 +68,8 @@ properties:
           description: "AgentDefinition ID"
   
   # Budget and quotas (hierarchical cost gate)
+  # Soft/hard thresholds: Observability uses soft_threshold_pct (warn/throttle) and
+  # hard_threshold_pct (revoke_by_scope for in-flight). Not fields on CostLease.
   budget:
     type: object
     properties:
@@ -70,6 +87,18 @@ properties:
         type: integer
         minimum: 1
         default: 10
+      soft_threshold_pct:
+        type: number
+        minimum: 50
+        maximum: 100
+        default: 80
+        description: "Ops soft threshold: reject/throttle new work; do not revoke in-flight"
+      hard_threshold_pct:
+        type: number
+        minimum: 50
+        maximum: 100
+        default: 100
+        description: "Ops hard threshold: CostEnforcer.revoke_by_scope cancels in-flight leases"
 
   # Default scoring weights for agent matching.
   # Runtime MUST normalize to sum=1.0 if provided weights do not sum to 1.0

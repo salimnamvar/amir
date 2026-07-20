@@ -35,7 +35,7 @@ Each aggregate root owns its invariants and is updated transactionally. Cross-ag
 All mutable operations require an idempotency key. Stored with operation outcome to prevent duplicate side effects.
 
 
-> **Contract:** [`docs/contract/schemas/idempotency-key.schema.yaml`](../contract/schemas/idempotency-key.schema.yaml)
+> **Contract:** [`docs/contract/schemas/eventing/idempotency-key.schema.yaml`](../contract/schemas/eventing/idempotency-key.schema.yaml)
 
 
 Key derivation:
@@ -49,7 +49,7 @@ Key derivation:
 
 ### TeamDefinition Aggregate (Configuration)
 
-> **Contract:** [`docs/contract/schemas/team.schema.yaml`](../contract/schemas/team.schema.yaml)
+> **Contract:** [`docs/contract/schemas/team/team.schema.yaml`](../contract/schemas/team/team.schema.yaml)
 
 **Lifecycle**: Draft → Validating → Published → Deprecated → Retired
 
@@ -61,7 +61,7 @@ Key derivation:
 
 ### RoleDefinition Aggregate (Configuration)
 
-> **Contract:** [`docs/contract/schemas/role.schema.yaml`](../contract/schemas/role.schema.yaml)
+> **Contract:** [`docs/contract/schemas/matching/role.schema.yaml`](../contract/schemas/matching/role.schema.yaml)
 
 **Lifecycle**: Draft → Validating → Published → Deprecated
 
@@ -72,7 +72,7 @@ Key derivation:
 
 ### AgentDefinition Aggregate (Configuration)
 
-> **Contract:** [`docs/contract/schemas/agent.schema.yaml`](../contract/schemas/agent.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/agent.schema.yaml`](../contract/schemas/execution/agent.schema.yaml)
 
 **Lifecycle**: Draft → Validating → Published → Deprecated
 
@@ -97,7 +97,7 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 ### Task Aggregate (Execution)
 
-> **Contract:** [`docs/contract/schemas/task.schema.yaml`](../contract/schemas/task.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/task.schema.yaml`](../contract/schemas/execution/task.schema.yaml)
 
 **Lifecycle**: Pending → Assigned → Running → Validating → Succeeded / Failed / Cancelled / Escalated
 
@@ -106,7 +106,7 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 - `matching_decision_id` required when status is `assigned`, `running`, or `validating`
 - `retry_state.last_failure_category` required when status is `failed` or `cancelled`
 - `cost_budget` must include at least one of `max_tokens` or `max_usd`
-- `validation_budget` is partitioned; enforced via separate CostLease (`budget_pool=validation`)
+- `validation_budget` is **required** and partitioned; enforced via separate CostLease (`budget_pool=validation`)
 - Cost budget must not be exceeded
 - Expected outputs must have valid ContractDefinitions
 - `retry_state.attempts` must not exceed `retry_policy.max_attempts` (incremented in same transaction as AgentSession create)
@@ -115,7 +115,7 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 ### AgentSession Aggregate (Execution) — Central Runtime Unit
 
-> **Contract:** [`docs/contract/schemas/agent-session.schema.yaml`](../contract/schemas/agent-session.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/agent-session.schema.yaml`](../contract/schemas/execution/agent-session.schema.yaml)
 
 High-frequency telemetry is **not** stored unbounded on the session document. See checkpoint, tool-call, cost-record, and cost-lease contracts; storage: [`sql/execution.sql`](../contract/sql/execution.sql).
 
@@ -135,9 +135,9 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 
 ### Workspace Aggregate (Execution)
 
-> **Contract:** [`docs/contract/schemas/workspace.schema.yaml`](../contract/schemas/workspace.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/workspace.schema.yaml`](../contract/schemas/execution/workspace.schema.yaml)
 
-**Lifecycle**: Created → Active → Observed → Cleaned
+**Lifecycle**: Created → Active → Observed | AutoCommitFailed → Cleaned | Failed
 
 **Invariants**:
 - session_id must reference exactly one AgentSession (unique in DDL)
@@ -151,7 +151,7 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 
 ### Artifact Aggregate (Execution)
 
-> **Contract:** [`docs/contract/schemas/artifact.schema.yaml`](../contract/schemas/artifact.schema.yaml)
+> **Contract:** [`docs/contract/schemas/artifact/artifact.schema.yaml`](../contract/schemas/artifact/artifact.schema.yaml)
 
 **Lifecycle**: Produced → Validated → Accepted / Rejected
 
@@ -163,9 +163,9 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 ### WorkflowInstance Aggregate (Workflow)
 
 > **Contracts:**
-> - Workflow template: [`workflow.schema.yaml`](../contract/schemas/workflow.schema.yaml)
-> - Compensation: [`compensation-action.schema.yaml`](../contract/schemas/compensation-action.schema.yaml)
-> - Step results: [`step-result.schema.yaml`](../contract/schemas/step-result.schema.yaml)
+> - Workflow template: [`orchestration/workflow.schema.yaml`](../contract/schemas/orchestration/workflow.schema.yaml)
+> - Compensation: [`orchestration/compensation-action.schema.yaml`](../contract/schemas/orchestration/compensation-action.schema.yaml)
+> - Step results: [`orchestration/step-result.schema.yaml`](../contract/schemas/orchestration/step-result.schema.yaml)
 > - Storage: [`sql/workflow.sql`](../contract/sql/workflow.sql)
 
 **Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / CompensationBlocked / Rejected
@@ -225,17 +225,22 @@ stateDiagram-v2
     [*] --> Pending
     Pending --> Assigned: assign_agent()
     Assigned --> Running: start_execution()
-    Running --> Validating: invocation_completed()
-    Validating --> Completed: artifact_valid()
+    Running --> Validating: session_terminal_output()
+    Validating --> Succeeded: artifact_valid()
     Validating --> Failed: artifact_invalid AND retries_exhausted
-    Validating --> Running: artifact_invalid AND retry_allowed
-    Running --> Failed: invocation_failed AND retries_exhausted
-    Running --> Running: feedback_loop(retry)
+    Validating --> Running: start_new_attempt_session
+    note right of Validating: Task re-enters Running with NEW AgentSession+Workspace\nPrior session stays failed (no session re-entry)
+    Running --> Failed: session_failed AND retries_exhausted
+    Running --> Escalated: escalate_after OR budget_exceeded_team_plus
     Pending --> Cancelled: cancel()
     Assigned --> Cancelled: cancel()
     Running --> Cancelled: cancel()
+    Validating --> Cancelled: cancel()
     Failed --> Assigned: reassign_after_escalation()
+    Escalated --> Assigned: human_or_policy_reassign()
 ```
+
+**Retry model (normative):** each validation/retry attempt creates a **new AgentSession** and **new Workspace**. Task stays alive and increments `retry_state.attempts`. Session status never re-enters `running` after `validating` on the same session. Event `Task.Completed` maps to status **`succeeded`**.
 
 ### AgentSession States
 
@@ -252,18 +257,20 @@ stateDiagram-v2
     Running --> TimedOut: timeout_exceeded()
     Running --> Cancelled: cancel_or_cost_lease_revoked()
     WaitingForInput --> Running: input_received()
+    WaitingForInput --> Failed: input_timeout_fail
     WaitingForInput --> Cancelled: cancel_or_cost_lease_revoked()
     ProducingArtifact --> Validating: output_parsed()
     ProducingArtifact --> Cancelled: cancel_or_cost_lease_revoked()
     Validating --> Succeeded: validation_passed()
-    Validating --> Failed: validation_failed AND retries_exhausted
-    Validating --> Running: validation_failed AND retry_allowed
+    Validating --> Failed: validation_failed
     Validating --> Cancelled: cancel_or_cost_lease_revoked()
     Succeeded --> [*]
     Failed --> [*]
     TimedOut --> [*]
     Cancelled --> [*]
 ```
+
+**No session re-entry after terminal validating.** On validation failure with retry allowed, Task creates a **new** AgentSession (attempt_number+1); the failed session stays `failed`. No `Correcting` or `Escalated` session statuses (escalation is Task-owned).
 
 ### WorkflowInstance States
 
@@ -285,7 +292,8 @@ stateDiagram-v2
     CompensationBlocked --> Escalated: emit_EscalationSignal
     CompensationBlocked --> Compensating: human_resume
     CompensationBlocked --> Failed: human_abort
-    [*] --> Escalated
+    Implementation --> Escalated: manual_or_slo
+    Escalated --> [*]
 ```
 
 ---
@@ -343,6 +351,10 @@ def score_agent(
     if history and history.circuit_breaker.state == "half_open":
         total *= 0.5
 
+    # Cold-start exploration (see agent.md); never bypasses hard filters
+    if is_cold_scorecard(history):
+        total = min(1.0, total + (context.exploration_bonus or 0.15))
+
     staleness = history.staleness_seconds if history else None
     
     return MatchingDecision(
@@ -366,13 +378,13 @@ When an `AgentDefinition` publishes a new version, the scorecard **inherits** ro
 Hierarchical skill taxonomy with dot notation:
 
 
-> **Contract:** [`docs/contract/schemas/skill.schema.yaml`](../contract/schemas/skill.schema.yaml)
+> **Contract:** [`docs/contract/schemas/matching/skill.schema.yaml`](../contract/schemas/matching/skill.schema.yaml)
 
 
 ### Default Scoring Weights
 
 
-> **Contract:** [`docs/contract/schemas/team.schema.yaml#scoring_weights`](../contract/schemas/team.schema.yaml#scoring_weights)
+> **Contract:** [`docs/contract/schemas/team/team.schema.yaml#scoring_weights`](../contract/schemas/team/team.schema.yaml#scoring_weights)
 
 
 ---
@@ -410,7 +422,7 @@ Two-layer model:
 2. **Concrete** (Execution Context): resolved at step completion into `git_revert`, `branch_delete`, `pr_close`, etc. against `Workspace.durable_effects`
 
 
-> **Contract:** [`docs/contract/schemas/compensation-action.schema.yaml`](../contract/schemas/compensation-action.schema.yaml)
+> **Contract:** [`docs/contract/schemas/orchestration/compensation-action.schema.yaml`](../contract/schemas/orchestration/compensation-action.schema.yaml)
 
 
 On workflow failure, compensation executes in reverse order (LIFO) against durable targets.

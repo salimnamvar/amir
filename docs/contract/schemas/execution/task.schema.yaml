@@ -5,7 +5,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [title, objective, assigned_role, idempotency_key, cost_budget]
+required: [title, objective, assigned_role, idempotency_key, cost_budget, validation_budget]
 properties:
   # Core identity
   id:
@@ -62,8 +62,10 @@ properties:
       - escalated
     default: pending
     description: >
-      Task lifecycle. matching_decision_id required for assigned/running/validating.
+      Task lifecycle. Success terminal is succeeded (event Task.Completed maps here).
+      matching_decision_id required for assigned/running/validating.
       last_failure_category required for failed/cancelled.
+      escalated = human/agent reassignment path (EscalationSignal); not a session status.
 
   # Input artifacts
   inputs:
@@ -148,13 +150,14 @@ properties:
 
   # Validation/repair budget — partitioned from execution budget to prevent starvation
   # Enforced via a separate CostLease with budget_pool=validation.
+  # REQUIRED — partitioned from execution; never optional (financial safety).
   validation_budget:
     type: object
     description: >
-      Budget reserved for validation feedback loop; separate from agent execution budget.
+      REQUIRED budget for validation feedback loop; separate CostLease budget_pool=validation.
       sum(ValidationResult.validators[*].budget_usd) MUST be ≤ validation_budget.
-      Exhaustion emits last_failure_category=budget_exceeded on the validation path
-      without consuming execution CostLease.
+      Exhaustion sets last_failure_category=budget_exceeded on the validation path
+      without consuming the execution CostLease. Never omitted.
     properties:
       max_tokens:
         type: integer
@@ -197,17 +200,7 @@ properties:
       retry_on:
         type: array
         items:
-          type: string
-          enum:
-            - structural
-            - semantic
-            - policy
-            - quality
-            - timeout
-            - infrastructure
-            - cancelled
-            - budget_exceeded
-            - circuit_breaker_open
+          $ref: "../shared-enums.schema.yaml#/$defs/TerminalFailureCategory"
         default:
           - structural
           - semantic
@@ -215,11 +208,13 @@ properties:
           - quality
           - timeout
           - infrastructure
+          - behavioral
+          - test_execution
         description: >
-          Failure categories that trigger retry. budget_exceeded excluded by default
-          (escalate instead). infrastructure included because sandbox/network failures
-          are typically transient. cancelled is human/operator cancel — only retry if
-          re-queued by operator; budget-driven cancels use budget_exceeded.
+          Failure categories that trigger retry (items $ref TerminalFailureCategory).
+          Default excludes budget_exceeded, cancelled, circuit_breaker_open (escalate).
+          behavioral and test_execution are retryable by default (validator-origin categories).
+          infrastructure included as typically transient.
       escalate_after:
         type: integer
         minimum: 1
@@ -241,18 +236,10 @@ properties:
         minimum: 0
         default: 0
       last_failure_category:
-        type: string
-        enum:
-          - structural
-          - semantic
-          - policy
-          - quality
-          - timeout
-          - infrastructure
-          - cancelled
-          - budget_exceeded
-          - circuit_breaker_open
-        description: "Category of last failure; used for retry eligibility and routing decisions"
+        $ref: "../shared-enums.schema.yaml#/$defs/TerminalFailureCategory"
+        description: >
+          Category of last failure; used for retry eligibility.
+          Must match AgentSession.last_failure_category vocabulary.
       last_session_id:
         type: string
         format: uuid

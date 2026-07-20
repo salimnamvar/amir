@@ -55,22 +55,14 @@ properties:
     format: uuid
     description: "Previous session ID (for retry chain)"
   
-  # Status enum excludes compensating — compensation is a WorkflowInstance concern
-  # that operates on durable_effects after the session has terminated.
+  # Status excludes compensating (WorkflowInstance concern on durable_effects).
+  # Status excludes Correcting/Escalated (Task-owned; each retry = new session).
+  # After validating, terminal is succeeded|failed|cancelled only — never re-enter running.
   # CostLease revocation → cancelled with last_failure_category=budget_exceeded.
+  # Status enum: no compensating, Correcting, or Escalated.
+  # Retry never re-enters running on the same session — always a new AgentSession.
   status:
-    type: string
-    enum:
-      - pending
-      - starting
-      - running
-      - waiting_for_input
-      - producing_artifact
-      - validating
-      - succeeded
-      - failed
-      - timed_out
-      - cancelled
+    $ref: "../shared-enums.schema.yaml#/$defs/AgentSessionStatus"
   
   # Required: every session owns exactly one workspace for its lifetime.
   # Session create MUST be atomic with workspace creation.
@@ -216,20 +208,11 @@ properties:
 
   # Failure attribution for retry eligibility (set on terminal failure/cancel)
   last_failure_category:
-    type: string
-    enum:
-      - structural
-      - semantic
-      - policy
-      - quality
-      - timeout
-      - infrastructure
-      - cancelled
-      - budget_exceeded
-      - circuit_breaker_open
+    $ref: "../shared-enums.schema.yaml#/$defs/TerminalFailureCategory"
     description: >
-      Terminal failure category. CostLease revocation MUST set budget_exceeded
-      and transition status to cancelled (not failed).
+      Terminal failure category (shared with Task.retry_state).
+      CostLease revocation MUST set budget_exceeded and status=cancelled (not failed).
+      Validator categories behavioral/test_execution are valid here for retry eligibility.
   
   replay_metadata:
     $ref: "replay-metadata.schema.yaml"
@@ -283,3 +266,9 @@ allOf:
           enum: [failed, cancelled, timed_out]
     then:
       required: [last_failure_category]
+  - if:
+      properties:
+        status:
+          const: waiting_for_input
+    then:
+      required: [pending_input]

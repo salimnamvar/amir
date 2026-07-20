@@ -6,7 +6,7 @@ Events in Amir are immutable facts representing state changes and business occur
 
 ## Domain Event Envelope
 
-> **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
+> **Contract:** [`docs/contract/schemas/eventing/domain-event.schema.yaml`](../contract/schemas/eventing/domain-event.schema.yaml)
 
 Events are linear hash-chained (`sequence`, `prev_hash`, optional `signature` / `key_ref`). W3C `traceparent` / `tracestate` may be present.
 
@@ -20,11 +20,15 @@ Events are linear hash-chained (`sequence`, `prev_hash`, optional `signature` / 
 | Task.Created | Orchestrator | task_id, title, objective, idempotency_key |
 | Task.Assigned | Orchestrator | task_id, agent_id, role, matching_decision |
 | Task.Started | Orchestrator | task_id, session_id |
-| Task.Completed | Orchestrator | task_id, artifact_ids |
+| Task.Completed | Orchestrator | task_id, artifact_ids — **maps to Task.status=succeeded** |
 | Task.Failed | Orchestrator | task_id, error, retry_state (last_failure_category), agent_circuit_breaker_state (snapshot from AgentScorecard at failure time — not task-owned) |
 | Task.Cancelled | Orchestrator | task_id, reason |
 | AgentSession.Started | AgentExecutor | session_id, agent_id, attempt_number |
 | AgentSession.Completed | AgentExecutor | session_id, artifact_id |
+| AgentSession.Cancelled | AgentExecutor | session_id, last_failure_category (budget_exceeded on lease kill) |
+| AgentSession.WaitingForInput | AgentExecutor | session_id, pending_input |
+| Workspace.Observed | AgentExecutor | workspace_id, current_commit |
+| Workspace.AutoCommitFailed | AgentExecutor | workspace_id, auto_commit.error |
 | AgentSession.Failed | AgentExecutor | session_id, error, feedback_generated |
 | AgentSession.Checkpoint | AgentExecutor | session_id, state, workspace_snapshot |
 | Artifact.Produced | AgentSession | artifact_id, contract_type, observation_method |
@@ -167,17 +171,17 @@ Verification: recompute hash chain from first event for the aggregate. Any tampe
 
 Events are published via outbox for reliable delivery:
 
-Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml).
 
 
 ### File-Based Publisher (Fallback)
 
-Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml).
 
 
 ### Message Queue Publisher (Alternative)
 
-Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/outbox-entry.schema.yaml).
+Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml).
 
 
 ## Event Retention Policies

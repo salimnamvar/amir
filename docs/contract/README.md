@@ -156,6 +156,7 @@ Cross-cutting operational protocols (lease ACK, allowlist merge).
 
 | Profile | File |
 |---------|------|
+| llm_only | `allowlists/llm_only.yaml` |
 | coding_standard | `allowlists/coding_standard.yaml` |
 | container_build | `allowlists/container_build.yaml` (optional; not default) |
 

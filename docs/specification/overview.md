@@ -1,12 +1,27 @@
 # Amir Architecture Specification
 
-**Version:** 2.1.1  
+**Version:** 2.2.0  
 **Status:** Authoritative Technical Specification  
 **Owner:** Technical Leadership
 
 ---
 
 ## Audit Findings Synthesis
+
+### Round 9 Audit Cleanup (applied)
+
+| Priority | Issue | Resolution |
+|----------|-------|------------|
+| P0 | Retry Validating→Running vs new session | Normative: new AgentSession+Workspace per attempt; diagrams fixed |
+| P0 | FailureCategory drift | TerminalFailureCategory + ValidatorFailureCategory in shared-enums; $ref |
+| P0 | Hierarchical lease cascade | CostEnforcer.revoke_by_scope; single invocation lease model |
+| P0 | validation_budget optional | Required on Task + SQL CHECK |
+| P0 | Task Completed vs succeeded | Status=succeeded; Task.Completed event maps to succeeded |
+| P0 | Parser chain order unenforced | prefixItems fixed order |
+| P1 | SQL CHECK gaps | matching validating, revoke timestamp, terminal categories |
+| P1 | MatchingDecision always requires winner | Conditional required on hard_filters.passed |
+| P1 | llm_only profile missing | allowlists/llm_only.yaml |
+| P1 | Contract path flat links | Domain folder paths in specs |
 
 ### Round 8 Residual (pool + mimo)
 
@@ -158,7 +173,7 @@ Prior round fully accepted foundations remain in force: AgentSession state machi
 
 ## Specification Status
 
-**Status:** `COMPLETE_AND_CONSISTENT` (v2.1.1)
+**Status:** `CONSISTENT_POST_ROUND_9` (v2.2.0) — retry model, failure vocab, hierarchical revoke, validation_budget required, parser chain order, SQL CHECKs, domain contract paths aligned
 
 Hardened relative to v2.0.0 / residual v2.1.0 gaps:
 
@@ -185,7 +200,7 @@ Hardened relative to v2.0.0 / residual v2.1.0 gaps:
 
 | Issue | Fix |
 |-------|-----|
-| sandbox `if/then` under `properties` (non-functional) | Moved to **schema root**; docker structurally illegal when `environment=production` (or omitted) |
+| sandbox `if/then` under `properties` (non-functional) | Moved to **schema root**; docker structurally illegal when `environment=production` (`environment` is required) |
 | Compensation “best-effort continue” | Default block → **CompensationBlocked** + human `EscalationSignal`; executor pseudocode updated |
 | AgentSession God Object risk | Lean model: ring buffers (checkpoints ≤20, tool_calls ≤50), `tool_call_events` table, latest usage snapshot only |
 | claim_reconciliation shapes | Canonical on ValidationResult (+ `authoritative_source=workspace`); Artifact/Feedback by ID only |

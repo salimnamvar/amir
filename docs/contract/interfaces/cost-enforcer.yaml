@@ -48,6 +48,7 @@ properties:
             - check_lease
             - commit_lease
             - revoke_lease
+            - revoke_by_scope
             - ack_revocation
         purpose:
           type: string
@@ -62,12 +63,20 @@ properties:
 
 # Canonical method semantics:
 # reserve_lease(task_id, session_id, budget_pool, reserved_usd, reserved_tokens, scope, idempotency_key)
-#   -> CostLease (status=active, lease_revision=0)
+#   -> CostLease (status=active, lease_revision=0, scope required, agent_session_id set)
+#   - Session leases use scope=invocation; Observability tracks parent team/tenant/org totals separately
 # heartbeat(lease_id, consumed_usd, consumed_tokens) -> { status, lease_revision }
-#   - If consumption ≥ kill_threshold_pct of reserved → auto-revoke
+#   - If consumption ≥ kill_threshold_pct of reserved → auto-revoke (status=revoked sole signal)
 # check_lease(lease_id, session_id) -> { action: continue | cancel, cancellation_reason?, status }
 #   - status=revoked or service unavailable with fail_closed → action=cancel
+#   - NEVER check a parallel cancelled boolean (does not exist)
 # commit_lease(lease_id, final_consumed) -> { status: released }
 # revoke_lease(lease_id, cancellation_reason, idempotency_key) -> { status: revoked, revocation_revision }
+# revoke_by_scope(scope, scope_id, cancellation_reason, idempotency_key)
+#   -> { revoked_lease_ids: uuid[], count: int }
+#   - Hierarchical cascade: revokes ALL active leases attributed to team_id|tenant_id|org_id
+#   - cancellation_reason MUST be team_budget_exceeded | tenant_budget_exceeded | org_budget_exceeded
+#   - Each child lease gets status=revoked; sidecars hard-kill sessions ≤100ms
+#   - Emits EscalationSignal (cost_limit_exceeded) for team+ scope
 # ack_revocation(lease_id, session_id, ack_at) -> void
 #   - Sidecar ACK within sidecar_ack_deadline_ms

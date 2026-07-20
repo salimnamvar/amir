@@ -7,14 +7,12 @@ type: object
 required:
   - decision_id
   - task_id
-  - selected_agent_id
-  - score
-  - dimension_scores
   - hard_filters
   - candidates
   - decided_at
-  - contract_negotiation
   - idempotency_key
+# selected_agent_id, score, dimension_scores, contract_negotiation required only when assignment succeeds
+# (hard_filters.passed=true and a compatible agent selected). No-winner decisions omit them.
 properties:
   decision_id:
     type: string
@@ -27,7 +25,7 @@ properties:
   selected_agent_id:
     type: string
     format: uuid
-    description: "Winning agent after hard filters + scoring + contract negotiation"
+    description: "Winning agent after hard filters + scoring + contract negotiation; omit when no agent selected"
 
   selected_agent_version:
     type: string
@@ -191,3 +189,18 @@ properties:
   decided_at:
     type: string
     format: date-time
+
+# Structural: when a winner is selected, scores + successful negotiation are required.
+# No-winner decisions (all hard-filtered or contract-incompatible) omit selected_agent_id.
+allOf:
+  - if:
+      required: [selected_agent_id]
+    then:
+      required: [score, dimension_scores, contract_negotiation]
+      properties:
+        contract_negotiation:
+          required: [negotiated_type, negotiated_version, compatible, fallback_used]
+          properties:
+            compatible:
+              const: true
+              description: "Must be true when selected_agent_id is set"

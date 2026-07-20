@@ -17,7 +17,7 @@ I want to POST /tasks with objective and role
 So that an agent executes the work
 
 Acceptance:
-- Task created with PENDING status
+- Task created with status=pending
 - Idempotency key required
 - Event Task.Created emitted
 - Task appears in task list
@@ -45,10 +45,10 @@ I want to GET /tasks/{id} for current status
 So that I can monitor progress
 
 Acceptance:
-- Returns current state (PENDING/ASSIGNED/RUNNING/etc)
-- Returns assigned agent
-- Returns AgentSession checkpoints
-- Returns artifact if completed
+- Returns current state (pending|assigned|running|validating|succeeded|failed|cancelled|escalated)
+- Returns assigned agent / matching_decision_id
+- Returns AgentSession checkpoints (current attempt)
+- Returns artifact if status=succeeded (event Task.Completed)
 ```
 
 ### US-ORCH-004: Handle Task Failure
@@ -75,14 +75,15 @@ So that runaway agents do not bankrupt us
 
 Acceptance:
 - Structural cost ceilings required on Task and session
-- Hierarchical cost gate (4 levels)
+- Hierarchical cost gate (4 levels); soft/hard thresholds on Team.budget
 - CostLease sync hard-kill gate (sidecar/egress checks every tick ≤100ms)
+- status=revoked is sole kill signal; fail_closed_on_unavailable=true
 - Pre-flight estimation with buffer; reservation/commit/release
-- Sidecar proxy counts tokens in real-time
 - Process killed at CostLease.kill_threshold_pct (default 95%) of reserved limit
-- Higher-level hard breach cancels in-flight work via lease revoke
+- Higher-level hard breach: CostEnforcer.revoke_by_scope cancels in-flight leases
+- Post-cancel: session cancelled + last_failure_category=budget_exceeded
 - budget_exceeded is not retried by default; team+ emits EscalationSignal
-- validation_budget partitioned from execution budget
+- validation_budget **required** and partitioned from execution budget
 - CostRecord emitted with attribution
 ```
 
@@ -93,11 +94,12 @@ I want each task in isolated workspace
 So that agents cannot interfere with each other
 
 Acceptance:
-- Each task gets unique workspace
+- Task 1 → 1..* Workspace (one exclusive workspace per AgentSession attempt)
 - Baseline commit recorded before execution
-- Current commit recorded after execution
-- Workspace cleaned after task completion
-- No shared filesystem between tasks
+- Current commit / auto-commit recorded after execution
+- Clean only after observation succeeds (not while auto_commit_failed)
+- durable_effects retained for compensation after ephemeral cleanup
+- No shared filesystem between sessions
 ```
 
 ### US-ORCH-007: Idempotent Operations

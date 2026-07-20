@@ -31,7 +31,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - All referenced roles must exist and be Published
 - All agent_bindings must reference valid AgentDefinitions
 - Budget limits must be non-negative
-- Scoring weights must sum to 1.0
+- Scoring weights: runtime normalizes to sum 1.0 if config drifts (see Team.scoring_weights); MatchingDecision.weights records actuals
 - Subjective proficiency enums are prohibited on capability requirements
 
 ## 2. Execution Context
@@ -41,7 +41,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 **Owner**: **AgentSession** is the central runtime aggregate; Task is the unit of work that spawns sessions
 
 **Entities**:
-- Task - Work unit with required cost_budget, retry_state, matching_decision_id
+- Task - Work unit with required cost_budget **and validation_budget**, retry_state, matching_decision_id
 - AgentSession - Central durable execution aggregate (lean: status, limits, refs, recent samples; full telemetry in events)
 - AgentInvocation - Request DTO that creates a session (not an aggregate root)
 - Workspace - Per-session filesystem with baseline observation and durable_effects
@@ -51,7 +51,9 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - FeedbackArtifact - Corrections and suggested strategy for retry (refs ValidationResult)
 - MatchingDecision - Agent selection audit (hard filters + scores + negotiation + exploration)
 
-**Lifecycle (Task)**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
+**Lifecycle (Task)**: Pending → Assigned → Running → Validating → Succeeded / Failed / Cancelled / Escalated
+
+> Event `Task.Completed` maps to status **`succeeded`**. Each retry attempt = new AgentSession + new Workspace.
 
 **Lifecycle (AgentSession)**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / TimedOut / Cancelled
 
@@ -131,7 +133,7 @@ Platform signing keys for SandboxAttestation and linear hash-chain audit roots:
 - Metric - Time-series data point
 - CostRecord - Token/cost consumption with multi-dimensional attribution (authoritative)
 - CostSummary - Aggregated cost by period/team/agent
-- CostLease - **Synchronous cost lease for in-flight session cancellation** (see cost-lease.schema.yaml)
+- CostLease - **Synchronous cost lease for in-flight session cancellation** (Observability authority; Execution holds `cost_lease_id`; storage may co-locate in execution SQL with Observability ownership — see cost-lease.schema.yaml)
 - QualityMetric - Artifact quality assessment
 - AgentScorecard - Historical performance metrics + **circuit breaker state**
 - ValidationMetric - Validation pipeline performance
@@ -220,7 +222,7 @@ ExecutionContext(Task.Assigned)
     → Sidecar + Egress (token counting) every 100ms
     → ObservabilityContext(Cost.Recorded per batch; lease checked synchronously)
     → If invocation limit: kill process (sync lease gate)
-    → If team/tenant/org limit: cancel in-flight via lease (sync hard kill)
+    → If team/tenant/org hard limit: CostEnforcer.revoke_by_scope (sync hard kill all matching leases)
     → ObservabilityContext(CostLease.Released; Cost.Committed or Released)
 ```
 

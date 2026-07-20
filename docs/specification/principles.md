@@ -29,9 +29,11 @@ Amir follows Clean Architecture principles with explicit boundaries:
 
 ### Dependency Rule
 
-- **Control Plane** depends on nothing (pure configuration logic)
-- **Execution Plane** depends on interfaces defined by Control Plane
+- **Domain/ports** define interfaces; adapters implement them (hexagonal)
+- **Control Plane** (API, orchestration, governance) depends on port interfaces, not concrete agents
+- **Execution Plane** depends on interfaces defined by Control Plane ports
 - **External Agents** are completely isolated; never influence core logic
+- Cross-context communication uses domain events and explicit ports (CostEnforcer, AgentAdapter, …)
 
 ### Ports and Adapters
 
@@ -90,7 +92,7 @@ Draft → Validating → Published → Deprecated → Retired
 ### Runtime Entities (Execution Lifecycle)
 
 ```
-Pending → Running → Completed / Failed / Cancelled
+Pending → Running → Succeeded / Failed / Cancelled / Escalated (Task); AgentSession uses its own enum
 ```
 
 - Stored in SQLite/PostgreSQL

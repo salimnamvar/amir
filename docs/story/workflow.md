@@ -47,8 +47,11 @@ Acceptance:
 - Abstract intents (rollback_workspace_effects, …) mapped to durable_effects
 - Concrete actions: git revert, branch delete, PR close, artifact delete
 - Targets durable commits/branches/PRs — not already-cleaned workspaces
-- Default continue_on_compensation_failure=false: durable-effect failure → CompensationBlocked
-- EscalationSignal emitted for human resolution when blocked
+- Pre-execution verification: missing targets → status=verification_failed → escalate (no silent skip)
+- Mid-flight cost kill compensates from effects_log appended during execution
+- auto_commit_failed blocks cleanup until remediated
+- Default continue_on_compensation_failure=false: failure → CompensationBlocked
+- EscalationSignal with remediation_plan when blocked
 - Compensation events (Started/Executed/Failed/Blocked/Completed) emitted for audit
 ```
 

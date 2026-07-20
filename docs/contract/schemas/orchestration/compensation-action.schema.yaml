@@ -11,7 +11,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [action_type, target_ref, idempotency_key]
+required: [action_type, target_ref, idempotency_key, status]
 properties:
   action_type:
     type: string
@@ -163,3 +163,20 @@ properties:
     items:
       type: string
     description: "Structured remediation when status=failed (required for EscalationSignal path)"
+
+allOf:
+  - if:
+      properties:
+        status:
+          enum: [failed, verification_failed]
+      required: [status]
+    then:
+      required: [error, remediation_steps]
+      description: "Failed compensation MUST carry remediation for EscalationSignal path"
+  - if:
+      properties:
+        action_type:
+          const: rollback_workspace_effects
+      required: [action_type]
+    then:
+      description: "Workspace rollback SHOULD include durable_effects_snapshot for reverse-order replay"

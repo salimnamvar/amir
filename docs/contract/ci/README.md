@@ -17,7 +17,25 @@ Normative checks that MUST run on every change under `docs/contract/`.
    Schema validation must reject Sandbox instances with `environment=production` and `runtime=docker`. Omitting `environment` must fail (required field).
 
 5. **Shared enum consistency**  
-   Diff failure-category / observation-method enums against `schemas/shared-enums.schema.yaml` definitions.
+   Domain schemas MUST `$ref` `schemas/shared-enums.schema.yaml#/$defs/*` for FailureCategory /
+   TerminalFailureCategory / ValidatorFailureCategory / ParserStrategy / OutputMode where applicable.
+   Inline re-declaration of those enums is a CI failure.
+
+6. **Parser default chain order**  
+   `interfaces/parser-registry.yaml` `default_strategy_chain` MUST use fixed `prefixItems` order:
+   structured_output → tool_call_interception → markdown_block → workspace_observation.
+   Permutations and `llm_coercion` in the default chain must fail validation.
+
+7. **Task validation_budget required**  
+   Reject Task instances missing `validation_budget` with at least one of max_tokens/max_usd.
+
+8. **CostLease active bindings**  
+   Reject active CostLease without `scope` and `agent_session_id`; reject revoked without
+   cancellation_reason + revocation_revision + revocation_timestamp.
+
+9. **Allowlist profiles present**  
+   Every SandboxPolicy profile enum value (`llm_only`, `coding_standard`, `custom`) must have
+   expansion source under `allowlists/` except `custom` (inline).
 
 ## Suggested entrypoints (implementation)
 
@@ -25,8 +43,8 @@ Normative checks that MUST run on every change under `docs/contract/`.
 # Validate all YAML schemas parse
 find docs/contract/schemas -name '*.yaml' -print0 | xargs -0 -n1 python -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))'
 
-# Allowlist merge unit tests (from coding_standard test_vectors)
-python tools/ci/check_allowlist_merge.py docs/contract/allowlists/coding_standard.yaml
+# Allowlist merge unit tests (all profiles with test_vectors)
+python tools/ci/check_allowlist_merge.py docs/contract/allowlists/*.yaml
 
 # Markdown drift heuristic
 python tools/ci/check_no_schema_dumps.py docs/specification docs/story

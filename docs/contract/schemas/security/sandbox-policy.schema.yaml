@@ -127,3 +127,25 @@ properties:
   # Note: Durable effects (commits, PRs, branches) are NOT recorded on SandboxPolicy.
   # They live on Workspace.durable_effects / effects_log and CompensationAction
   # durable_effects_snapshot. SandboxPolicy is admission-control only (allowlist + runtime).
+
+allOf:
+  - if:
+      properties:
+        admission_decision:
+          const: deny
+      required: [admission_decision]
+    then:
+      required: [deny_reason]
+  - if:
+      properties:
+        environment:
+          const: production
+      required: [environment]
+    then:
+      properties:
+        allowed_runtime:
+          items:
+            type: string
+            enum: [gvisor, firecracker]
+          description: "Production: docker structurally excluded from allowed_runtime"
+

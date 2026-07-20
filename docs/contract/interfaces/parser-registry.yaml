@@ -21,17 +21,19 @@ properties:
   default_strategy_chain:
     type: array
     description: >
-      Ordered strategies (tuple). MUST be applied in this order; stop at first success.
-      llm_coercion is NOT included. workspace_observation is always last in the default chain.
-    items:
-      type: string
-      enum:
-        - structured_output
-        - tool_call_interception
-        - markdown_block
-        - workspace_observation
+      Fixed ordered tuple (prefixItems). MUST be applied in this exact order; stop at first success.
+      llm_coercion is NOT included. workspace_observation is always last.
+      Any permutation is schema-invalid.
+    prefixItems:
+      - const: structured_output
+      - const: tool_call_interception
+      - const: markdown_block
+      - const: workspace_observation
+    items: false
     minItems: 4
     maxItems: 4
+    # Canonical instance value for implementers / CI:
+    # [structured_output, tool_call_interception, markdown_block, workspace_observation]
 
   optional_strategies:
     type: array

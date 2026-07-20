@@ -15,12 +15,12 @@ CREATE TABLE tasks (
     attempts INTEGER DEFAULT 0,
     max_attempts INTEGER DEFAULT 3,
     -- retry_state (task-scoped); circuit breakers live on agent_scorecards
-    last_failure_category TEXT,  -- structural|semantic|policy|quality|timeout|infrastructure|cancelled|budget_exceeded|circuit_breaker_open
+    last_failure_category TEXT,  -- TerminalFailureCategory incl. behavioral|test_execution
     last_session_id UUID,
     escalated BOOLEAN DEFAULT FALSE,
     cost_budget_max_tokens INTEGER,
     cost_budget_max_usd REAL,
-    validation_budget_max_tokens INTEGER,  -- partitioned from execution budget
+    validation_budget_max_tokens INTEGER,  -- REQUIRED partitioned budget (at least one of tokens/usd)
     validation_budget_max_usd REAL,
     validation_budget_consumed_usd REAL DEFAULT 0,
     validation_lease_id UUID,
@@ -30,10 +30,16 @@ CREATE TABLE tasks (
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
     CHECK (cost_budget_max_tokens IS NOT NULL OR cost_budget_max_usd IS NOT NULL),
-    -- assigned/running require matching_decision_id (enforced at app layer + partial index)
+    CHECK (validation_budget_max_tokens IS NOT NULL OR validation_budget_max_usd IS NOT NULL),
+    -- assigned/running/validating require matching_decision_id
     CHECK (
-      status NOT IN ('assigned', 'running')
+      status NOT IN ('assigned', 'running', 'validating')
       OR matching_decision_id IS NOT NULL
+    ),
+    -- terminal failed/cancelled require last_failure_category
+    CHECK (
+      status NOT IN ('failed', 'cancelled')
+      OR last_failure_category IS NOT NULL
     )
 );
 
@@ -58,7 +64,7 @@ CREATE TABLE agent_sessions (
     validation_result_id UUID,  -- ID only; never embed full ValidationResult
     feedback_artifact_id UUID,  -- ID only; never embed full Feedback
     cost_record_id UUID,
-    last_failure_category TEXT,
+    last_failure_category TEXT,  -- TerminalFailureCategory; required when status in failed|cancelled|timed_out (app+CHECK)
     max_tokens INTEGER,
     max_usd REAL,
     timeout_seconds INTEGER NOT NULL,
@@ -74,6 +80,10 @@ CREATE TABLE agent_sessions (
     CHECK (
       status NOT IN ('starting', 'running', 'waiting_for_input', 'producing_artifact', 'validating')
       OR cost_lease_id IS NOT NULL
+    ),
+    CHECK (
+      status NOT IN ('failed', 'cancelled', 'timed_out')
+      OR last_failure_category IS NOT NULL
     )
 );
 
@@ -164,7 +174,7 @@ CREATE TABLE cost_leases (
     lease_id UUID PRIMARY KEY,
     idempotency_key TEXT UNIQUE NOT NULL,
     task_id UUID NOT NULL,
-    agent_session_id UUID,
+    agent_session_id UUID,  -- required when status=active (hard-kill target)
     budget_pool TEXT NOT NULL,  -- execution|validation
     reserved_usd REAL NOT NULL,
     reserved_tokens INTEGER NOT NULL,
@@ -187,9 +197,20 @@ CREATE TABLE cost_leases (
     expires_at TIMESTAMP,
     CHECK (
       status IS DISTINCT FROM 'revoked'
-      OR (cancellation_reason IS NOT NULL AND revocation_revision IS NOT NULL)
+      OR (
+        cancellation_reason IS NOT NULL
+        AND revocation_revision IS NOT NULL
+        AND revocation_timestamp IS NOT NULL
+      )
+    ),
+    CHECK (
+      status IS DISTINCT FROM 'active'
+      OR agent_session_id IS NOT NULL
     )
 );
+-- CostLease authority: Observability Context owns the gate; Execution holds cost_lease_id on session.
+-- Hierarchical cascade: CostEnforcer.revoke_by_scope revokes all active leases for team/tenant/org.
+
 
 CREATE TABLE idempotency_keys (
     key TEXT PRIMARY KEY,

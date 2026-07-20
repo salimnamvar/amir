@@ -45,7 +45,7 @@ REQUESTED → PLANNED → IMPLEMENTATION → TESTING → REVIEW → APPROVED →
 ### Task Specification
 
 
-> **Contract:** [`docs/contract/schemas/task.schema.yaml`](../contract/schemas/task.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/task.schema.yaml`](../contract/schemas/execution/task.schema.yaml)
 
 
 ### CompensationSpec
@@ -53,7 +53,7 @@ REQUESTED → PLANNED → IMPLEMENTATION → TESTING → REVIEW → APPROVED →
 Each workflow step declares compensation **intent** upfront. Concrete git/PR/artifact actions are resolved when the step records `durable_effects` on its Workspace. Compensation never depends on the ephemeral sandbox filesystem still existing.
 
 
-> **Contract:** [`docs/contract/schemas/compensation-action.schema.yaml`](../contract/schemas/compensation-action.schema.yaml)
+> **Contract:** [`docs/contract/schemas/orchestration/compensation-action.schema.yaml`](../contract/schemas/orchestration/compensation-action.schema.yaml)
 
 
 ### StepResult
@@ -61,7 +61,7 @@ Each workflow step declares compensation **intent** upfront. Concrete git/PR/art
 Each completed step records its result and compensation action:
 
 
-> **Contract:** [`docs/contract/schemas/step-result.schema.yaml`](../contract/schemas/step-result.schema.yaml)
+> **Contract:** [`docs/contract/schemas/orchestration/step-result.schema.yaml`](../contract/schemas/orchestration/step-result.schema.yaml)
 
 
 ## Compensation Model (Saga Pattern)
@@ -144,9 +144,21 @@ class CompensationExecutor:
 | Condition | Behavior |
 |-----------|----------|
 | Durable-effect compensation fails | Emit `Compensation.Failed` |
-| `continue_on_compensation_failure=false` (default) | Enter **CompensationBlocked**; emit `Escalation.Signal` (`compensation_blocked`) |
+| Target missing (stale PR/branch/commit) | Pre-check `verification.exists=false` → status **`verification_failed`**; emit EscalationSignal |
+| `continue_on_compensation_failure=false` (default) | Enter **CompensationBlocked**; emit `Escalation.Signal` (`compensation_blocked`) with `remediation_plan` |
 | Human acknowledges | Resume compensation, abort workflow, or manual remediate (`EscalationSignal.resolution`) |
 | `continue_on_compensation_failure=true` | Explicit opt-in only; log failure and continue stack (not recommended for git/PR effects) |
+| Mid-flight CostLease kill | Compensate from `Workspace.durable_effects.effects_log` (append-only during execution) |
+| `Workspace.status=auto_commit_failed` | Do **not** clean ephemeral FS; remediation before compensation targets are trusted |
+
+### Pre-execution verification (stale git/PR refs)
+
+Before each concrete action (`git_revert`, `branch_delete`, `pr_close`, …):
+
+1. Resolve `target` using `target_kind` (commit_sha, branch_name, pr_number, …).
+2. Check remote existence; record `verification.{exists, remote_checked, verified_at}`.
+3. If `exists=false` → set action `status=verification_failed`, require `error` + `remediation_steps`, escalate (do not silently skip).
+4. Merge commits, force-push races, and already-closed PRs are **verification/escalation** cases, not silent success.
 
 ### Compensation Guarantees
 
@@ -161,7 +173,7 @@ class CompensationExecutor:
 ### RetryPolicy
 
 
-> **Contract:** [`docs/contract/schemas/task.schema.yaml#retry_policy`](../contract/schemas/task.schema.yaml#retry_policy)
+> **Contract:** [`docs/contract/schemas/execution/task.schema.yaml#retry_policy`](../contract/schemas/execution/task.schema.yaml#retry_policy)
 
 
 ### Failure Handling Flow
@@ -186,7 +198,7 @@ retry_allowed?
 ## Approval Model
 
 
-> **Contract:** [`docs/contract/schemas/approval.schema.yaml`](../contract/schemas/approval.schema.yaml)
+> **Contract:** [`docs/contract/schemas/orchestration/approval.schema.yaml`](../contract/schemas/orchestration/approval.schema.yaml)
 
 
 ### Approval Escalation
@@ -194,7 +206,7 @@ retry_allowed?
 For critical workflows, approval can escalate:
 
 
-> **Contract:** [`docs/contract/schemas/approval.schema.yaml#escalation`](../contract/schemas/approval.schema.yaml#escalation)
+> **Contract:** [`docs/contract/schemas/orchestration/approval.schema.yaml#escalation`](../contract/schemas/orchestration/approval.schema.yaml#escalation)
 
 
 ## Durable Execution
@@ -214,7 +226,7 @@ The internal state machine MUST persist state transitions synchronously to maint
 ### Durable Execution Primitives
 
 
-> **Contract:** [`docs/contract/schemas/durable-execution-config.schema.yaml`](../contract/schemas/durable-execution-config.schema.yaml)
+> **Contract:** [`docs/contract/schemas/execution/durable-execution-config.schema.yaml`](../contract/schemas/execution/durable-execution-config.schema.yaml)
 
 
 ### Recovery Process

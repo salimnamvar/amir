@@ -1,0 +1,29 @@
+# Canonical llm_only network allowlist profile expansion
+# Authority: docs/contract/allowlists/llm_only.yaml
+# Used by SandboxPolicy profile expansion before intersection merge.
+# Platform LLM routes are always unioned AFTER intersection (see allowlist-merge.schema.yaml).
+
+profile: llm_only
+version: "1.0.0"
+description: >
+  Fixed expansion for agents that need only LLM provider reachability.
+  Tenant host list is empty; platform LLM routes are injected after intersection
+  so cost attribution always works. Use coding_standard when package registries
+  are required.
+
+# No additional hosts — platform LLM routes only (unioned post-intersection)
+hosts: []
+
+# Test vectors for CI validation of intersection merge
+test_vectors:
+  - name: empty_agent_sandbox_deny_all_except_platform
+    agent_set: []
+    sandbox_set: []
+    platform_llm_routes: ["api.openai.com", "api.anthropic.com"]
+    expected_effective: ["api.openai.com", "api.anthropic.com"]
+  - name: custom_host_intersected_away
+    agent_set: ["evil.example.com"]
+    sandbox_set: []
+    role_set: []
+    platform_llm_routes: ["api.openai.com"]
+    expected_effective: ["api.openai.com"]

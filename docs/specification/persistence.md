@@ -86,7 +86,7 @@ JSONL file with atomic appends can be replaced by Kafka producer with same schem
 ## Addressing Audit Concerns
 
 ### Workspace Persistence (All Audits)
-Workspace state persisted with baseline/current commit tracking enables reproduction of failed agent executions and workspace reuse across task retries.
+Workspace state persisted with baseline/current commit tracking enables reproduction of failed agent executions and durable_effects and observation retention across task retries (each attempt still gets a **new** Workspace; no filesystem reuse).
 
 ### Audit Immutability (All Audits)
 Append-only file storage with restricted permissions. linear hash-chained events with cryptographic signatures provide tamper-evidence.

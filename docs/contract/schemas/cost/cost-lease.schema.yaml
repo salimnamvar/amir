@@ -10,6 +10,15 @@
 # 5. AgentExecutor observes process exit, transitions AgentSession to cancelled with
 #    last_failure_category=budget_exceeded, then Workflow runs compensation on durable_effects.
 # 6. Durable effects are appended as created (not only at session completion).
+#
+# Hierarchical cascade model (normative — single-lease-per-session):
+# - Each in-flight session holds ONE active CostLease with scope=invocation
+#   (budget_pool=execution or validation). Parent budgets are running totals in Observability.
+# - On team/tenant/org hard breach: CostEnforcer.revoke_by_scope(scope, scope_id, reason)
+#   revokes ALL active leases attributed to that scope (team_id/tenant_id/org_id match).
+# - There is no parallel cancelled boolean — status=revoked is the sole kill signal.
+# - Soft/hard percentage thresholds for parent budgets are ops policy on Team.budget /
+#   CostSummary; defaults 80% soft / 100% hard are NOT schema fields on CostLease.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -21,6 +30,7 @@ required:
   - reserved_tokens
   - status
   - budget_pool
+  - scope
   - idempotency_key
   - lease_revision
 properties:
@@ -48,8 +58,7 @@ properties:
   # CostRecord.budget_pool also allows compensation and orchestration for
   # attribution-only spend (not hard-killed via lease; no CostLease for those).
   budget_pool:
-    type: string
-    enum: [execution, validation]
+    $ref: "../shared-enums.schema.yaml#/$defs/CostLeaseBudgetPool"
     description: >
       execution = agent/worker spend; validation = validator/repair spend.
       Validation budget cannot be stolen by execution and vice versa.
@@ -126,24 +135,15 @@ properties:
   # Lifecycle status (single source of truth — no separate cancelled boolean)
   # active → revoked (budget breach / manual) | expired | released (normal commit)
   status:
-    type: string
-    enum: [active, revoked, expired, released]
+    $ref: "../shared-enums.schema.yaml#/$defs/CostLeaseStatus"
     default: "active"
     description: >
-      Lease lifecycle. status=revoked is the sole cancellation signal;
-      Execution MUST terminate the session process (AgentSession.status=cancelled,
-      last_failure_category=budget_exceeded). Do not use a parallel cancelled flag.
+      Lease lifecycle. status=revoked is the SOLE cancellation signal (no cancelled flag).
+      Execution MUST terminate the session (AgentSession.status=cancelled,
+      last_failure_category=budget_exceeded).
 
   cancellation_reason:
-    type: string
-    enum:
-      - invocation_budget_exceeded
-      - team_budget_exceeded
-      - tenant_budget_exceeded
-      - org_budget_exceeded
-      - validation_budget_exceeded
-      - session_timeout
-      - manual_revocation
+    $ref: "../shared-enums.schema.yaml#/$defs/CancellationReason"
     description: "Why the lease was revoked (required when status=revoked)"
 
   # Whether a new attempt may retry after this revocation
@@ -156,9 +156,10 @@ properties:
 
   # Hierarchy attribution
   scope:
-    type: string
-    enum: [invocation, team, tenant, org]
-    description: "Budget scope this lease enforces"
+    $ref: "../shared-enums.schema.yaml#/$defs/CostLeaseScope"
+    description: >
+      Budget scope this lease enforces. Active session leases use scope=invocation.
+      Parent breach uses revoke_by_scope which sets cancellation_reason to team+|tenant+|org+.
 
   team_id:
     type: string
@@ -240,5 +241,38 @@ allOf:
         scope:
           const: org
       required: [scope]
+    then:
+      required: [org_id]
+  # Active leases must bind a session (hard-kill needs a process)
+  - if:
+      properties:
+        status:
+          const: active
+      required: [status]
+    then:
+      required: [agent_session_id]
+  # cancellation_reason must be consistent with scope when scope is parent-level
+  - if:
+      properties:
+        cancellation_reason:
+          const: team_budget_exceeded
+      required: [cancellation_reason]
+    then:
+      properties:
+        scope:
+          enum: [team, invocation]
+      required: [team_id]
+  - if:
+      properties:
+        cancellation_reason:
+          const: tenant_budget_exceeded
+      required: [cancellation_reason]
+    then:
+      required: [tenant_id]
+  - if:
+      properties:
+        cancellation_reason:
+          const: org_budget_exceeded
+      required: [cancellation_reason]
     then:
       required: [org_id]

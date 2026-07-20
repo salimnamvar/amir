@@ -1,11 +1,18 @@
 # Shared Enumerations
 # Single source of truth for cross-schema vocabularies.
-# Other schemas SHOULD $ref these definitions rather than re-declaring enums.
+# Other schemas MUST $ref these definitions rather than re-declaring enums.
+#
+# Failure category mapping (validator → session/task terminal):
+#   behavioral      → may map at boundary to quality (or stored as behavioral)
+#   test_execution  → may map at boundary to quality (or stored as test_execution)
+# TerminalFailureCategory is the full set used by AgentSession/Task for retry eligibility.
+# ValidatorFailureCategory is the set used by ValidationResult/Feedback error_categories.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/schemas/shared-enums"
 
 $defs:
+  # Full union of failure categories across validation + terminal session/task.
   FailureCategory:
     type: string
     enum:
@@ -20,8 +27,47 @@ $defs:
       - circuit_breaker_open
       - behavioral
       - test_execution
-    description: "Shared failure / error category vocabulary for Task, ValidationResult, Feedback"
+    description: >
+      Shared failure / error category vocabulary.
+      Validator-only categories (behavioral, test_execution) are valid on
+      ValidationResult and as TerminalFailureCategory for retry eligibility.
 
+  # Categories that may appear on ValidationResult / Feedback (no cancelled/circuit)
+  ValidatorFailureCategory:
+    type: string
+    enum:
+      - structural
+      - semantic
+      - policy
+      - quality
+      - behavioral
+      - test_execution
+      - timeout
+      - infrastructure
+      - budget_exceeded
+    description: "ValidationResult.error_categories and Feedback.validation_errors"
+
+  # Terminal failure on AgentSession / Task.retry_state (retry eligibility input)
+  TerminalFailureCategory:
+    type: string
+    enum:
+      - structural
+      - semantic
+      - policy
+      - quality
+      - timeout
+      - infrastructure
+      - cancelled
+      - budget_exceeded
+      - circuit_breaker_open
+      - behavioral
+      - test_execution
+    description: >
+      last_failure_category on AgentSession and Task.
+      When a validator emits behavioral/test_execution, Execution stores that
+      category (or maps to quality) before evaluating Task.retry_policy.retry_on.
+
+  # Default Task.retry_policy.retry_on (excludes budget_exceeded, cancelled, circuit_breaker_open)
   RetryableFailureCategory:
     type: string
     enum:
@@ -31,7 +77,11 @@ $defs:
       - quality
       - timeout
       - infrastructure
-    description: "Default Task.retry_policy.retry_on set"
+      - behavioral
+      - test_execution
+    description: >
+      Default Task.retry_policy.retry_on set.
+      budget_exceeded / cancelled / circuit_breaker_open excluded by default (escalate).
 
   ObservationMethod:
     type: string
@@ -57,6 +107,11 @@ $defs:
     type: string
     enum: [execution, validation, compensation, orchestration]
     description: "Cost attribution pool"
+
+  CostLeaseBudgetPool:
+    type: string
+    enum: [execution, validation]
+    description: "Pools that use synchronous CostLease hard-kill (not compensation/orchestration)"
 
   CostLeaseStatus:
     type: string
@@ -102,6 +157,9 @@ $defs:
       - failed
       - timed_out
       - cancelled
+    description: >
+      No compensating (Workflow-owned). No Correcting/Escalated (Task-owned).
+      Each retry attempt is a new session; status never re-enters running after validating.
 
   TaskStatus:
     type: string
@@ -114,6 +172,10 @@ $defs:
       - failed
       - cancelled
       - escalated
+    description: >
+      Success terminal is succeeded (not completed).
+      Event Task.Completed maps to status=succeeded.
+      Escalation is Task.status=escalated + EscalationSignal (not a session status).
 
   ApprovalStatus:
     type: string

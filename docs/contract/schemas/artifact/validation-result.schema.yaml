@@ -76,17 +76,7 @@ properties:
       required: [category, code, message]
       properties:
         category:
-          type: string
-          enum:
-            - structural
-            - semantic
-            - policy
-            - quality
-            - behavioral
-            - test_execution
-            - timeout
-            - infrastructure
-            - budget_exceeded
+          $ref: "../shared-enums.schema.yaml#/$defs/ValidatorFailureCategory"
         code:
           type: string
           description: "Machine-readable error code (e.g., SCHEMA_REQUIRED_FIELD)"

@@ -60,10 +60,11 @@ I want JIT secret injection
 So that secrets are not leaked
 
 Acceptance:
-- Secrets mounted as tmpfs
-- API keys routed through egress proxy
-- Secrets revoked after task completion (TTL)
-- No secrets in environment variables
+- Secrets injected only after SandboxAttestation verified
+- Prefer access_method=file (tmpfs) or proxy; env allowed only via SecretBinding (CLI agents)
+- API keys routed through egress proxy when applicable
+- Secrets revoked after session completion (TTL)
+- No host-level secret dumps outside SecretBinding
 ```
 
 ### US-SEC-005: Verifiable Audit Trail
@@ -97,7 +98,7 @@ Acceptance:
 ### US-SEC-007: Workspace Isolation
 ```
 As a Security Officer
-I want workspaces isolated
+I want each AgentSession attempt in an isolated workspace
 So that agents cannot access other tasks
 
 Acceptance:
