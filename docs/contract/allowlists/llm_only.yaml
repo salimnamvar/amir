@@ -15,15 +15,25 @@ description: >
 hosts: []
 
 # Test vectors for CI validation of intersection merge
+# Field names match allowlist-merge.schema.yaml inputs for consistency.
 test_vectors:
   - name: empty_agent_sandbox_deny_all_except_platform
-    agent_set: []
-    sandbox_set: []
-    platform_llm_routes: ["api.openai.com", "api.anthropic.com"]
-    expected_effective: ["api.openai.com", "api.anthropic.com"]
-  - name: custom_host_intersected_away
-    agent_set: ["evil.example.com"]
+    agent_profile: llm_only
     sandbox_set: []
     role_set: []
-    platform_llm_routes: ["api.openai.com"]
-    expected_effective: ["api.openai.com"]
+    platform_llm_routes: [api.openai.com, api.anthropic.com]
+    expected_effective: [api.openai.com, api.anthropic.com]
+  - name: llm_only_intersect_sandbox_deny_all_except_platform
+    agent_profile: llm_only
+    sandbox_set: [pypi.org, github.com]
+    role_set: []
+    platform_llm_routes: [api.openai.com]
+    expected_effective: [api.openai.com]
+  - name: llm_only_role_narrows
+    agent_profile: llm_only
+    sandbox_set: [api.openai.com]
+    role_set: [api.openai.com]
+    platform_llm_routes: [api.anthropic.com]
+    expected_effective: [api.anthropic.com]
+    # llm_only has no hosts, so even role narrowing results in empty intersection;
+    # only platform routes survive union.

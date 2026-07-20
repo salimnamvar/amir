@@ -15,7 +15,8 @@ All contracts use MAJOR.MINOR.PATCH format:
 Contracts must maintain backward compatibility with the previous MINOR version:
 
 ```
-Contract v1.2.x is compatible with v1.1.x
+Contract v1.2.x can consume v1.1.x data (backward compatible)
+Contract v1.1.x may reject v1.2.x data (forward incompatible)
 Contract v2.x.x is NOT compatible with v1.x.x
 ```
 
@@ -185,7 +186,8 @@ When deprecating a contract version:
 
 ## Contract Registry
 
-The Contract Registry (Configuration Context) owns all contract definitions:
+The Contract Registry (Configuration Context) owns all contract definitions.
+Registry shows representative published contracts. Full schema inventory: see [`README.md`](README.md).
 
 ```
 ContractRegistry

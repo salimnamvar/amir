@@ -47,14 +47,14 @@ properties:
           type: string
       agent_network_allowlist_profile:
         type: string
-        enum: [llm_only, coding_standard, custom]
+        enum: [llm_only, coding_standard, container_build, custom]
       sandbox_network_allowlist:
         type: array
         items:
           type: string
       sandbox_network_allowlist_profile:
         type: string
-        enum: [llm_only, coding_standard, custom]
+        enum: [llm_only, coding_standard, container_build, custom]
       role_required_network:
         type: array
         items:

@@ -130,6 +130,7 @@ properties:
   # Cost controls — at least one ceiling is mandatory (cost is a runtime invariant)
   cost_budget:
     type: object
+    minProperties: 1
     description: "Hard cost ceiling for execution pool; at least one of max_tokens or max_usd is required"
     properties:
       max_tokens:
@@ -153,6 +154,7 @@ properties:
   # REQUIRED — partitioned from execution; never optional (financial safety).
   validation_budget:
     type: object
+    minProperties: 1
     description: >
       REQUIRED budget for validation feedback loop; separate CostLease budget_pool=validation.
       sum(ValidationResult.validators[*].budget_usd) MUST be ≤ validation_budget.
@@ -213,6 +215,8 @@ properties:
         description: >
           Failure categories that trigger retry (items $ref TerminalFailureCategory).
           Default excludes budget_exceeded, cancelled, circuit_breaker_open (escalate).
+          circuit_breaker_open means the agent's circuit breaker tripped — tasks must
+          escalate to a different agent rather than retry on the same one.
           behavioral and test_execution are retryable by default (validator-origin categories).
           infrastructure included as typically transient.
       escalate_after:

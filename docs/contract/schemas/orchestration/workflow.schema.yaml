@@ -123,8 +123,10 @@ properties:
   compensation_stack:
     type: array
     description: >
-      LIFO stack of CompensationAction refs maintained by WorkflowInstance.
-      Popped and executed in reverse order on failure.
+      LIFO stack of CompensationAction reference handles maintained by WorkflowInstance.
+      Popped and executed in reverse order on failure. These are lightweight refs, not
+      full CompensationAction objects — the canonical CompensationAction with idempotency_key
+      lives in the orchestration compensation table.
     items:
       type: object
       required: [compensation_action_id, step_id]

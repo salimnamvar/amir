@@ -34,7 +34,7 @@ Normative checks that MUST run on every change under `docs/contract/`.
    cancellation_reason + revocation_revision + revocation_timestamp.
 
 9. **Allowlist profiles present**  
-   Every SandboxPolicy profile enum value (`llm_only`, `coding_standard`, `custom`) must have
+   Every SandboxPolicy profile enum value (`llm_only`, `coding_standard`, `container_build`, `custom`) must have
    expansion source under `allowlists/` except `custom` (inline).
 
 ## CI Check Entrypoints

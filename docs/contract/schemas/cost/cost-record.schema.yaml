@@ -40,8 +40,7 @@ properties:
   # Which budget pool was charged
   # execution/validation: gated by CostLease; compensation/orchestration: attribution only
   budget_pool:
-    type: string
-    enum: [execution, validation, compensation, orchestration]
+    $ref: "../shared-enums.schema.yaml#/$defs/BudgetPool"
     description: >
       Cost attribution pool. validation spend never charges execution lease.
       compensation and orchestration are not lease-gated (no hard-kill path);
@@ -114,8 +113,7 @@ properties:
     description: "LLM model used"
   
   parser_strategy_used:
-    type: string
-    enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
+    $ref: "../shared-enums.schema.yaml#/$defs/ParserStrategy"
     description: "Parser strategy that succeeded"
   
   retry_count:

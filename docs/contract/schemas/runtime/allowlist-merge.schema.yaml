@@ -70,3 +70,5 @@ properties:
     description: "Paths to allowlist test_vectors (e.g. allowlists/coding_standard.yaml#test_vectors)"
     default:
       - "docs/contract/allowlists/coding_standard.yaml#test_vectors"
+      - "docs/contract/allowlists/container_build.yaml#test_vectors"
+      - "docs/contract/allowlists/llm_only.yaml#test_vectors"

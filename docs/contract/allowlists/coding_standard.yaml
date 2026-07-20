@@ -37,25 +37,26 @@ hosts:
   - gitlab.com
 
 # Test vectors for CI validation of intersection merge
+# Field names match allowlist-merge.schema.yaml inputs for consistency.
 test_vectors:
   - name: agent_coding_intersect_sandbox_subset
     agent_profile: coding_standard
-    sandbox_hosts: [pypi.org, github.com]
-    role_required_network: []
-    expected_effective_before_platform:
-      - pypi.org
-      - github.com
+    sandbox_set: [pypi.org, github.com]
+    role_set: []
+    platform_llm_routes: []
+    expected_effective: [pypi.org, github.com]
   - name: empty_intersection_deny_all_except_platform
-    agent_hosts: [evil.example.com]
-    sandbox_hosts: [pypi.org]
-    role_required_network: []
-    expected_effective_before_platform: []
+    agent_profile: coding_standard
+    sandbox_set: []
+    role_set: []
+    platform_llm_routes: [api.openai.com]
+    expected_effective: [api.openai.com]
   - name: role_layer_narrows
     agent_profile: coding_standard
-    sandbox_profile: coding_standard
-    role_required_network: [pypi.org]
-    expected_effective_before_platform:
-      - pypi.org
+    sandbox_set: [pypi.org, github.com]
+    role_set: [pypi.org]
+    platform_llm_routes: []
+    expected_effective: [pypi.org]
 
 # Separate profile for roles that must pull base images (not default coding_standard).
 # Only assignable when role has explicit container-build capability; still subject to

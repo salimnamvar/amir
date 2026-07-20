@@ -187,8 +187,11 @@ Profiles expand **before** merge. Expansion is fixed by Configuration Context (p
 |---------|-----------|
 | `llm_only` | Expansion file [`allowlists/llm_only.yaml`](../contract/allowlists/llm_only.yaml) (empty host set); platform LLM routes unioned after intersection |
 | `coding_standard` | Canonical host list in [`allowlists/coding_standard.yaml`](../contract/allowlists/coding_standard.yaml) (package registries + git hosts; **no** Docker Hub); platform LLM routes unioned after intersection. Optional [`container_build`](../contract/allowlists/container_build.yaml) for image pulls only |
+| `container_build` | Base image pull destinations only ([`allowlists/container_build.yaml`](../contract/allowlists/container_build.yaml)); **not** part of `coding_standard`; must not be assigned without explicit role capability; production sandboxes still ban runtime=docker |
 | Merge algorithm | Machine contract: [`allowlist-merge.schema.yaml`](../contract/schemas/runtime/allowlist-merge.schema.yaml) (`const: intersection`) |
 | `custom` | Use `network_allowlist` as-is (no preset expansion); still subject to merge below |
+
+**Docker Hub exclusion**: Docker Hub (`registry-1.docker.io`) is excluded from the `coding_standard` profile. Agents requiring base image pulls must use the `container_build` profile, which is assignable only when the role has an explicit `container-build` capability. Production sandboxes always ban `runtime=docker` regardless of profile — `container_build` grants network reachability to registries, not the Docker runtime.
 
 Platform may extend the coding_standard registry via configuration with audit trail; tenants cannot broaden beyond SandboxPolicy ceiling.
 

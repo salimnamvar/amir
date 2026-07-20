@@ -93,6 +93,7 @@ properties:
   # Hard resource ceilings (structurally enforced)
   resource_limits:
     type: object
+    minProperties: 1
     required: [timeout_seconds]
     properties:
       max_tokens:

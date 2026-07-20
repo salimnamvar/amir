@@ -56,7 +56,7 @@ properties:
   
   network_allowlist_profile:
     type: string
-    enum: [llm_only, coding_standard, custom]
+    enum: [llm_only, coding_standard, container_build, custom]
     default: coding_standard
     description: "Preset expanded before enforcement; custom uses network_allowlist only"
   

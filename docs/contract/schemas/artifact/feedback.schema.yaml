@@ -25,7 +25,9 @@ properties:
       - strategy_change
       - agent_change
       - human_intervention
-    description: "Type of feedback / next control-plane action"
+    description: >
+      Type of feedback / next control-plane action.
+      strategy_change must not select llm_coercion (requires Approval flow, not feedback hint).
   
   previous_raw_output:
     type: string

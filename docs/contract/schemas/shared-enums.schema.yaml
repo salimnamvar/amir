@@ -116,12 +116,18 @@ $defs:
   BudgetPool:
     type: string
     enum: [execution, validation, compensation, orchestration]
-    description: "Cost attribution pool"
+    description: >
+      Cost attribution pool for CostRecord. execution/validation are lease-gated
+      (synchronous hard-kill via CostLease). compensation/orchestration are
+      attribution-only (no lease, no hard-kill path — recorded for rollup only).
+      For CostLease budget_pool, use CostLeaseBudgetPool (execution/validation only).
 
   CostLeaseBudgetPool:
     type: string
     enum: [execution, validation]
-    description: "Pools that use synchronous CostLease hard-kill (not compensation/orchestration)"
+    description: >
+      Pools that use synchronous CostLease hard-kill. compensation and orchestration
+      costs are NOT lease-gated; they are recorded on CostRecord with BudgetPool only.
 
   CostLeaseStatus:
     type: string

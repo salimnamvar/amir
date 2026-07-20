@@ -76,6 +76,8 @@ properties:
 #   -> { revoked_lease_ids: uuid[], count: int }
 #   - Hierarchical cascade: revokes ALL active leases attributed to team_id|tenant_id|org_id
 #   - cancellation_reason MUST be team_budget_exceeded | tenant_budget_exceeded | org_budget_exceeded
+#     (Implementations MUST reject other cancellation_reason values with a validation error;
+#     manual_revocation and invocation_budget_exceeded are per-lease, not per-scope cascade)
 #   - Each child lease gets status=revoked; sidecars hard-kill sessions ≤100ms
 #   - Emits EscalationSignal (cost_limit_exceeded) for team+ scope
 # ack_revocation(lease_id, session_id, ack_at) -> void

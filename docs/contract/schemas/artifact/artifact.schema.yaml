@@ -113,7 +113,11 @@ allOf:
     then:
       required: [coercion_approval_id]
 
-# CodeChangeArtifact - produced by developer agents
+# Contract-specific content shapes (reference definitions).
+# Discriminator: contract_type selects the expected content shape.
+# The root Artifact schema intentionally allows any content object; runtime validation
+# must dispatch on contract_type to the appropriate definition below.
+# CI check: implementations MUST validate content.shape against contract_type definitions.
 definitions:
   CodeChangeArtifact:
     type: object

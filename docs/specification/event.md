@@ -176,12 +176,12 @@ Publisher implementations (outbox / file JSONL / message queue) all accept `Doma
 
 ### File-Based Publisher (Fallback)
 
-Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml).
+For environments without a message queue, events are written to local JSONL files and shipped asynchronously. Each line is a complete `DomainEvent` JSON object. File rotation follows size/time limits. This is a fallback only — outbox is the primary path.
 
 
 ### Message Queue Publisher (Alternative)
 
-Publisher implementations (outbox / file JSONL / message queue) all accept `DomainEvent` and follow delivery semantics in the taxonomy tables. Outbox storage contract: [`sql/outbox.sql`](../contract/sql/outbox.sql) + [`outbox-entry.schema.yaml`](../contract/schemas/eventing/outbox-entry.schema.yaml).
+For high-throughput deployments, events are published to a message queue (Kafka, NATS, etc.) with at-least-once delivery. Partitioning key is `aggregate_id` to preserve per-aggregate ordering. This replaces the outbox table for scalable deployments.
 
 
 ## Event Retention Policies

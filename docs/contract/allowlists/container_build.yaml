@@ -16,22 +16,23 @@ hosts:
   - quay.io
 
 # Test vectors for CI validation of intersection merge
+# Field names match allowlist-merge.schema.yaml inputs for consistency.
 test_vectors:
   - name: container_build_intersect_sandbox_subset
     agent_profile: container_build
-    sandbox_hosts: [ghcr.io, registry-1.docker.io]
-    role_required_network: []
-    expected_effective_before_platform:
-      - ghcr.io
-      - registry-1.docker.io
+    sandbox_set: [ghcr.io, registry-1.docker.io]
+    role_set: []
+    platform_llm_routes: []
+    expected_effective: [ghcr.io, registry-1.docker.io]
   - name: container_build_empty_intersection
     agent_profile: container_build
-    sandbox_hosts: [pypi.org]
-    role_required_network: []
-    expected_effective_before_platform: []
+    sandbox_set: [pypi.org]
+    role_set: []
+    platform_llm_routes: []
+    expected_effective: []
   - name: container_build_role_narrows
     agent_profile: container_build
-    sandbox_profile: container_build
-    role_required_network: [ghcr.io]
-    expected_effective_before_platform:
-      - ghcr.io
+    sandbox_set: [ghcr.io, registry-1.docker.io]
+    role_set: [ghcr.io]
+    platform_llm_routes: []
+    expected_effective: [ghcr.io]
