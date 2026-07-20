@@ -182,3 +182,15 @@ allOf:
       properties:
         claim_reconciliation:
           required: [coercion_approval_id]
+  # observation_method=synthesized requires coercion_approval_id (workspace diff preferred; synthesized only with approval)
+  - if:
+      properties:
+        claim_reconciliation:
+          properties:
+            observation_method:
+              const: synthesized
+          required: [observation_method]
+    then:
+      properties:
+        claim_reconciliation:
+          required: [coercion_approval_id]
