@@ -149,7 +149,7 @@ Progress events emitted on state transitions. Continuous streaming available via
 CostRecord with multi-dimensional attribution. Hierarchical cost summaries. AgentScorecard derived from cost events.
 
 ### Audit Tamper-Evidence (Minimax/GLM)
-Merkle-chained events with sequence numbers and prev_hash. Periodic root-commit to external transparency log.
+linear hash-chained events with sequence numbers and prev_hash. Periodic root-commit to external transparency log.
 
 ### Replay Capability (Minimax)
 Full replay metadata on every AgentSession. Enables exact reproduction of agent execution for debugging.

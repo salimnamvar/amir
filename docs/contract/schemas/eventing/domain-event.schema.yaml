@@ -1,5 +1,10 @@
 # DomainEvent Contract Schema
 # Immutable envelope for all domain and audit-relevant events
+#
+# Hash chain (linear, per aggregate): events for a given aggregate_id form a
+# linear hash chain (not a Merkle tree). Single-writer per aggregate is required —
+# serialize outbox inserts via row-level lock on the aggregate or partition by
+# aggregate_id. Root events set causation_id null and prev_hash null/empty.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -10,10 +15,10 @@ required:
   - aggregate_id
   - aggregate_type
   - correlation_id
-  - causation_id
   - producer
   - timestamp
   - payload
+  - sequence
 properties:
   event_id:
     type: string
@@ -31,9 +36,9 @@ properties:
     format: uuid
     description: "Workflow / request correlation for distributed tracing"
   causation_id:
-    type: string
+    type: ["string", "null"]
     format: uuid
-    description: "ID of the event that caused this one"
+    description: "ID of the event that caused this one; null for root events"
   producer:
     type: string
     description: "Component that emitted the event"
@@ -52,10 +57,12 @@ properties:
   sequence:
     type: integer
     minimum: 0
-    description: "Monotonic sequence within the hash chain scope"
+    description: "Monotonic sequence within the linear hash chain scope (per aggregate_id)"
   prev_hash:
-    type: string
-    description: "SHA256 of previous event in the Merkle chain"
+    type: ["string", "null"]
+    description: >
+      SHA256 of previous event in the linear hash chain for this aggregate_id.
+      null for the first event in the chain. Required for sequence > 0 at write time.
   algorithm:
     type: string
     description: "Signature algorithm (e.g. Ed25519, ECDSA-P256)"
@@ -64,6 +71,8 @@ properties:
     description: "Signing key reference (KMS/HSM)"
   traceparent:
     type: string
-    description: "W3C trace context"
+    description: "W3C trace context (format: 00-{trace-id}-{span-id}-{flags})"
+    pattern: "^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$"
   tracestate:
     type: string
+    description: "W3C tracestate header value"

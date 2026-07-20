@@ -20,6 +20,7 @@ properties:
   total_invocations:
     type: integer
     minimum: 0
+    description: "Invocation count used for exploration_bonus cold-start computation"
   successful_invocations:
     type: integer
     minimum: 0
@@ -30,6 +31,15 @@ properties:
     type: number
     minimum: 0
     maximum: 1
+  # Explicit alias for exploration algorithm (equals total_invocations)
+  invocation_count:
+    type: integer
+    minimum: 0
+    description: "Same as total_invocations; explicit field for exploration_bonus formula"
+  staleness_seconds:
+    type: integer
+    minimum: 0
+    description: "Age of scorecard metrics since last_updated; routing applies exploration if stale"
   avg_cost_usd:
     type: number
     minimum: 0

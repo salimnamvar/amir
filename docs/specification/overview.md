@@ -8,7 +8,33 @@
 
 ## Audit Findings Synthesis
 
-### Round 5 Residual Hardening (This Pass)
+### Round 6 Multi-Audit Cleanup (This Pass)
+
+Cross-audit pass (copilot, deepseek, glm, grok, kimi, minimax, mistral, qwen, sakana, tinker). Not a redesign — contract seam repair + story alignment.
+
+| Priority | Issue | Resolution |
+|----------|-------|------------|
+| P0 | US-WORKFLOW-006 auto-approve true | Story aligned to `auto_approve=false` opt-in |
+| P0 | docker valid when environment omitted | `environment` **required** on Sandbox |
+| P0 | adapter_config always requires binary_path | `if/then` per adapter_type |
+| P0 | AgentSession embeds ValidationResult/Feedback | IDs only; lean aggregate |
+| P0 | workspace_id optional on session | **Required**; atomic with workspace create |
+| P0 | CostLease cancelled vs status dual signal | Collapsed to `status=revoked` + revision/ACK protocol |
+| P0 | synthesized without coercion_approval_id | `if/then` structural require |
+| P0 | error_categories missing validator types | Aligned with validator_type enum |
+| P1 | Missing SandboxPolicy / CostEnforcer | New contracts + coding_standard allowlist file |
+| P1 | Workflow missing stack/step_results | Fields + CompensationBlocked + DDL |
+| P1 | Idempotency gaps | Keys on Workflow, Approval, CostLease, MatchingDecision, Escalation, SecretBinding |
+| P1 | kill threshold only in stories | `kill_threshold_pct` on CostLease (default 95) |
+| P1 | validation budget not isolated | `budget_pool` on CostLease/CostRecord + validation_lease_id |
+| P1 | Role.required_network missing | Field + merge algorithm link |
+| P1 | CostRecord lacks tenant/org | Fields on CostRecord/CostSummary/Task |
+| P1 | EscalationSignal no recipient | `assigned_to` + channel + deadline |
+| P1 | Adapter cancel unbounded | 5s grace + cancellation_reason + process_supervision |
+| P2 | Merkle misnomer | Linear hash chain per aggregate + concurrency note |
+| P2 | SQL/DDL drift | execution/workflow/outbox/security/observability updated |
+
+### Round 5 Residual Hardening
 
 Focused correction of production-blocking gaps still open after the post–Round 4 hardening commit. Not a redesign.
 
@@ -68,7 +94,7 @@ Focused correction of production-blocking gaps still open after the post–Round
 |---------|--------|---------------------|
 | Delete agent-session.schema.yaml entirely | GLM | Session is the execution-first aggregate; telemetry fields are bounded and versioned |
 | Defer multi-dimensional scoring / cost hierarchy | Xiaomi | Complete-system design requires full routing and hierarchical cost; not optional complexity |
-| Drop Merkle audit chain | Xiaomi | Tamper-evidence is a stated differentiator; key lifecycle closes the gap |
+| Drop linear hash-chain audit chain | Xiaomi | Tamper-evidence is a stated differentiator; key lifecycle closes the gap |
 | Mandate MCP over CLI | Prior | CLI remains first-class; MCP is an adapter type |
 | Firecracker as sole runtime | Prior | gVisor default; Firecracker optional max-security |
 | Full Temporal as design requirement | Prior | WorkflowEngine interface seam only |
@@ -157,7 +183,7 @@ Specification and story markdown **reference** contracts; they no longer embed s
 | Temporal as mandatory engine | Interface seam only; durability via event-sourced WorkflowInstance |
 | Firecracker / eBPF mandatory | Optional max-security / hardening; gVisor remains production default |
 | PromptTemplate formal schema | Integrity via `template_hash` on CompiledPrompt; template structure is config, not runtime contract |
-| Merkle global sequence redesign | Per-aggregate chaining is production-viable; global sequence optimization is implementation detail |
+| hash-chain global sequence redesign | Per-aggregate chaining is production-viable; global sequence optimization is implementation detail |
 | Opening the protocol | Internal coherence first |
 | FS snapshot compensation as required | Durable git/PR/artifact effects remain the compensation target |
 | Algorithm pseudocode in specs | Behavior documentation (not structure); must not restate field lists |

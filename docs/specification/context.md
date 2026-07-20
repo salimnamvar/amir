@@ -102,7 +102,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - SandboxPolicy - Rules evaluated before sandbox/workspace creation
 - AccessPolicy - RBAC/ABAC rules (static or OPA)
 - SecretBinding - Per-session secret grants with TTL (see secret-binding.schema.yaml)
-- AuditEvent - Security-relevant state changes (Merkle-chained)
+- AuditEvent - Security-relevant state changes (linear hash-chained)
 - EgressProxy - Network egress control and token counting
 - SandboxAttestation - Runtime integrity verification
 
@@ -112,7 +112,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 
 ### Key Management (Attestation & Audit)
 
-Platform signing keys for SandboxAttestation and Merkle audit roots:
+Platform signing keys for SandboxAttestation and linear hash-chain audit roots:
 
 - Stored in KMS/HSM; referenced by `signing_key_ref` (never embedded private keys).
 - Rotation: dual-valid window where `previous_key_ref` verifies historical signatures.
@@ -222,6 +222,15 @@ ExecutionContext(Task.Assigned)
     → ObservabilityContext(CostLease.Released; Cost.Committed or Released)
 ```
 
-**Trust boundary**: The CostLease shared-state gate lives in Observability Context. Execution Context holds a lease token reference. The sidecar/egress proxy checks the lease **synchronously** on each metering tick (≤100ms); cancellation is immediate when lease expires or is revoked. Lease service unavailability is **fail-closed** (no further metered consumption).
+**Trust boundary**: The CostLease shared-state gate lives in Observability Context. Execution Context holds a lease token reference (`AgentSession.cost_lease_id`, required while status ∈ starting/running/waiting_for_input/producing_artifact/validating). The sidecar/egress proxy checks the lease **synchronously** on each metering tick (≤100ms) via `CostEnforcer.check_lease`; cancellation is immediate when lease status is `revoked`. Lease service unavailability is **fail-closed** (no further metered consumption). Kill triggers at `kill_threshold_pct` (default 95%) of reserved budget.
 
-**Post-cancel**: Sessions killed by lease terminate with `last_failure_category=budget_exceeded`. Default `retry_on` excludes `budget_exceeded` (no automatic retry into the same wall). Team/tenant/org kills emit `EscalationSignal` (`cost_limit_exceeded`). Durable effects already committed still enter the normal compensation path.
+**Kill protocol (normative)**:
+1. Observability revokes lease (`status=revoked`, `revocation_revision`, `cancellation_reason`).
+2. Sidecar observes revoke on next tick (or push); sends SIGTERM to sandbox process — **does not write Execution DB**.
+3. `AgentAdapter.cancel(handle, cancellation_reason, grace_period_seconds=5)` → SIGTERM → wait → SIGKILL → orphan reap; returns `cancel_acknowledged`.
+4. AgentExecutor observes process exit, sets `AgentSession.status=cancelled` and `last_failure_category=budget_exceeded` (not `failed`; skip normal validation path).
+5. Workflow compensation runs against `Workspace.durable_effects` (append-logged incrementally during execution so mid-flight kills still have targets).
+
+**Budget pools**: Execution and validation use separate CostLeases (`budget_pool=execution|validation`). Validation spend cannot consume the execution lease. Exhausted validation budget fails validation with `budget_exceeded` without killing execution.
+
+**Post-cancel**: Default `retry_on` excludes `budget_exceeded` (no automatic retry into the same wall). Team/tenant/org kills emit `EscalationSignal` (`cost_limit_exceeded`) with `assigned_to` and remediation plan.

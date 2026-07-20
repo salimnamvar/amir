@@ -69,7 +69,7 @@ Acceptance:
 ### US-SEC-005: Verifiable Audit Trail
 ```
 As a Compliance Officer
-I want Merkle-chained audit events
+I want linear hash-chained audit events
 So that tampering is detectable
 
 Acceptance:
@@ -91,7 +91,7 @@ Acceptance:
 - Hierarchical cost gate (4 levels)
 - Pre-flight estimation
 - Reservation protocol for concurrent tasks
-- Kill switch at 95% threshold
+- Kill switch at CostLease.kill_threshold_pct (default 95%; see cost-lease.schema.yaml)
 ```
 
 ### US-SEC-007: Workspace Isolation
@@ -124,5 +124,5 @@ Acceptance:
 - Security is enforced at Sandbox Manager level
 - gVisor mandatory in production; Docker dev-only
 - Egress proxy mandatory; host networking eliminated
-- Merkle-chained audit events for tamper-evidence
+- Linear hash-chained audit events for tamper-evidence
 - TTL-based secret revocation

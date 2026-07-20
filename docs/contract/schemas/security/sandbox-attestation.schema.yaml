@@ -14,6 +14,7 @@ required:
   - attestation_signature
   - signing_key_ref
   - attested_at
+  - expires_at
 properties:
   attestation_id:
     type: string
@@ -74,20 +75,36 @@ properties:
     default: ed25519
 
   # Key lifecycle (referenced, not embedded secrets)
+  # Verification during rotation: accept signatures from signing_key_ref or
+  # previous_key_ref while previous key_status is rotated (not revoked).
+  # Consult signed key registry; revoked keys invalidate historical attestations
+  # after revocation_timestamp for new verifications only.
   key_lifecycle:
     type: object
     properties:
       key_id:
         type: string
+      key_status:
+        type: string
+        enum: [active, rotated, revoked]
+        default: active
+        description: "Signing key status in the key registry"
       rotated_at:
         type: string
         format: date-time
       previous_key_ref:
         type: string
         description: "Prior key still valid for verification during rotation window"
+      previous_key_status:
+        type: string
+        enum: [active, rotated, revoked]
       compromise_revoked:
         type: boolean
         default: false
+      revocation_timestamp:
+        type: string
+        format: date-time
+        description: "When key was revoked (if key_status=revoked)"
 
   attested_at:
     type: string
@@ -96,4 +113,4 @@ properties:
   expires_at:
     type: string
     format: date-time
-    description: "Attestation validity end; sessions past this must re-attest"
+    description: "Attestation validity end (required); sessions past this must re-attest"

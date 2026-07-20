@@ -1,10 +1,17 @@
 # CompensationAction Contract Schema
 # Dual-layer saga compensation: abstract workflow intent + concrete durable effects
+#
+# Abstract → concrete mapping (canonical):
+#   rollback_workspace_effects → git_revert, branch_delete, pr_close
+#   delete_artifacts           → artifact_delete
+#   revoke_access              → revoke_access_token
+#   notify                     → send_notification
+#   custom                     → resource_cleanup (or custom parameters)
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [action_type, target_ref]
+required: [action_type, target_ref, idempotency_key]
 properties:
   action_type:
     type: string
@@ -15,31 +22,105 @@ properties:
       - notify
       - custom
     description: "Abstract compensation intent (Workflow Context)"
+
   target_ref:
     type: string
     description: "task_id or step_id whose durable_effects are compensated"
+
+  workflow_step_id:
+    type: string
+    description: "Workflow step that produced the durable effects"
+
+  produced_in_session_id:
+    type: string
+    format: uuid
+    description: "AgentSession whose Workspace.durable_effects are the compensation target"
+
+  idempotency_key:
+    type: string
+    description: "Idempotency key for this compensation action"
+
   parameters:
     type: object
+
+  # Snapshot of durable effects at compensation time (for replay verification)
+  durable_effects_snapshot:
+    type: object
+    description: "Copy of Workspace.durable_effects at the moment compensation was planned"
+    properties:
+      branch_name:
+        type: string
+      head_commit:
+        type: string
+      pr_number:
+        type: integer
+      remote_url:
+        type: string
+        format: uri
+      artifact_ids:
+        type: array
+        items:
+          type: string
+          format: uuid
+
   concrete_actions:
     type: array
     description: "Execution-context mapping resolved at step completion"
     items:
       type: object
-      required: [effect_type, target]
+      required: [effect_type, target, idempotency_key]
       properties:
         effect_type:
           type: string
-          enum: [git_revert, branch_delete, pr_close, artifact_delete, resource_cleanup]
+          enum:
+            - git_revert
+            - branch_delete
+            - pr_close
+            - artifact_delete
+            - resource_cleanup
+            - revoke_access_token
+            - send_notification
         target:
           type: string
-          description: "Commit SHA, branch name, PR number, or artifact id"
+          description: "Commit SHA, branch name, PR number, artifact id, or token ref"
+        idempotency_key:
+          type: string
+          description: "Per-concrete-action idempotency key"
         parameters:
           type: object
+        attempts:
+          type: integer
+          minimum: 0
+          default: 0
+          description: "Compensation attempt counter for this concrete action"
+        last_error_uri:
+          type: string
+          description: "URI to last error evidence when failed"
+        retry_policy:
+          type: object
+          properties:
+            max_attempts:
+              type: integer
+              minimum: 1
+              default: 3
+            backoff_seconds:
+              type: integer
+              minimum: 1
+              default: 30
+
   status:
     type: string
     enum: [pending, completed, failed, skipped]
+
   executed_at:
     type: string
     format: date-time
+
   error:
     type: string
+
+  remediation_steps:
+    type: array
+    items:
+      type: string
+    description: "Structured remediation when status=failed (required for EscalationSignal path)"

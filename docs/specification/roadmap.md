@@ -34,7 +34,7 @@
 |--------|---------|
 | Default | Static AllowDeny policies |
 | Extended | OPA integration for ABAC |
-| Audit | Merkle-chained events + transparency log |
+| Audit | linear hash-chained events + transparency log |
 
 ### Parser
 | Option | Technology |
@@ -57,7 +57,7 @@ All features are designed and specified. Implementation options vary by deployme
 | Policy | Static rules, OPA integration, Federated policy |
 | Observability | Structured logs, Prometheus metrics, Dedicated observability cluster |
 | Parser | 4-strategy default chain, Custom parser plugins |
-| Audit | File-based (WORM), Merkle-chained events, Transparency log |
+| Audit | File-based (WORM), linear hash-chained events, Transparency log |
 | Cost | Structural ceilings, Hierarchical cost gate, Pre-flight estimation + reservation |
 
 ---
@@ -73,4 +73,4 @@ All features are designed and specified. Implementation options vary by deployme
 | Agent Cascades Failures | 5 consecutive failures | Circuit breaker with quarantine |
 | Workflow State Loss | Event store corruption | Event sourcing with checkpoints |
 | Duplicate Side Effects | Idempotency check fails | Idempotency keys on all mutable operations |
-| Audit Tampering | Hash chain verification | Merkle-chained events + transparency log |
+| Audit Tampering | Hash chain verification | linear hash-chained events + transparency log |

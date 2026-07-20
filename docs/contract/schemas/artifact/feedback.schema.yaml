@@ -16,18 +16,30 @@ properties:
       type: string
     description: "Specific suggestions for correction"
   
-  suggested_strategy:
+  # Single control-plane decision field (removed redundant suggested_strategy)
+  feedback_strategy:
     type: string
-    enum: [retry_same, retry_different_agent, apply_corrections, human_intervention]
-    description: "Recommended next action"
+    enum:
+      - structural_hint
+      - semantic_hint
+      - strategy_change
+      - agent_change
+      - human_intervention
+    description: "Type of feedback / next control-plane action"
   
   previous_raw_output:
     type: string
-    description: "Agent's raw output for context"
+    maxLength: 10000
+    description: "Truncated agent raw output for context (max 10k chars); prefer previous_artifact_id for full content"
+
+  previous_artifact_id:
+    type: string
+    format: uuid
+    description: "Reference to previous attempt artifact (preferred over embedding previous_raw_output)"
   
   previous_artifact:
     type: object
-    description: "Previous attempt's artifact (if any)"
+    description: "Previous attempt's artifact summary (if any; non-authoritative display)"
   
   validation_errors:
     type: array
@@ -37,7 +49,16 @@ properties:
       properties:
         category:
           type: string
-          enum: [structural, semantic, policy, quality]
+          enum:
+            - structural
+            - semantic
+            - policy
+            - quality
+            - behavioral
+            - test_execution
+            - timeout
+            - infrastructure
+            - budget_exceeded
         code:
           type: string
           description: "Machine-readable error code"
@@ -61,25 +82,14 @@ properties:
     minimum: 1
     description: "Maximum allowed attempts"
   
-  feedback_strategy:
-    type: string
-    enum: [structural_hint, semantic_hint, strategy_change, agent_change]
-    description: "Type of feedback to inject"
-  
   # Advisory only — OutputParser / control plane decides strategy; agent does not.
+  # llm_coercion excluded: coercion requires Approval, not a feedback hint.
   parser_strategy_hint:
     type: string
-    enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
-    description: "Optional hint for the next parse chain; not binding on the agent"
+    enum: [structured_output, tool_call_interception, markdown_block, workspace_observation]
+    description: "Optional hint for the next parse chain; not binding; llm_coercion not allowed via hint"
 
   validation_result_id:
     type: string
     format: uuid
-    description: "ValidationResult that produced this feedback"
-
-  # Claim reconciliation reference (authoritative source is ValidationResult)
-  # When validation failure includes claim divergence, this references the canonical data.
-  claim_reconciliation_validation_id:
-    type: string
-    format: uuid
-    description: "Reference to ValidationResult.claim_reconciliation when workspace observation diverges from agent claims"
+    description: "ValidationResult that produced this feedback (canonical; owns claim_reconciliation)"

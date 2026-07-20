@@ -1,6 +1,6 @@
 # Role Contract Schema
 # Machine-readable contract for role definitions
-# Updated: Added prompt_template_ref
+# Updated: required_network for allowlist merge; capability $ref discipline
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -82,6 +82,7 @@ properties:
   
   # Capability requirements are objective hard filters + soft scoring inputs.
   # Subjective proficiency enums are prohibited; use tools/constraints instead.
+  # Items mirror Capability shape for hard-filter evaluation (skill + tools + network).
   required_capabilities:
     type: array
     items:
@@ -103,6 +104,18 @@ properties:
           type: boolean
           default: true
           description: "Whether this capability needs egress (package registries / LLM API)"
+
+  # Explicit network destinations required by this role (for allowlist merge).
+  # If empty/unset, treat as "no additional role constraint" — skip role layer
+  # in the intersection algorithm (do not zero the intersection).
+  required_network:
+    type: array
+    items:
+      type: string
+    default: []
+    description: >
+      Domain/hostname allowlist contributions from the role.
+      Used in: effective_allowlist = agent_set ∩ sandbox_set [∩ role_set if non-empty].
   
   prompt_template_ref:
     type: string

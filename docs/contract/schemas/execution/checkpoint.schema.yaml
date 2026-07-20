@@ -20,7 +20,8 @@ properties:
     format: date-time
   payload:
     type: object
-    description: "State-specific snapshot data"
+    maxProperties: 32
+    description: "State-specific snapshot data (bounded; large state must use external refs)"
   workspace_snapshot:
     type: string
     description: "Git commit or tree hash at this checkpoint"

@@ -2,13 +2,13 @@
 
 ## Overview
 
-Events in Amir are immutable facts representing state changes and business occurrences. All events follow a consistent structure enabling distributed tracing, replay, and debugging. Events are Merkle-chained for tamper-evidence.
+Events in Amir are immutable facts representing state changes and business occurrences. All events follow a consistent structure enabling distributed tracing, replay, and debugging. Events are linear hash-chained for tamper-evidence.
 
 ## Domain Event Envelope
 
 > **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
 
-Events are Merkle-chained (`sequence`, `prev_hash`, optional `signature` / `key_ref`). W3C `traceparent` / `tracestate` may be present.
+Events are linear hash-chained (`sequence`, `prev_hash`, optional `signature` / `key_ref`). W3C `traceparent` / `tracestate` may be present.
 
 
 ## Event Taxonomy
@@ -146,13 +146,18 @@ Compensation.Executed (correlation_id: W-123, step N-1)
 
 Enables audit trail reconstruction, error tracing, and workflow replay.
 
-## Hash Chain (Merkle Chaining)
+## Hash Chain (Linear Hash Chaining)
+
+Events form a **linear hash chain per aggregate_id** (not a Merkle tree). Scope of the chain is the aggregate instance.
 
 Every event includes:
-- `sequence`: Monotonically increasing integer
-- `prev_hash`: SHA256 of previous event's (event_id + sequence + prev_hash)
+- `sequence`: Monotonically increasing integer within the aggregate
+- `prev_hash`: SHA256 of previous event for this aggregate_id (`null` for the root event)
+- `causation_id`: may be `null` for root events
 
-Verification: recompute hash chain from first event. Any tampering breaks the chain.
+**Concurrency constraint (normative):** Single-writer per aggregate is required. Serialize outbox inserts via row-level lock on the aggregate row (or Kafka/DB partition keyed by `aggregate_id`) before writing the next chain event. Concurrent multi-pod writers without this serialization will break the chain.
+
+Verification: recompute hash chain from first event for the aggregate. Any tampering breaks the chain. Periodic root-commit of chain tips to an external transparency log is optional hardening.
 
 ---
 
@@ -194,7 +199,7 @@ Publisher implementations (outbox / file JSONL / message queue) all accept `Doma
 Single-writer per aggregate ensures ordering. Persistent storage provides atomicity. Outbox pattern ensures reliable delivery.
 
 ### Audit Tamper-Evidence (Minimax/GLM)
-Merkle-chained events with sequence numbers and prev_hash. Periodic root-commit to external transparency log.
+linear hash-chained events with sequence numbers and prev_hash. Periodic root-commit to external transparency log.
 
 ### Outbox Pattern (Kimi)
 Reliable event publishing via outbox table. Delivery semantics enforced by category.

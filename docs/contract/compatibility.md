@@ -26,21 +26,26 @@ This means:
 
 ## Compatibility Matrix
 
-| Contract Type | Backward Compatibility | Breaking Changes |
-|---------------|---------------------|-----------------|
-| AgentContract | N-1 minor | Removed required field, changed field type, removed capability |
-| TaskContract | N-1 minor | Changed objective format, removed role reference, removed idempotency_key, removed cost ceiling requirement |
-| ArtifactContract | N-1 minor | Schema structure change, required field removal, removed lineage fields |
-| WorkflowContract | N-1 minor | Removed state, changed transition structure, removed compensation config |
-| RoleContract | N-1 minor | Changed inputs/outputs structure, reintroduced subjective proficiency |
-| TeamContract | N-1 minor | Changed budget/quota structure, removed scoring_weights |
-| FeedbackContract | N-1 minor | Changed error category enum, removed correction suggestions |
-| AgentSessionContract | N-1 minor | Changed status enum, removed checkpoint structure, removed cost ceiling |
-| CostRecordContract | N-1 minor | Changed attribution fields, removed cost hierarchy |
-| MatchingDecisionContract | N-1 minor | Changed scoring dimensions, removed hard_filters, removed explanation |
-| CompiledPromptContract | N-1 minor | Changed template_hash semantics, removed output_contract |
-| ValidationResultContract | N-1 minor | Changed error category enum, removed claim_reconciliation |
-| SandboxAttestationContract | N-1 minor | Changed signature algorithm, removed signing_key_ref |
+Names match schema files under `schemas/` (see README catalog). Suffix "Contract" is not used in filenames.
+
+| Schema file | Backward Compatibility | Breaking Changes |
+|-------------|---------------------|-----------------|
+| `execution/agent.schema.yaml` | N-1 minor | Removed required field, changed field type, removed capability |
+| `execution/task.schema.yaml` | N-1 minor | Changed objective format, removed role reference, removed idempotency_key, removed cost ceiling requirement |
+| `artifact/artifact.schema.yaml` | N-1 minor | Schema structure change, required field removal, removed lineage fields |
+| `orchestration/workflow.schema.yaml` | N-1 minor | Removed state, changed transition structure, removed compensation config |
+| `matching/role.schema.yaml` | N-1 minor | Changed inputs/outputs structure, reintroduced subjective proficiency |
+| `team/team.schema.yaml` | N-1 minor | Changed budget/quota structure, removed scoring_weights |
+| `artifact/feedback.schema.yaml` | N-1 minor | Changed error category enum, removed correction suggestions |
+| `execution/agent-session.schema.yaml` | N-1 minor | Changed status enum, removed lean-session constraints, removed cost ceiling |
+| `cost/cost-record.schema.yaml` | N-1 minor | Changed attribution fields, removed cost hierarchy |
+| `cost/cost-lease.schema.yaml` | N-1 minor | Removed kill threshold, changed status/revocation semantics |
+| `matching/matching-decision.schema.yaml` | N-1 minor | Changed scoring dimensions, removed hard_filters, removed explanation |
+| `execution/compiled-prompt.schema.yaml` | N-1 minor | Changed template_hash semantics, removed output_contract |
+| `artifact/validation-result.schema.yaml` | N-1 minor | Changed error category enum, removed claim_reconciliation |
+| `security/sandbox.schema.yaml` | N-1 minor | Weakened production docker ban, removed environment requirement |
+| `security/sandbox-policy.schema.yaml` | N-1 minor | Changed merge algorithm away from intersection |
+| `security/sandbox-attestation.schema.yaml` | N-1 minor | Changed signature algorithm, removed signing_key_ref / expires_at |
 
 ## Contract Catalog
 

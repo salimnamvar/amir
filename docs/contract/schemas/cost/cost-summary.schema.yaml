@@ -1,5 +1,5 @@
 # CostSummary Contract Schema
-# Aggregated cost by period / team / agent
+# Aggregated cost by period / team / tenant / org / agent
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -14,6 +14,10 @@ properties:
   tenant_id:
     type: string
     format: uuid
+  org_id:
+    type: string
+    format: uuid
+    description: "Org for 4-level cost hierarchy rollup"
   agent_definition_id:
     type: string
     format: uuid
@@ -24,6 +28,9 @@ properties:
     type: number
     minimum: 0
   worker_cost_usd:
+    type: number
+    minimum: 0
+  validation_cost_usd:
     type: number
     minimum: 0
   total_tokens:

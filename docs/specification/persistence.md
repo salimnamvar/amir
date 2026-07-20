@@ -89,7 +89,7 @@ JSONL file with atomic appends can be replaced by Kafka producer with same schem
 Workspace state persisted with baseline/current commit tracking enables reproduction of failed agent executions and workspace reuse across task retries.
 
 ### Audit Immutability (All Audits)
-Append-only file storage with restricted permissions. Merkle-chained events with cryptographic signatures provide tamper-evidence.
+Append-only file storage with restricted permissions. linear hash-chained events with cryptographic signatures provide tamper-evidence.
 
 ### Event Sourcing (Tinker/Kimi)
 WorkflowInstance state derived from events. Event store provides full audit trail and enables replay for debugging.

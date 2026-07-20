@@ -1,16 +1,37 @@
 # CostLease Contract Schema
 # Synchronous cost lease / shared-state gate for in-flight session cancellation
 # Enables immediate cancellation when team/tenant/org limits are breached
+#
+# Kill protocol (normative):
+# 1. Observability marks lease status=revoked with revocation_revision + cancellation_reason.
+# 2. Sidecar/egress observes revoked status on next ≤100ms tick (or sooner via push).
+# 3. Sidecar sends SIGTERM to sandbox process; does NOT write Execution DB.
+# 4. AgentAdapter.cancel(handle, cancellation_reason, grace_period_seconds=5) → SIGTERM→SIGKILL.
+# 5. AgentExecutor observes process exit, transitions AgentSession to cancelled with
+#    last_failure_category=budget_exceeded, then Workflow runs compensation on durable_effects.
+# 6. Durable effects are appended as created (not only at session completion).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [lease_id, task_id, reserved_usd, reserved_tokens]
+required:
+  - lease_id
+  - task_id
+  - reserved_usd
+  - reserved_tokens
+  - status
+  - budget_pool
+  - idempotency_key
+  - lease_revision
 properties:
   lease_id:
     type: string
     format: uuid
     description: "Unique lease identifier"
+
+  idempotency_key:
+    type: string
+    description: "Idempotency key for lease reservation (required for all mutable ops)"
 
   task_id:
     type: string
@@ -21,6 +42,14 @@ properties:
     type: string
     format: uuid
     description: "Current session holding this lease"
+
+  # Which budget pool this lease meters (execution vs validation isolation)
+  budget_pool:
+    type: string
+    enum: [execution, validation]
+    description: >
+      execution = agent/worker spend; validation = validator/repair spend.
+      Validation budget cannot be stolen by execution and vice versa.
 
   # Reservation amounts
   reserved_usd:
@@ -46,6 +75,40 @@ properties:
     default: 0
     description: "Tokens consumed so far"
 
+  # Soft-kill threshold: process termination triggered at this % of reserved limit
+  kill_threshold_pct:
+    type: number
+    minimum: 50
+    maximum: 100
+    default: 95
+    description: >
+      Percentage of reserved_usd/reserved_tokens at which the lease is revoked.
+      Default 95 leaves headroom for in-flight tool completion before hard ceiling.
+
+  # Monotonic revision for lease state changes (create/heartbeat/commit/revoke)
+  lease_revision:
+    type: integer
+    minimum: 0
+    description: "Monotonic revision; every mutation increments"
+
+  revocation_revision:
+    type: integer
+    minimum: 0
+    description: "Revision at which status became revoked; required when status=revoked"
+
+  revocation_timestamp:
+    type: string
+    format: date-time
+    description: "When the lease was revoked"
+
+  # Sidecar must ACK revocation within this window or fail-closed
+  sidecar_ack_deadline_ms:
+    type: integer
+    minimum: 100
+    maximum: 30000
+    default: 5000
+    description: "Bounded window for sidecar to ACK lease revocation"
+
   # Time bounds
   created_at:
     type: string
@@ -56,23 +119,36 @@ properties:
     format: date-time
     description: "Absolute expiry for this lease"
 
-  # Status
+  # Lifecycle status (single source of truth — no separate cancelled boolean)
+  # active → revoked (budget breach / manual) | expired | released (normal commit)
   status:
     type: string
     enum: [active, revoked, expired, released]
     default: "active"
-    description: "Lease lifecycle state"
-
-  # Cancellation signal
-  cancelled:
-    type: boolean
-    default: false
-    description: "If true, in-flight sessions must terminate immediately"
+    description: >
+      Lease lifecycle. status=revoked is the sole cancellation signal;
+      Execution MUST terminate the session process (AgentSession.status=cancelled,
+      last_failure_category=budget_exceeded). Do not use a parallel cancelled flag.
 
   cancellation_reason:
     type: string
-    enum: [invocation_budget_exceeded, team_budget_exceeded, tenant_budget_exceeded, org_budget_exceeded, manual_revocation]
-    description: "Why the lease was cancelled"
+    enum:
+      - invocation_budget_exceeded
+      - team_budget_exceeded
+      - tenant_budget_exceeded
+      - org_budget_exceeded
+      - validation_budget_exceeded
+      - session_timeout
+      - manual_revocation
+    description: "Why the lease was revoked (required when status=revoked)"
+
+  # Whether a new attempt may retry after this revocation
+  retryable:
+    type: boolean
+    description: >
+      Computed from cancellation_reason: invocation_budget_exceeded and
+      session_timeout may be retryable with a higher budget; team+/org scope
+      and validation_budget_exceeded are not retryable by default (escalate).
 
   # Hierarchy attribution
   scope:
@@ -88,9 +164,13 @@ properties:
     type: string
     format: uuid
 
+  org_id:
+    type: string
+    format: uuid
+
   # Failure modes (design contract for implementers)
   # - Lease check is synchronous on each sidecar/egress metering tick (≤100ms).
-  # - cancelled=true or status=revoked → Execution MUST terminate the session process.
+  # - status=revoked → Execution MUST terminate the session process via Adapter.cancel.
   # - Lease service unavailable → fail-closed: treat as revoked for new consumption
   #   (no further LLM egress); complete in-flight tool step only if already started.
   # - Post-cancel terminal category is budget_exceeded (not retryable by default;
@@ -99,3 +179,12 @@ properties:
     type: boolean
     default: true
     description: "If lease service is unreachable, deny further metered consumption"
+
+# When revoked, cancellation_reason and revocation_revision are required
+allOf:
+  - if:
+      properties:
+        status:
+          const: revoked
+    then:
+      required: [cancellation_reason, revocation_revision, revocation_timestamp]

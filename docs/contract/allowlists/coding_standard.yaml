@@ -1,0 +1,58 @@
+# Canonical coding_standard network allowlist profile expansion
+# Authority: docs/contract/allowlists/coding_standard.yaml
+# Used by SandboxPolicy profile expansion before intersection merge.
+# Platform LLM routes are always unioned AFTER intersection (see sandbox-policy.schema.yaml).
+
+profile: coding_standard
+version: "1.0.0"
+description: >
+  Fixed expansion for coding agents: common package registries.
+  LLM provider routes are injected separately by the platform (not listed here)
+  so they cannot be broadened or removed by tenant profile edits.
+
+# Hostnames expanded when network_allowlist_profile=coding_standard
+hosts:
+  # Python
+  - pypi.org
+  - files.pythonhosted.org
+  # Node / JS
+  - registry.npmjs.org
+  - registry.yarnpkg.com
+  # Go
+  - proxy.golang.org
+  - sum.golang.org
+  # Rust
+  - crates.io
+  - static.crates.io
+  # Java / Maven
+  - repo.maven.apache.org
+  - repo1.maven.org
+  # Ruby
+  - rubygems.org
+  # Container images (common)
+  - ghcr.io
+  - registry-1.docker.io
+  # Git hosting (clone/push for durable effects)
+  - github.com
+  - gitlab.com
+
+# Test vectors for CI validation of intersection merge
+test_vectors:
+  - name: agent_coding_intersect_sandbox_subset
+    agent_profile: coding_standard
+    sandbox_hosts: [pypi.org, github.com]
+    role_required_network: []
+    expected_effective_before_platform:
+      - pypi.org
+      - github.com
+  - name: empty_intersection_deny_all_except_platform
+    agent_hosts: [evil.example.com]
+    sandbox_hosts: [pypi.org]
+    role_required_network: []
+    expected_effective_before_platform: []
+  - name: role_layer_narrows
+    agent_profile: coding_standard
+    sandbox_profile: coding_standard
+    role_required_network: [pypi.org]
+    expected_effective_before_platform:
+      - pypi.org

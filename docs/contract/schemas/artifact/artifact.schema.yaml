@@ -1,6 +1,6 @@
 # Artifact Contract Schema
 # Machine-readable contract for artifacts produced by agents
-# Updated: Added lineage, observation method, and idempotency
+# Updated: lineage, observation method, idempotency, coercion approval enforcement
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -68,30 +68,31 @@ properties:
     format: uuid
     description: "Artifact ID this artifact replaces"
   
-  # Observation method
+  # Observation method (how content was derived — distinct from ParserStrategy)
+  # ParserStrategy (structured_output, tool_call_interception, …) lives on ValidationResult.
+  # ObservationMethod describes the ground-truth relationship of the artifact to the workspace.
   observation_method:
     type: string
     enum: [workspace_diff, parser_extracted, agent_claims, synthesized]
-    description: "How artifact was derived. workspace_diff is preferred ground truth. synthesized requires llm_coercion approval (coercion_approval_id) and is not default."
+    description: >
+      How artifact was derived. workspace_diff is preferred ground truth.
+      synthesized requires llm_coercion approval (coercion_approval_id) and is not default.
+      Do NOT embed claim_reconciliation here — reference ValidationResult only.
 
-  # Reference to canonical claim reconciliation (ValidationResult)
-  # The complete claim_reconciliation data is held on ValidationResult;
-  # this reference enables workspace-ground-truth lookup without duplication.
-  claim_reconciliation_validation_id:
+  # Single canonical pointer to ValidationResult (which owns claim_reconciliation).
+  # Do not add a second claim_reconciliation_validation_id field — one ID only.
+  validation_result_id:
     type: string
     format: uuid
-    description: "Reference to ValidationResult.claim_reconciliation for authoritative claim vs workspace comparison"
+    description: >
+      Reference to ValidationResult for this artifact. ValidationResult holds the
+      canonical claim_reconciliation; do not duplicate that structure on Artifact.
 
   # When llm_coercion is used, synthesized is required and approval_id must be set
   coercion_approval_id:
     type: string
     format: uuid
-    description: "Required when observation_method=synthesized; references Approval that authorized coercion override"
-
-  validation_result_id:
-    type: string
-    format: uuid
-    description: "Reference to ValidationResult for this artifact"
+    description: "Required when observation_method=synthesized; references Approval with status=granted that authorized coercion"
 
   sandbox_attestation_id:
     type: string
@@ -103,6 +104,15 @@ properties:
     type: string
     enum: [produced, validated, accepted, rejected]
     default: "produced"
+
+# Structural enforcement: synthesized artifacts require coercion approval
+allOf:
+  - if:
+      properties:
+        observation_method:
+          const: synthesized
+    then:
+      required: [coercion_approval_id]
 
 # CodeChangeArtifact - produced by developer agents
 definitions:

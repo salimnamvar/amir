@@ -1,6 +1,12 @@
 # Agent Session Schema
 # Central durable execution aggregate. AgentInvocation is the request DTO that
 # creates a session; runtime truth lives here (checkpoints, cost, validation, workspace).
+#
+# Lean-aggregate invariant (anti–God Object):
+# Session retains only: identity, status, references, latest metering snapshot,
+# recent ring-buffer ID samples for debugging, and replay metadata IDs.
+# Full ValidationResult / Feedback live in their own tables (IDs only here).
+# Full checkpoint/tool-call histories live in event streams / linked tables.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -13,6 +19,7 @@ required:
   - status
   - idempotency_key
   - resource_limits
+  - workspace_id
 properties:
   session_id:
     type: string
@@ -48,6 +55,9 @@ properties:
     format: uuid
     description: "Previous session ID (for retry chain)"
   
+  # Status enum excludes compensating — compensation is a WorkflowInstance concern
+  # that operates on durable_effects after the session has terminated.
+  # CostLease revocation → cancelled with last_failure_category=budget_exceeded.
   status:
     type: string
     enum:
@@ -59,10 +69,11 @@ properties:
       - validating
       - succeeded
       - failed
-      - compensating
       - timed_out
       - cancelled
   
+  # Required: every session owns exactly one workspace for its lifetime.
+  # Session create MUST be atomic with workspace creation.
   workspace_id:
     type: string
     format: uuid
@@ -106,15 +117,12 @@ properties:
       - required: [max_usd]
   
   # --- Aggregate hygiene (anti–God Object) ---
-  # High-frequency data lives in event streams / linked tables, not the session document.
-  # Session retains only: identity, status, references, latest metering snapshot,
-  # recent ring-buffer samples for debugging, and replay metadata IDs.
-  #
   # Full histories:
   #   checkpoints  → checkpoints table + AgentSession.Checkpoint events
   #   tool_calls   → tool_call_events stream + AgentSession.ToolCall events
   #   resource_usage history → CostRecord + Cost.Recorded events
-  # Session document holds at most a recent sample window (ring buffer).
+  #   validation   → ValidationResult table (validation_result_id only)
+  #   feedback     → Feedback table (feedback_artifact_id only)
 
   # Recent checkpoint IDs only; full Checkpoint rows are linked artifacts/events
   recent_checkpoint_ids:
@@ -125,21 +133,14 @@ properties:
       format: uuid
     description: "Ring buffer of latest checkpoint IDs; authoritative store is checkpoints table / events"
 
-  # Optional embedded recent checkpoints for hot-path recovery (bounded)
-  checkpoints:
-    type: array
-    maxItems: 20
-    description: "Recent checkpoint samples only; not the full history"
-    items:
-      $ref: "checkpoint.schema.yaml"
-
-  # Recent tool-call samples only; full history is ToolCallEvent stream
-  tool_calls:
+  # Recent tool-call IDs only (not embedded full objects)
+  recent_tool_call_ids:
     type: array
     maxItems: 50
-    description: "Ring buffer of recent tool calls for debugging; full history in event stream"
     items:
-      $ref: "tool-call.schema.yaml"
+      type: string
+      format: uuid
+    description: "Ring buffer of recent tool-call IDs; full history in event stream"
 
   tool_call_event_stream_ref:
     type: string
@@ -162,16 +163,16 @@ properties:
         type: integer
         minimum: 1
   
+  # References only — never embed full ValidationResult or Feedback
   validation_result_id:
     type: string
     format: uuid
     description: "Reference to standalone ValidationResult contract"
 
-  validation_result:
-    $ref: "../artifact/validation-result.schema.yaml"
-  
-  feedback_artifact:
-    $ref: "../artifact/feedback.schema.yaml"
+  feedback_artifact_id:
+    type: string
+    format: uuid
+    description: "Reference to Feedback artifact (if retry path produced one)"
   
   # Live metering (sidecar); not the durable CostRecord
   # For long-running sessions, this is the latest snapshot; full history in CostRecord.
@@ -195,6 +196,23 @@ properties:
     type: string
     format: uuid
     description: "Authoritative CostRecord in Observability Context"
+
+  # Failure attribution for retry eligibility (set on terminal failure/cancel)
+  last_failure_category:
+    type: string
+    enum:
+      - structural
+      - semantic
+      - policy
+      - quality
+      - timeout
+      - infrastructure
+      - cancelled
+      - budget_exceeded
+      - circuit_breaker_open
+    description: >
+      Terminal failure category. CostLease revocation MUST set budget_exceeded
+      and transition status to cancelled (not failed).
   
   replay_metadata:
     $ref: "replay-metadata.schema.yaml"
@@ -207,3 +225,11 @@ properties:
     type: string
     format: date-time
 
+# cost_lease_id required when session is actively consuming budget
+allOf:
+  - if:
+      properties:
+        status:
+          enum: [starting, running, waiting_for_input, producing_artifact, validating]
+    then:
+      required: [cost_lease_id]

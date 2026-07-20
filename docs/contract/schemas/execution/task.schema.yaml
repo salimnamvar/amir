@@ -36,6 +36,31 @@ properties:
     type: string
     description: "Role to perform this task"
 
+  # Hierarchy attribution (4-level cost hierarchy)
+  team_id:
+    type: string
+    format: uuid
+  tenant_id:
+    type: string
+    format: uuid
+  org_id:
+    type: string
+    format: uuid
+
+  # Lifecycle status
+  status:
+    type: string
+    enum:
+      - pending
+      - assigned
+      - running
+      - succeeded
+      - failed
+      - cancelled
+      - escalated
+    default: pending
+    description: "Task lifecycle; assigned/running require matching_decision_id"
+
   # Input artifacts
   inputs:
     type: array
@@ -99,7 +124,7 @@ properties:
   # Cost controls — at least one ceiling is mandatory (cost is a runtime invariant)
   cost_budget:
     type: object
-    description: "Hard cost ceiling; at least one of max_tokens or max_usd is required"
+    description: "Hard cost ceiling for execution pool; at least one of max_tokens or max_usd is required"
     properties:
       max_tokens:
         type: integer
@@ -112,15 +137,20 @@ properties:
         minimum: 0
         maximum: 50
         default: 10
-        description: "Extra headroom reserved beyond estimate to reduce mid-flight kills"
+        description: "Extra headroom reserved beyond estimate; applied when creating CostLease"
     anyOf:
       - required: [max_tokens]
       - required: [max_usd]
 
   # Validation/repair budget — partitioned from execution budget to prevent starvation
+  # Enforced via a separate CostLease with budget_pool=validation.
   validation_budget:
     type: object
-    description: "Budget reserved for validation feedback loop; separate from agent execution budget"
+    description: >
+      Budget reserved for validation feedback loop; separate from agent execution budget.
+      sum(ValidationResult.validators[*].budget_usd) MUST be ≤ validation_budget.
+      Exhaustion emits last_failure_category=budget_exceeded on the validation path
+      without consuming execution CostLease.
     properties:
       max_tokens:
         type: integer
@@ -137,6 +167,11 @@ properties:
     anyOf:
       - required: [max_tokens]
       - required: [max_usd]
+
+  validation_lease_id:
+    type: string
+    format: uuid
+    description: "CostLease (budget_pool=validation) for the current validation cycle"
 
   # Retry policy (task-scoped attempt accounting — NOT a circuit breaker)
   # retry_on values align with last_failure_category vocabulary for computable retry eligibility
@@ -159,9 +194,28 @@ properties:
         type: array
         items:
           type: string
-          enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]
-        default: ["structural", "semantic", "policy", "quality", "timeout"]
-        description: "Failure categories that trigger retry; budget_exceeded excluded by default (escalate instead)"
+          enum:
+            - structural
+            - semantic
+            - policy
+            - quality
+            - timeout
+            - infrastructure
+            - cancelled
+            - budget_exceeded
+            - circuit_breaker_open
+        default:
+          - structural
+          - semantic
+          - policy
+          - quality
+          - timeout
+          - infrastructure
+        description: >
+          Failure categories that trigger retry. budget_exceeded excluded by default
+          (escalate instead). infrastructure included because sandbox/network failures
+          are typically transient. cancelled is human/operator cancel — only retry if
+          re-queued by operator; budget-driven cancels use budget_exceeded.
       escalate_after:
         type: integer
         minimum: 1
@@ -177,17 +231,32 @@ properties:
         type: integer
         minimum: 0
         default: 0
+        description: "Incremented by Task saga coordinator in the same transaction as AgentSession create"
       consecutive_failures:
         type: integer
         minimum: 0
         default: 0
       last_failure_category:
         type: string
-        enum: [structural, semantic, policy, quality, timeout, infrastructure, cancelled, budget_exceeded]
+        enum:
+          - structural
+          - semantic
+          - policy
+          - quality
+          - timeout
+          - infrastructure
+          - cancelled
+          - budget_exceeded
+          - circuit_breaker_open
         description: "Category of last failure; used for retry eligibility and routing decisions"
       last_session_id:
         type: string
         format: uuid
+      validation_budget_consumed_usd:
+        type: number
+        minimum: 0
+        default: 0
+        description: "Cumulative validation spend across attempts"
       escalated:
         type: boolean
         default: false
@@ -198,7 +267,23 @@ properties:
     format: uuid
     description: "Workspace for the current attempt; prior attempts retain their own workspaces until cleaned"
 
+  previous_workspace_ids:
+    type: array
+    items:
+      type: string
+      format: uuid
+    description: "Lineage of prior attempt workspaces"
+
   matching_decision_id:
     type: string
     format: uuid
     description: "MatchingDecision that selected the current agent"
+
+# matching_decision_id required when assigned or running
+allOf:
+  - if:
+      properties:
+        status:
+          enum: [assigned, running]
+    then:
+      required: [matching_decision_id]

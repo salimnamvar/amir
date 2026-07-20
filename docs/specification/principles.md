@@ -111,7 +111,7 @@ Pending → Running → Completed / Failed / Cancelled
 All events use `DomainEvent` with:
 - event_id, event_type, aggregate_id, aggregate_type
 - correlation_id, causation_id, producer, version, timestamp, payload
-- sequence, prev_hash (for Merkle chain)
+- sequence, prev_hash (for linear hash chain)
 
 ### Outbox Pattern
 
@@ -124,7 +124,7 @@ Domain events published via outbox for reliable delivery. Delivery semantics by 
 - Every agent execution is fully isolated
 - All outbound traffic through egress proxy (host mode eliminated)
 - Secrets never stored with code; injected via tmpfs with TTL
-- All actions logged and traceable via Merkle-chained audit
+- All actions logged and traceable via linear hash-chained audit
 
 ### Defense in Depth
 

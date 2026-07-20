@@ -20,7 +20,7 @@ The core architectural insight: **CLI agents are unreliable, non-deterministic p
 
 ✅ **Security-First Architecture** - Zero-trust execution with mandatory gVisor isolation, egress proxy, and just-in-time secrets
 
-✅ **Observable Operations** - Full audit trails, Merkle-chained events, and structured logging for compliance
+✅ **Observable Operations** - Full audit trails, linear hash-chained events, and structured logging for compliance
 
 ✅ **Scalable Design** - Horizontal scaling from 5 to 1000+ agents with documented evolution paths
 
@@ -59,7 +59,7 @@ The core architectural insight: **CLI agents are unreliable, non-deterministic p
 - Mandatory egress proxy (host mode eliminated)
 - Just-in-time secret injection with TTL
 - Runtime attestation for sandbox integrity
-- Merkle-chained audit events
+- linear hash-chained audit events
 - Pluggable policy engine (static default, OPA optional)
 
 ### Observability
@@ -110,7 +110,7 @@ The core architectural insight: **CLI agents are unreliable, non-deterministic p
 | Artifact Recovery | Automatic via workspace observation + feedback loop |
 | Sandbox Security | Mandatory gVisor/Firecracker in production |
 | Cost Control | Hierarchical enforcement with reservation |
-| Audit Completeness | Merkle-chained events with tamper-evidence |
+| Audit Completeness | linear hash-chained events with tamper-evidence |
 
 ---
 
@@ -137,5 +137,5 @@ The vision has been hardened based on three rounds of architecture audits:
 - **Idempotency** (Claude/Kimi): All mutable operations keyed
 - **Circuit Breaker** (Xiaomi/Sakana): Per-agent failure quarantine
 - **Agent Scorecard** (ChatGPT/Grok): Historical performance for routing
-- **Verifiable Audit** (Minimax/GLM): Merkle-chained events
+- **Verifiable Audit** (Minimax/GLM): linear hash-chained events
 - **Prompt Compiler** (Minimax/Kimi): Reproducible prompt artifacts

@@ -1,15 +1,24 @@
 # IdempotencyKey Contract Schema
 # Outcome store for idempotent mutable operations
+# Required for: Task, AgentSession, Artifact, Workflow, Approval, CostLease,
+# MatchingDecision, EscalationSignal, SecretBinding, CompensationAction
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [key, operation_type, created_at]
+required: [key, operation_type, scope, created_at]
 properties:
   key:
     type: string
+    description: "Opaque idempotency key (e.g. SHA256 of natural key material)"
   operation_type:
     type: string
+    description: "e.g. task.create, session.create, lease.reserve, workflow.start"
+  scope:
+    type: string
+    enum: [global, tenant, team, task, agent]
+    default: global
+    description: "Collision scope; keys are unique within scope"
   outcome:
     type: object
     description: "Serialized successful result for replay on duplicate request"

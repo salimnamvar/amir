@@ -1,11 +1,13 @@
 # Sandbox Contract Schema
 # Complete schema for sandbox configuration
 # Updated: Mandatory gVisor, egress proxy, attestation
+# P0 fix: environment is required (JSON Schema default is not a validation keyword;
+# omitting environment previously allowed docker to pass structural validation).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [runtime, network_mode]
+required: [runtime, network_mode, environment]
 properties:
   # Runtime type (gVisor mandatory in production)
   runtime:
@@ -58,13 +60,13 @@ properties:
     default: coding_standard
     description: "Preset expanded before enforcement; custom uses network_allowlist only"
   
-  # Production constraint: docker runtime is invalid when environment=production
-  # Structural enforcement is at schema root via if/then (NOT under properties).
+  # Production constraint: docker runtime is invalid when environment=production.
+  # REQUIRED so the root-level if/then always evaluates; default alone is not validation.
   environment:
     type: string
     enum: [development, staging, production]
     default: production
-    description: "Deployment environment. Default production; docker only valid in development/staging."
+    description: "Deployment environment (required). docker only valid in development/staging."
   
   # Resource limits
   resource_limits:
@@ -102,9 +104,9 @@ properties:
         default: true
         description: "Verify container image signature"
 
-# Structural enforcement: docker runtime is illegal when environment is production
-# (or omitted — default production). if/then MUST be at schema root, not under properties.
-# Missing environment still matches: properties-only if-subschema does not require the key.
+# Structural enforcement: docker runtime is illegal when environment is production.
+# if/then MUST be at schema root, not under properties.
+# environment is in required[] so the if condition always has a value to match.
 if:
   properties:
     environment:

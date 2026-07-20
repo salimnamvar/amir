@@ -4,27 +4,61 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [step_id, status]
+required: [step_id, status, sequence]
 properties:
+  step_result_id:
+    type: string
+    format: uuid
+
   step_id:
     type: string
+
   task_id:
     type: string
     format: uuid
+
   session_id:
     type: string
     format: uuid
+
   status:
     type: string
-    enum: [pending, running, succeeded, failed, compensated, skipped]
+    enum:
+      - pending
+      - running
+      - succeeded
+      - failed
+      - compensated
+      - compensation_blocked
+      - skipped
+    description: "compensation_blocked when concrete compensation fails and continue_on_compensation_failure=false"
+
   sequence:
     type: integer
     minimum: 0
+    description: "Ordering key; step_results must be ordered by sequence"
+
   compensation:
     $ref: "compensation-action.schema.yaml"
+
+  durable_effects_snapshot:
+    type: object
+    description: "Workspace.durable_effects captured at step completion (for compensation)"
+    properties:
+      branch_name:
+        type: string
+      head_commit:
+        type: string
+      pr_number:
+        type: integer
+      remote_url:
+        type: string
+        format: uri
+
   started_at:
     type: string
     format: date-time
+
   completed_at:
     type: string
     format: date-time

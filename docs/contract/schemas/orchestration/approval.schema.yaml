@@ -1,11 +1,21 @@
 # Approval Contract Schema
 # Complete schema for approval tracking
+# auto_approve defaults to false (safe); cancelled status for workflow abort during pending.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [workflow_id, gate_name, status]
+required: [workflow_id, gate_name, status, idempotency_key]
 properties:
+  approval_id:
+    type: string
+    format: uuid
+    description: "Unique approval identifier"
+
+  idempotency_key:
+    type: string
+    description: "Idempotency key for approval request / grant"
+
   # References
   workflow_id:
     type: string
@@ -14,12 +24,22 @@ properties:
   gate_name:
     type: string
     description: "Name of approval gate"
+
+  # Approval type (extends for coercion approvals)
+  approval_type:
+    type: string
+    enum: [workflow_gate, coercion, manual]
+    default: workflow_gate
+    description: "workflow_gate = normal transition; coercion = llm_coercion synthesis; manual = operator"
   
   # Approval status
   status:
     type: string
-    enum: [pending, auto_approved, granted, rejected, expired]
+    enum: [pending, auto_approved, granted, rejected, expired, cancelled]
     default: "pending"
+    description: >
+      pending → auto_approved (when auto_approve=true) or granted (human) or rejected
+      or expired or cancelled (workflow aborted while waiting).
   
   # Timing
   requested_at:
@@ -29,11 +49,16 @@ properties:
   responded_at:
     type: string
     format: date-time
+    description: "Required when status is granted, rejected, auto_approved, or cancelled"
   
   # Approver info
   approver_id:
     type: string
     description: "Who approved (empty for auto-approved)"
+
+  approver_role:
+    type: string
+    description: "Role of approver (required for approval_type=coercion)"
   
   # Gate configuration
   auto_approve:
@@ -45,6 +70,12 @@ properties:
     type: integer
     minimum: 1
     default: 86400
+
+  # TTL for granted coercion approvals
+  expires_at:
+    type: string
+    format: date-time
+    description: "When a granted approval expires (especially for coercion)"
 
   # Escalation chain for multi-approver / critical gates
   escalation:
@@ -74,4 +105,6 @@ properties:
 
   context:
     type: object
-    description: "What the approver sees (non-authoritative display payload)"
+    description: >
+      Non-authoritative display payload for the approver UI.
+      MUST NOT be used for authorization decisions.

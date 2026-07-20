@@ -123,6 +123,9 @@ class CompensationExecutor:
                         target_type="workflow_instance",
                         target_id=workflow.id,
                         reason=str(e),
+                        assigned_to=workflow.team_oncall_id,  # required recipient
+                        remediation_plan=action.remediation_steps,
+                        safe_abort_available=True,
                     ))
                     return CompensationResult(blocked=True, ...)
                 # Explicit opt-in only: log and continue remaining actions

@@ -79,7 +79,7 @@ Acceptance:
 - CostLease sync hard-kill gate (sidecar/egress checks every tick ≤100ms)
 - Pre-flight estimation with buffer; reservation/commit/release
 - Sidecar proxy counts tokens in real-time
-- Process killed at 95% of invocation limit
+- Process killed at CostLease.kill_threshold_pct (default 95%) of reserved limit
 - Higher-level hard breach cancels in-flight work via lease revoke
 - budget_exceeded is not retried by default; team+ emits EscalationSignal
 - validation_budget partitioned from execution budget

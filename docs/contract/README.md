@@ -83,6 +83,7 @@ Authorization, sandbox configuration, secret injection, network egress.
 | EgressProxy | `schemas/security/egress-proxy.schema.yaml` |
 | PolicyEngine | `schemas/security/policy-engine.schema.yaml` |
 | Sandbox | `schemas/security/sandbox.schema.yaml` |
+| SandboxPolicy | `schemas/security/sandbox-policy.schema.yaml` |
 | SandboxAttestation | `schemas/security/sandbox-attestation.schema.yaml` |
 | SecretBinding | `schemas/security/secret-binding.schema.yaml` |
 
@@ -132,6 +133,15 @@ Team definitions, role bindings, agent bindings, budgets.
 | AgentAdapter | `interfaces/agent-adapter.yaml` |
 | WorkflowEngine | `interfaces/workflow-engine.yaml` |
 | ParserRegistry | `interfaces/parser-registry.yaml` |
+| CostEnforcer | `interfaces/cost-enforcer.yaml` |
+
+## Allowlist Profiles (`allowlists/`)
+
+| Profile | File |
+|---------|------|
+| coding_standard | `allowlists/coding_standard.yaml` |
+
+Used by SandboxPolicy profile expansion before intersection merge. Platform LLM routes are always unioned after intersection.
 
 ## Rules for Authors
 
@@ -139,3 +149,4 @@ Team definitions, role bindings, agent bindings, budgets.
 2. **New behavior** → update markdown; if structure changes, update the contract in the same change.
 3. **No field dumps in MD** — link to the contract path instead.
 4. **Examples in MD** may show *values* of a contract (short instance snippets) only when needed for clarity; they must not redefine the schema.
+5. **Idempotency** — all mutable operations require `idempotency_key` (see `idempotency-key.schema.yaml`).

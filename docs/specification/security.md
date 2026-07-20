@@ -147,7 +147,7 @@ LLM Provider
 
 > **Contract:** [`docs/contract/schemas/secret-binding.schema.yaml`](../contract/schemas/secret-binding.schema.yaml)
 
-SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/proxy, and revokes on session end. Storage: [`sql/security.sql`](../contract/sql/security.sql).
+SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/proxy, and revokes on session end. Secrets are injected only after SandboxAttestation is verified (`sandbox_attestation_id` on the binding). When `single_use=true`, consumption proof (`consumed_at`, `consumer_session_id`, `consumption_signature`) is required on transition to `status=used`. Storage: [`sql/security.sql`](../contract/sql/security.sql).
 
 
 ### Runtime Attestation
@@ -161,7 +161,7 @@ SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/pro
 |-------|----------|
 | Generation | Keys created in KMS/HSM; only public material leaves the HSM |
 | Rotation | New key becomes primary; previous_key_ref remains valid for verification window |
-| Signing | Attestations and Merkle roots use current primary key |
+| Signing | Attestations and hash-chain roots use current primary key |
 | Compromise | Mark key revoked; stop signing; historical events verify with known public keys |
 | Audit | All key ops emit AuditEvents |
 
@@ -170,7 +170,9 @@ SecretBroker fetches from vault, creates bindings with TTL, mounts via tmpfs/pro
 - `network_mode: proxy` is required for cloud LLM CLIs.
 - `network_mode: none` is only for offline/local tools (no provider API).
 - Empty allowlist = **deny-all** except platform-injected LLM provider routes for cost attribution.
-- Security evaluates SandboxPolicy; Execution owns the Workspace aggregate.
+- Security evaluates SandboxPolicy at admission; Execution owns the Workspace aggregate.
+
+> **Contracts:** [`sandbox-policy.schema.yaml`](../contract/schemas/security/sandbox-policy.schema.yaml), [`sandbox.schema.yaml`](../contract/schemas/security/sandbox.schema.yaml) (`environment` required; docker illegal when `environment=production`)
 
 ### Network Allowlist Profile Expansion
 
@@ -179,7 +181,7 @@ Profiles expand **before** merge. Expansion is fixed by Configuration Context (p
 | Profile | Expansion |
 |---------|-----------|
 | `llm_only` | Platform-managed LLM provider routes only (injected by egress for cost attribution; not editable by agents) |
-| `coding_standard` | `llm_only` ∪ package registries: `pypi.org`, `files.pythonhosted.org`, `registry.npmjs.org`, `registry.yarnpkg.com`, `proxy.golang.org`, `sum.golang.org`, `crates.io`, `static.crates.io`, `rubygems.org`, `repo.maven.apache.org`, `index.crates.io` |
+| `coding_standard` | Canonical host list in [`allowlists/coding_standard.yaml`](../contract/allowlists/coding_standard.yaml) (package registries + git hosts); platform LLM routes unioned after intersection |
 | `custom` | Use `network_allowlist` as-is (no preset expansion); still subject to merge below |
 
 Platform may extend the coding_standard registry via configuration with audit trail; tenants cannot broaden beyond SandboxPolicy ceiling.
@@ -212,7 +214,7 @@ Principles:
 
 ### Verifiable Audit Log
 
-Events are Merkle-chained for tamper-evidence:
+Events are linear hash-chained for tamper-evidence:
 
 
 > **Contract:** [`docs/contract/schemas/domain-event.schema.yaml`](../contract/schemas/domain-event.schema.yaml)
@@ -251,7 +253,7 @@ Events are Merkle-chained for tamper-evidence:
 | Artifact tampering | MEDIUM | SHA256 checksums, provenance tracking |
 | Cost explosion | HIGH | Hierarchical cost gate with reservation protocol |
 | Agent impersonation | MEDIUM | AgentScorecard, capability verification |
-| Audit tampering | MEDIUM | Merkle-chained events, external transparency log |
+| Audit tampering | MEDIUM | linear hash-chained events, external transparency log |
 | Agent-to-agent escape | HIGH | Separate sandboxes, no shared filesystem |
 
 ---

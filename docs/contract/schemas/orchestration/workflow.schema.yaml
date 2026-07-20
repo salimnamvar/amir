@@ -1,13 +1,13 @@
 # Workflow Contract Schema
-# Complete schema for workflow templates
-# Updated: Added compensation specs and step results
+# Complete schema for workflow templates and runtime instance state
+# Updated: compensation stack, step results, CompensationBlocked, idempotency
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [name, states]
+required: [name, states, idempotency_key]
 properties:
-  # Template identity
+  # Template / instance identity
   name:
     type: string
     description: "Workflow name (lowercase, machine-readable)"
@@ -21,6 +21,31 @@ properties:
     type: string
     description: "Workflow version (SemVer)"
     pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+  workflow_instance_id:
+    type: string
+    format: uuid
+    description: "Runtime instance id (set when instantiated)"
+
+  idempotency_key:
+    type: string
+    description: "Idempotency key for workflow creation / start"
+
+  # Runtime status for instances (includes reserved CompensationBlocked)
+  instance_status:
+    type: string
+    enum:
+      - pending
+      - running
+      - awaiting_approval
+      - succeeded
+      - failed
+      - compensating
+      - compensation_blocked
+      - escalated
+      - rejected
+      - cancelled
+    description: "WorkflowInstance lifecycle status"
   
   # State machine definition
   states:
@@ -53,6 +78,7 @@ properties:
         approval_gate:
           type: boolean
           default: false
+          description: "When true, requires Approval (auto_approve defaults to false)"
         timeout_seconds:
           type: integer
           minimum: 1
@@ -70,15 +96,79 @@ properties:
           type: string
         trigger:
           type: string
-          enum: [on_complete, on_approve, on_timeout, on_fail, on_compensate, on_compensation_blocked]
+          enum:
+            - on_complete
+            - on_approve
+            - on_timeout
+            - on_fail
+            - on_compensate
+            - on_compensation_blocked
+            - on_reject
+            - on_cancel
 
-  # Events for compensation lifecycle
+  # Events for compensation lifecycle (informational catalog; taxonomy in event.md)
   events:
-    - Compensation.Started
-    - Compensation.Executed
-    - Compensation.Failed
-    - Compensation.Blocked  # Triggers human escalation
-    - Escalation.Signal
+    type: array
+    items:
+      type: string
+    default:
+      - Compensation.Started
+      - Compensation.Executed
+      - Compensation.Failed
+      - Compensation.Blocked
+      - Escalation.Signal
+    description: "Compensation-related events this workflow may emit"
+  
+  # LIFO compensation stack (runtime) — abstract intents pushed as steps complete
+  compensation_stack:
+    type: array
+    description: >
+      LIFO stack of CompensationAction refs maintained by WorkflowInstance.
+      Popped and executed in reverse order on failure.
+    items:
+      type: object
+      required: [compensation_action_id, step_id]
+      properties:
+        compensation_action_id:
+          type: string
+          format: uuid
+        step_id:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+          description: "AgentSession that produced the durable_effects to compensate"
+        pushed_at:
+          type: string
+          format: date-time
+
+  # Ordered step execution history (references StepResult)
+  step_results:
+    type: array
+    description: "Ordered by sequence; must match StepResult.sequence ordering invariant"
+    items:
+      type: object
+      required: [step_result_id, sequence]
+      properties:
+        step_result_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          minimum: 0
+        step_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, compensated, compensation_blocked, skipped]
+
+  current_step_id:
+    type: string
+    description: "Currently executing step id (if any)"
+
+  durable_execution_config_ref:
+    type: string
+    description: "Reference to DurableExecutionConfig for timeouts/heartbeats"
   
   # Compensation configuration
   compensation:
@@ -91,13 +181,14 @@ properties:
         type: string
         enum: [reverse_order, parallel, selective]
         default: "reverse_order"
+        description: "reverse_order = LIFO (default saga semantics)"
       max_compensation_attempts:
         type: integer
         minimum: 1
         default: 3
       # Compensation failure handling:
-      # - continue_on_compensation_failure=false (default) causes COMPENSATION_BLOCKED state
-      # - COMPENSATION_BLOCKED triggers human escalation via EscalationSignal
+      # - continue_on_compensation_failure=false (default) → instance_status=compensation_blocked
+      # - compensation_blocked triggers human escalation via EscalationSignal
       continue_on_compensation_failure:
         type: boolean
         default: false
@@ -105,4 +196,4 @@ properties:
       escalation_on_blocked:
         type: boolean
         default: true
-        description: "Emit EscalationSignal when entering COMPENSATION_BLOCKED state"
+        description: "Emit EscalationSignal when entering compensation_blocked state"

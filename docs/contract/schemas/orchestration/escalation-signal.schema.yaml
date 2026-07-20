@@ -4,12 +4,22 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [signal_id, target_type, target_id, escalation_type]
+required:
+  - signal_id
+  - target_type
+  - target_id
+  - escalation_type
+  - idempotency_key
+  - assigned_to
 properties:
   signal_id:
     type: string
     format: uuid
     description: "Unique escalation identifier"
+
+  idempotency_key:
+    type: string
+    description: "Idempotency key for escalation creation"
 
   target_type:
     type: string
@@ -35,6 +45,32 @@ properties:
   reason:
     type: string
     description: "Human-readable reason for escalation"
+
+  # Recipient (required for actionable escalations)
+  assigned_to:
+    type: string
+    description: "Team or user ID expected to respond"
+
+  notification_channel:
+    type: string
+    enum: [email, slack, pagerduty, webhook, in_app]
+    description: "How to notify the assignee"
+
+  response_deadline:
+    type: string
+    format: date-time
+    description: "When a response is required by"
+
+  remediation_plan:
+    type: array
+    items:
+      type: string
+    description: "Structured remediation steps (especially for compensation_blocked)"
+
+  safe_abort_available:
+    type: boolean
+    default: true
+    description: "Whether operator can choose safe abort without further compensation"
 
   triggered_at:
     type: string

@@ -1,5 +1,6 @@
 # ValidationResult Contract Schema
 # Structured structural + semantic validation outcome for artifacts and sessions
+# Canonical owner of claim_reconciliation (Artifact/Feedback reference by ID only).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -63,8 +64,11 @@ properties:
         budget_usd:
           type: number
           minimum: 0
-          description: "Budget allocated to this validator run"
+          description: >
+            Budget allocated to this validator run. Sum of all validators'
+            budget_usd MUST be ≤ Task.validation_budget (enforced by Execution).
 
+  # Aligned with validator_type so every validator failure can produce a category
   error_categories:
     type: array
     items:
@@ -73,7 +77,16 @@ properties:
       properties:
         category:
           type: string
-          enum: [structural, semantic, policy, quality]
+          enum:
+            - structural
+            - semantic
+            - policy
+            - quality
+            - behavioral
+            - test_execution
+            - timeout
+            - infrastructure
+            - budget_exceeded
         code:
           type: string
           description: "Machine-readable error code (e.g., SCHEMA_REQUIRED_FIELD)"
@@ -93,8 +106,7 @@ properties:
       type: string
 
   # Canonical claim reconciliation (authoritative). Artifact and Feedback reference
-  # this via claim_reconciliation_validation_id / validation_result_id — they MUST
-  # NOT duplicate this structure.
+  # this via validation_result_id — they MUST NOT duplicate this structure.
   claim_reconciliation:
     type: object
     description: >
@@ -107,9 +119,10 @@ properties:
       claims_match_observation:
         type: boolean
         description: "True when agent/parser claims are consistent with workspace state"
+      # authoritative_source is fixed to workspace; retained as const for explicit audit.
       authoritative_source:
         type: string
-        enum: [workspace]
+        const: workspace
         default: workspace
         description: "Always workspace; parser/agent claims never override filesystem ground truth"
       baseline_commit:
@@ -142,6 +155,11 @@ properties:
         type: string
         enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
         description: "Which ParserRegistry strategy produced the claims being reconciled"
+      # Required when parser_strategy_used=llm_coercion
+      coercion_approval_id:
+        type: string
+        format: uuid
+        description: "Approval authorizing llm_coercion (required when strategy is llm_coercion)"
 
   validation_duration_ms:
     type: integer
@@ -154,3 +172,17 @@ properties:
   completed_at:
     type: string
     format: date-time
+
+# llm_coercion requires approval reference on claim reconciliation
+allOf:
+  - if:
+      properties:
+        claim_reconciliation:
+          properties:
+            parser_strategy_used:
+              const: llm_coercion
+          required: [parser_strategy_used]
+    then:
+      properties:
+        claim_reconciliation:
+          required: [coercion_approval_id]

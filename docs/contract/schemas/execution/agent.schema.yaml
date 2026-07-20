@@ -1,5 +1,6 @@
 # Agent Contract Schema
 # Machine-readable contract for agent registration and invocation
+# P0 fix: adapter_config requirements are conditional on adapter_type (if/then).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -22,7 +23,7 @@ properties:
     description: "Agent version (SemVer format)"
     pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
   
-  # Adapter Configuration (strict)
+  # Adapter Configuration
   adapter_type:
     type: string
     enum: [cli, mcp, api, remote]
@@ -30,22 +31,34 @@ properties:
   
   adapter_config:
     type: object
-    required: [binary_path]
     properties:
       binary_path:
         type: string
-        description: "Path to CLI binary (REQUIRED for cli type)"
+        description: "Path to CLI binary (required when adapter_type=cli)"
       working_directory:
         type: string
         description: "Working directory for execution"
       endpoint:
         type: string
-        description: "API endpoint URL (REQUIRED for api type)"
+        description: "API endpoint URL (required when adapter_type=api or remote)"
         pattern: "^https?://"
       protocol:
         type: string
         enum: [http, grpc, jsonrpc]
         default: "http"
+      command:
+        type: string
+        description: "MCP server command (required when adapter_type=mcp)"
+      command_args:
+        type: array
+        items:
+          type: string
+        description: "MCP server command arguments"
+      env:
+        type: object
+        additionalProperties:
+          type: string
+        description: "Environment variables for the adapter process"
   
   # Capabilities (for routing)
   capabilities:
@@ -100,7 +113,10 @@ properties:
         description: >
           coding_standard expands to LLM provider + common package registries;
           llm_only is provider endpoints only; custom uses network_allowlist as-is.
-  # Supported output modes (control-plane extraction strategies)
+  
+  # Supported extraction modes the agent/adapter can feed (control-plane strategies).
+  # workspace_observation is a control-plane strategy, not an agent-emitted mode;
+  # it remains listed because adapters declare whether workspace observation is viable.
   supported_output_modes:
     type: array
     items:
@@ -108,7 +124,11 @@ properties:
       enum: [json_schema, tool_use, markdown_yaml, workspace_observation]
     minItems: 1
     default: [json_schema, workspace_observation]
-    description: "Extraction modes this agent/adapter supports; free_text is not a control-plane mode"
+    description: >
+      Extraction modes this agent/adapter supports. Mapping to ParserRegistry strategies:
+      json_schema → structured_output; tool_use → tool_call_interception;
+      markdown_yaml → markdown_block; workspace_observation → workspace_observation.
+      free_text is not a control-plane mode.
   
   # Runtime Contract Support
   supported_contracts:
@@ -125,3 +145,31 @@ properties:
           description: "Minimum version required"
         max_version:
           type: string
+          description: "Maximum compatible version (N-1 policy)"
+
+# Conditional adapter_config requirements by adapter_type
+allOf:
+  - if:
+      properties:
+        adapter_type:
+          const: cli
+    then:
+      properties:
+        adapter_config:
+          required: [binary_path]
+  - if:
+      properties:
+        adapter_type:
+          enum: [api, remote]
+    then:
+      properties:
+        adapter_config:
+          required: [endpoint]
+  - if:
+      properties:
+        adapter_type:
+          const: mcp
+    then:
+      properties:
+        adapter_config:
+          required: [command]

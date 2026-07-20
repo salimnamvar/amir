@@ -1,0 +1,70 @@
+# CostEnforcer Interface Contract
+# Synchronous lease check boundary for sidecar / egress / executor
+#
+# Trust boundary:
+# - Observability owns CostLease shared-state gate
+# - Execution holds lease_id on AgentSession
+# - Sidecar/egress checks lease synchronously on each metering tick (≤100ms)
+# - Sidecar MUST NOT write Execution DB; only signals process / returns check result
+# - AgentExecutor transitions AgentSession on cancel/ack
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/interfaces/cost-enforcer"
+
+type: object
+required: [interface, methods, invariants]
+properties:
+  interface:
+    const: CostEnforcer
+
+  invariants:
+    type: object
+    properties:
+      max_tick_latency_ms:
+        type: integer
+        const: 100
+        description: "Lease check must complete within 100ms"
+      fail_closed_default:
+        type: boolean
+        const: true
+      kill_threshold_pct_default:
+        type: number
+        const: 95
+
+  methods:
+    type: array
+    items:
+      type: object
+      required: [name, purpose, inputs, outputs]
+      properties:
+        name:
+          type: string
+          enum:
+            - reserve_lease
+            - heartbeat
+            - check_lease
+            - commit_lease
+            - revoke_lease
+            - ack_revocation
+        purpose:
+          type: string
+        inputs:
+          type: array
+          items:
+            type: string
+        outputs:
+          type: array
+          items:
+            type: string
+
+# Canonical method semantics:
+# reserve_lease(task_id, session_id, budget_pool, reserved_usd, reserved_tokens, scope, idempotency_key)
+#   -> CostLease (status=active, lease_revision=0)
+# heartbeat(lease_id, consumed_usd, consumed_tokens) -> { status, lease_revision }
+#   - If consumption ≥ kill_threshold_pct of reserved → auto-revoke
+# check_lease(lease_id, session_id) -> { action: continue | cancel, cancellation_reason?, status }
+#   - status=revoked or service unavailable with fail_closed → action=cancel
+# commit_lease(lease_id, final_consumed) -> { status: released }
+# revoke_lease(lease_id, cancellation_reason, idempotency_key) -> { status: revoked, revocation_revision }
+# ack_revocation(lease_id, session_id, ack_at) -> void
+#   - Sidecar ACK within sidecar_ack_deadline_ms

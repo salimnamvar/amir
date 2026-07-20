@@ -1,0 +1,125 @@
+# SandboxPolicy Contract Schema
+# Security Context admission-control entity evaluated before sandbox/workspace creation.
+# Produces the effective network allowlist via intersection merge and an admission decision.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+type: object
+required:
+  - policy_id
+  - agent_definition_id
+  - admission_decision
+  - effective_network_allowlist
+  - network_mode
+  - evaluated_at
+properties:
+  policy_id:
+    type: string
+    format: uuid
+    description: "Unique evaluation id for this admission decision"
+
+  # Inputs to evaluation
+  agent_definition_id:
+    type: string
+    format: uuid
+  task_id:
+    type: string
+    format: uuid
+  role_name:
+    type: string
+    description: "Role name (for required_network layer)"
+  workspace_config_ref:
+    type: string
+    description: "Optional workspace config reference"
+  environment:
+    type: string
+    enum: [development, staging, production]
+    description: "Deployment environment used for runtime constraints"
+
+  # Inputs recorded for audit
+  inputs:
+    type: object
+    description: "Allowlist layers before merge"
+    properties:
+      agent_network_allowlist:
+        type: array
+        items:
+          type: string
+      agent_network_allowlist_profile:
+        type: string
+        enum: [llm_only, coding_standard, custom]
+      sandbox_network_allowlist:
+        type: array
+        items:
+          type: string
+      sandbox_network_allowlist_profile:
+        type: string
+        enum: [llm_only, coding_standard, custom]
+      role_required_network:
+        type: array
+        items:
+          type: string
+        description: "Empty = skip role layer (do not zero intersection)"
+      platform_llm_routes:
+        type: array
+        items:
+          type: string
+        description: "Always unioned after intersection (cost attribution routes)"
+
+  # Merge algorithm (normative, intersection — never union of agent/sandbox/role):
+  # 1. Expand profiles (coding_standard, llm_only) via amir-config/allowlists/*
+  # 2. agent_set = expanded agent allowlist
+  # 3. sandbox_set = expanded sandbox allowlist
+  # 4. role_set = Role.required_network (if empty, skip role layer)
+  # 5. effective = agent_set ∩ sandbox_set [∩ role_set if non-empty]
+  # 6. effective = effective ∪ platform_llm_routes
+  # 7. empty effective (before platform routes) = deny-all except platform LLM routes
+  merge_algorithm:
+    type: string
+    const: intersection
+    description: "Network allowlist merge is intersection of layers, never union"
+
+  effective_network_allowlist:
+    type: array
+    items:
+      type: string
+    description: "Computed allowlist after profile expansion + intersection + platform LLM union"
+
+  effective_allowlist_hash:
+    type: string
+    description: "SHA256 of sorted effective_network_allowlist (for sandbox verification)"
+
+  network_mode:
+    type: string
+    enum: [proxy, none]
+    description: "Effective network mode after policy evaluation"
+
+  allowed_runtime:
+    type: array
+    items:
+      type: string
+      enum: [gvisor, firecracker, docker]
+    description: "Runtimes permitted for this evaluation (docker excluded when environment=production)"
+
+  admission_decision:
+    type: string
+    enum: [allow, deny]
+    description: "Whether sandbox/workspace creation may proceed"
+
+  deny_reason:
+    type: string
+    description: "Required when admission_decision=deny"
+
+  effective_access_policies:
+    type: array
+    items:
+      type: string
+    description: "AccessPolicy ids applied"
+
+  security_signature:
+    type: string
+    description: "Optional Security Context signature over the evaluated policy for audit"
+
+  evaluated_at:
+    type: string
+    format: date-time

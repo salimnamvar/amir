@@ -78,16 +78,17 @@ Acceptance:
 - Compensation can be re-triggered
 ```
 
-### US-WORKFLOW-006: Auto-Approve Transitions
+### US-WORKFLOW-006: Opt-In Auto-Approve Transitions
 ```
 As a Developer
-I want auto-approval in automated workflows
-So that workflows run without human intervention
+I want optional auto-approval for trusted automated workflows
+So that low-risk paths can run without human intervention when explicitly configured
 
 Acceptance:
-- All transitions auto-approved by default
-- Approval entity used only for manual gates
-- Workflow completes automatically
+- Approval gates default to auto_approve=false (safe default; see approval.schema.yaml)
+- Auto-approval requires explicit opt-in per gate (auto_approve=true)
+- Workflow tasks default to approval_gate=false; setting approval_gate=true requires an Approval entity
+- Workflows with no approval gates complete automatically without Approval records
 ```
 
 ### US-WORKFLOW-007: Idempotent Step Execution

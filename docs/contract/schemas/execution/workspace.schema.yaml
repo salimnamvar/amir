@@ -2,6 +2,13 @@
 # Ephemeral execution filesystem. Owned by Execution Context.
 # Cardinality: Task 1 → 1..* Workspace (one Workspace per AgentSession attempt).
 # Security Context enforces policy; it does not own the Workspace aggregate.
+#
+# Auto-commit invariant (normative):
+# After observation and BEFORE ephemeral cleanup, AgentExecutor MUST ensure a durable
+# commit exists for any working-tree changes and update durable_effects.head_commit.
+# If the agent produced no commit, the control plane synthesizes one from the diff.
+# Observation without a durable commit is invalid for compensation-capable sessions.
+# durable_effects are appended incrementally as effects are created (not only at end).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -21,7 +28,7 @@ properties:
   session_id:
     type: string
     format: uuid
-    description: "Owning AgentSession (exactly one session per workspace)"
+    description: "Owning AgentSession (exactly one session per workspace; unique in DDL)"
 
   # Git configuration
   repo_url:
@@ -64,6 +71,8 @@ properties:
     description: "Full tree hash for observation even if agent does not commit"
 
   # Durable side-effect handles (survive workspace cleanup; used by compensation)
+  # Append-only log semantics: effects are recorded as created during execution so
+  # budget-killed sessions still have a compensation target list.
   durable_effects:
     type: object
     description: "References to durable repo/PR state produced while workspace was active"
@@ -72,11 +81,27 @@ properties:
         type: string
       head_commit:
         type: string
+        description: "Must be a real commit SHA after auto-commit (required for git_revert)"
       pr_number:
         type: integer
       remote_url:
         type: string
         format: uri
+      effects_log:
+        type: array
+        description: "Incremental log of durable effects as they were created"
+        items:
+          type: object
+          required: [effect_type, target, created_at]
+          properties:
+            effect_type:
+              type: string
+              enum: [branch_create, commit, pr_open, artifact_publish, other]
+            target:
+              type: string
+            created_at:
+              type: string
+              format: date-time
 
   # Cleanup settings
   ephemeral:
@@ -110,7 +135,14 @@ properties:
         type: array
         items:
           type: string
-        description: "Effective allowlist after policy merge"
+        description: "Effective allowlist after SandboxPolicy intersection merge"
+      effective_allowlist_hash:
+        type: string
+        description: "SHA256 of effective allowlist; sandbox must verify match"
+      sandbox_policy_id:
+        type: string
+        format: uuid
+        description: "SandboxPolicy evaluation that produced this allowlist"
 
   created_at:
     type: string

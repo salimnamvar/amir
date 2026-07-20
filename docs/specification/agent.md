@@ -51,24 +51,25 @@ Pending → Starting → Running → WaitingForInput
     ↓         ↓      ↓  Escalated (different agent/human)
     ↓         ↓      ↓
     ↓    TimedOut  Cancelled
-    ↓
- Compensating → Compensated
 ```
+
+**Note:** Compensation is owned by `WorkflowInstance`, not `AgentSession`. CostLease revocation transitions the session to `cancelled` with `last_failure_category=budget_exceeded` (not a separate compensating state). Session create is atomic with workspace create (`workspace_id` required).
 
 ### AgentSession Aggregate (Lean Document)
 
 > **Contract:** [`docs/contract/schemas/agent-session.schema.yaml`](../contract/schemas/agent-session.schema.yaml)
 
-AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry.
+AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry. Full `ValidationResult` and `Feedback` objects are **never** embedded — IDs only. Checkpoints and tool calls keep ring-buffer **IDs** only (max 20 / 50).
 
 | Concern | On session document | Authoritative store |
 |---------|---------------------|---------------------|
 | Identity, status, limits, refs | Yes | Session row / agent-session contract |
-| Checkpoints (full history) | Recent IDs only | [`checkpoint.schema.yaml`](../contract/schemas/checkpoint.schema.yaml) + SQL |
-| Tool calls (full history) | Recent ring only | [`tool-call.schema.yaml`](../contract/schemas/tool-call.schema.yaml) + stream |
+| `workspace_id` | **Required** | Workspace row (1:1) |
+| Checkpoints (full history) | `recent_checkpoint_ids` only | [`checkpoint.schema.yaml`](../contract/schemas/checkpoint.schema.yaml) + SQL |
+| Tool calls (full history) | `recent_tool_call_ids` only | [`tool-call.schema.yaml`](../contract/schemas/tool-call.schema.yaml) + stream |
 | Live meters | Latest snapshot | [`cost-record.schema.yaml`](../contract/schemas/cost-record.schema.yaml) |
-| Validation / feedback | IDs | validation-result / feedback contracts |
-| Cost hard kill | `cost_lease_id` | [`cost-lease.schema.yaml`](../contract/schemas/cost-lease.schema.yaml) |
+| Validation / feedback | `validation_result_id` / `feedback_artifact_id` only | validation-result / feedback contracts |
+| Cost hard kill | `cost_lease_id` (required while running) | [`cost-lease.schema.yaml`](../contract/schemas/cost-lease.schema.yaml) |
 
 ### Checkpoint
 
@@ -247,13 +248,19 @@ Agent output is treated as untrusted narrative. The filesystem is ground truth.
    - Read modified files; handle binaries as opaque blobs (hash only)
    - Ignore .git mutations by the agent (treat as policy violation)
 
-3. Claim Reconciliation (mandatory for CodeChangeArtifact):
+3. Mandatory auto-commit (before cleanup):
+   - AgentExecutor MUST ensure a durable commit exists for any working-tree changes
+   - If the agent produced no commit, synthesize one from the diff and update durable_effects.head_commit
+   - Append durable_effects.effects_log incrementally as effects are created (not only at end)
+   - Observation without a durable commit is invalid for compensation-capable sessions
+
+4. Claim Reconciliation (mandatory for CodeChangeArtifact):
    - Parse agent/parser claims (if any)
    - Diff claimed_paths vs observed_paths
    - If diverge: authoritative_source = workspace; record divergence_summary
-   - Emit ValidationResult.claim_reconciliation
+   - Emit ValidationResult.claim_reconciliation (canonical; Artifact references by validation_result_id only)
 
-4. Artifact Construction:
+5. Artifact Construction:
    - files[] from workspace observation (not agent claims)
    - changes summary from diff
    - tests from file listing + test runner when configured
@@ -264,12 +271,13 @@ Agent output is treated as untrusted narrative. The filesystem is ground truth.
 
 | Situation | Behavior |
 |-----------|----------|
-| Agent edits but does not commit | Observe working tree vs baseline_tree_hash |
+| Agent edits but does not commit | Observe working tree vs baseline_tree_hash; **then auto-commit** before cleanup |
 | Gitignored paths changed | Include if quality_criteria requires; else note in warnings |
 | Binary files changed | Record path + content hash; skip textual diff |
 | Agent mutates `.git` | Policy failure; session fails; no artifact acceptance |
 | Claims ⊆ observation | Accept; note extra unclaimed changes if policy requires |
 | Claims ⊄ observation | Reject claim paths; synthesize from observation; feedback may cite divergence |
+| Budget kill mid-execution | Compensation uses durable_effects.effects_log already appended |
 
 ### Synthetic Artifact Generation
 
@@ -292,7 +300,6 @@ def synthesize_artifact(workspace: Workspace, baseline: str, validation: Validat
         },
         observation_method="workspace_diff",  # or synthesized only with coercion_approval_id
         validation_result_id=validation.validation_id,
-        claim_reconciliation_validation_id=validation.validation_id,
         # Canonical claim_reconciliation lives on ValidationResult only
     )
 ```
@@ -517,19 +524,21 @@ Eventual consistency from Observability → Execution is **too slow** for hierar
 | Schema | `cost-lease.schema.yaml` |
 | Owner | Observability Context (lease authority) |
 | Holder | Execution Context (`AgentSession.cost_lease_id`) |
-| Check path | Sidecar + egress proxy on **every metering tick (≤100ms)** — synchronous read of lease status |
-| Hard kill | `cancelled=true` or `status=revoked` → terminate agent process immediately; session → `cancelled` |
+| Check path | Sidecar + egress proxy on **every metering tick (≤100ms)** via `CostEnforcer.check_lease` |
+| Hard kill | `status=revoked` (sole signal; no parallel cancelled flag) at `kill_threshold_pct` (default 95%) → Adapter.cancel with 5s grace → session `cancelled` + `budget_exceeded` |
 | Failure mode | Lease service unavailable → **fail-closed** (`fail_closed_on_unavailable=true`): deny further metered LLM egress |
-| Trust boundary | Execution never self-authorizes continued spend after lease revoke; Observability is source of truth for hierarchical limits |
+| Trust boundary | Sidecar MUST NOT write Execution DB; AgentExecutor owns session state transitions. Observability owns the lease gate. |
+| Interface | [`cost-enforcer.yaml`](../contract/interfaces/cost-enforcer.yaml) + [`agent-adapter.yaml`](../contract/interfaces/agent-adapter.yaml) |
 
 ```
 ExecutionContext(Task.Assigned)
-  → ObservabilityContext(Cost.ReservationCreated + CostLease.Created)
-  → ExecutionContext(AgentSession.Started with cost_lease_id)
-  → each tick: sidecar checks lease (sync) + meters tokens
-  → hard breach: Observability sets lease cancelled/revoked
-  → next tick (≤100ms): process killed; session cancelled
-  → CostLease.Released; Cost.Committed or Released
+  → ObservabilityContext(Cost.ReservationCreated + CostLease.Created, budget_pool=execution)
+  → ExecutionContext(AgentSession.Started with cost_lease_id + workspace_id atomic)
+  → each tick: sidecar CostEnforcer.check_lease (sync) + meters tokens
+  → hard breach (≥ kill_threshold_pct): Observability sets status=revoked + revocation_revision
+  → sidecar SIGTERM; Adapter.cancel(grace=5s) → SIGKILL; ack within sidecar_ack_deadline_ms
+  → AgentExecutor: session.status=cancelled, last_failure_category=budget_exceeded
+  → Workflow compensation on durable_effects; CostLease remains revoked (not released)
 ```
 
 ### Post-Cancel Path (budget_exceeded)

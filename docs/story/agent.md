@@ -120,7 +120,7 @@ Acceptance:
 - cost_budget / resource_limits require max_tokens and/or max_usd structurally
 - Hierarchical cost gate (invocation → team-hourly → tenant-daily → org-monthly)
 - Pre-flight estimation with reservation buffer
-- Sidecar proxy counts tokens in real-time; process killed at 95% of invocation limit
+- Sidecar proxy counts tokens in real-time; process killed at CostLease.kill_threshold_pct (default 95%) of reserved limit
 - Team/tenant/org hard thresholds cancel in-flight sessions (not only new work)
 - CostRecord emitted with orchestration/worker separation
 ```

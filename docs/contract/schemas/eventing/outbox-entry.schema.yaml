@@ -4,11 +4,15 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status]
+required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status, event_id]
 properties:
   sequence:
     type: integer
     minimum: 0
+  event_id:
+    type: string
+    format: uuid
+    description: "Correlates to DomainEvent.event_id"
   event_type:
     type: string
   aggregate_id:
@@ -20,6 +24,9 @@ properties:
     type: object
   idempotency_key:
     type: string
+  retention_policy_id:
+    type: string
+    description: "Retention policy for this outbox entry (e.g. permanent, 365d, 90d)"
   created_at:
     type: string
     format: date-time

@@ -95,7 +95,7 @@ So that agents can retry with context
 
 Acceptance:
 - FeedbackArtifact contract defined
-- Includes error_context, corrections, suggested_strategy
+- Includes error_context, corrections, feedback_strategy
 - Includes parser strategy suggestion
 - Feedback injected into PromptCompiler
 ```

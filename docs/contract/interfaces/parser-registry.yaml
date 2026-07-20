@@ -1,16 +1,23 @@
 # ParserRegistry / OutputParser Interface Contract
+#
+# Strategy order is an ordered tuple, not a set. Strategies MUST be tried in order;
+# stop at first success. workspace_observation is the final ground-truth arbiter
+# in the default chain. llm_coercion is opt-in only and requires Approval at parse time.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/interfaces/parser-registry"
 
 type: object
-required: [interface, default_strategy_chain, methods]
+required: [interface, default_strategy_chain, methods, output_mode_to_strategy_mapping]
 properties:
   interface:
     const: ParserRegistry
+
   default_strategy_chain:
     type: array
-    description: "Default ordered strategies; llm_coercion is NOT included"
+    description: >
+      Ordered strategies (tuple). MUST be applied in this order; stop at first success.
+      llm_coercion is NOT included. workspace_observation is always last in the default chain.
     items:
       type: string
       enum:
@@ -20,12 +27,37 @@ properties:
         - workspace_observation
     minItems: 4
     maxItems: 4
+    # Order is normative: index 0 = structured_output … index 3 = workspace_observation
+
   optional_strategies:
     type: array
     items:
       type: string
       enum: [llm_coercion]
-    description: "Opt-in only; requires human Approval and observation_method=synthesized"
+    description: >
+      Opt-in only. Selecting llm_coercion requires approval_ref (Approval with status=granted
+      and approval_type=coercion) at parse time (fail-closed). Produced artifacts MUST have
+      observation_method=synthesized and coercion_approval_id set.
+
+  # Canonical mapping from agent/control-plane output_mode to ParserStrategy
+  output_mode_to_strategy_mapping:
+    type: object
+    description: "Maps AgentInvocation/CompiledPrompt.output_mode → ParserRegistry strategy"
+    required: [json_schema, tool_use, markdown_yaml, workspace_observation]
+    properties:
+      json_schema:
+        type: string
+        const: structured_output
+      tool_use:
+        type: string
+        const: tool_call_interception
+      markdown_yaml:
+        type: string
+        const: markdown_block
+      workspace_observation:
+        type: string
+        const: workspace_observation
+
   methods:
     type: array
     items:
@@ -34,4 +66,30 @@ properties:
       properties:
         name:
           type: string
-          enum: [get_parser, register_parser, parse, can_handle]
+          enum:
+            - get_parser
+            - register_parser
+            - select_strategy
+            - parse
+            - can_handle
+        purpose:
+          type: string
+        inputs:
+          type: array
+          items:
+            type: string
+        outputs:
+          type: array
+          items:
+            type: string
+
+# Canonical method semantics:
+# select_strategy(agent_capabilities, output_mode) -> strategy_chain
+#   - Builds ordered chain from default_strategy_chain filtered by agent support
+#   - Never inserts llm_coercion unless caller provides approval_ref
+# parse(raw_output, strategy_chain, workspace_snapshot, approval_ref?) ->
+#   { artifact, observation_method, parser_strategy_used, approval_ref? }
+#   - If strategy_chain includes llm_coercion, approval_ref is REQUIRED (fail-closed)
+#   - llm_coercion always sets observation_method=synthesized
+# can_handle(raw_output, strategy) -> boolean
+# get_parser / register_parser: registry management

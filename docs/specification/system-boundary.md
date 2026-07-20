@@ -22,7 +22,7 @@ Amir is a **complete** control plane for reliable orchestration of external AI a
 | Workflow Engine | Linear and DAG workflows with saga compensation |
 | Compensation | Abstract workflow intents → durable git/PR/artifact effects |
 | Human Approvals | Approval entity with escalation |
-| Audit | Merkle-chained events with KMS-backed signing keys |
+| Audit | linear hash-chained events with KMS-backed signing keys |
 | Cost Control | Hierarchical gate with structural ceilings, CostLease sync hard kill, validation_budget partition |
 | Sandbox | Mandatory gVisor (prod) / Firecracker option; docker only for development |
 | Egress Proxy | All traffic through Amir proxy; default-deny allowlist |

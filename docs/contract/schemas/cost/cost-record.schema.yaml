@@ -1,10 +1,11 @@
 # Cost Record Schema
 # Multi-dimensional cost tracking with orchestration/worker separation
+# Supports 4-level hierarchy: invocation → team → tenant → org
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [id, task_id, agent_session_id, team_id, tokens_total, cost_usd]
+required: [id, task_id, agent_session_id, team_id, tokens_total, cost_usd, budget_pool]
 properties:
   id:
     type: string
@@ -25,6 +26,22 @@ properties:
   team_id:
     type: string
     format: uuid
+
+  tenant_id:
+    type: string
+    format: uuid
+    description: "Tenant for 4-level cost hierarchy rollup"
+
+  org_id:
+    type: string
+    format: uuid
+    description: "Org for 4-level cost hierarchy rollup"
+
+  # Which budget pool was charged
+  budget_pool:
+    type: string
+    enum: [execution, validation, compensation, orchestration]
+    description: "Cost attribution pool; validation spend never charges execution lease"
   
   # Consumption
   tokens_input:
@@ -56,6 +73,12 @@ properties:
     type: number
     minimum: 0
     description: "Agent/LLM provider cost"
+
+  validation_cost_usd:
+    type: number
+    minimum: 0
+    default: 0
+    description: "Validation-pipeline spend (when budget_pool=validation)"
   
   # Timing
   duration_seconds:
@@ -88,6 +111,7 @@ properties:
   
   parser_strategy_used:
     type: string
+    enum: [structured_output, tool_call_interception, markdown_block, workspace_observation, llm_coercion]
     description: "Parser strategy that succeeded"
   
   retry_count:

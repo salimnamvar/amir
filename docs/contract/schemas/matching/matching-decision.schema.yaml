@@ -13,6 +13,8 @@ required:
   - hard_filters
   - candidates
   - decided_at
+  - contract_negotiation
+  - idempotency_key
 properties:
   decision_id:
     type: string
@@ -115,9 +117,14 @@ properties:
       filter_notes:
         type: string
 
+  idempotency_key:
+    type: string
+    description: "Idempotency key for recording this decision"
+
   contract_negotiation:
     type: object
-    description: "Result of negotiate_contract() on the selected agent"
+    description: "Result of negotiate_contract() on the selected agent (required when selected_agent_id is set)"
+    required: [negotiated_type, negotiated_version, compatible, fallback_used]
     properties:
       negotiated_type:
         type: string

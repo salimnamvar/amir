@@ -80,7 +80,8 @@ Key derivation:
 - If sandbox_required=true, network must be limited to proxy
 - All capabilities must have valid skill names
 - supported_output_modes must not be empty
-- max_retry_attempts must be >= 1
+- Retry attempt ceilings live on Task.retry_policy.max_attempts (>= 1), not on AgentDefinition
+- adapter_config requirements are conditional on adapter_type (cli→binary_path, api/remote→endpoint, mcp→command)
 
 ### ContractDefinition Aggregate (Configuration)
 
@@ -102,11 +103,14 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 **Invariants**:
 - Must have Assignment before Running
+- `matching_decision_id` required when status is `assigned` or `running`
 - `cost_budget` must include at least one of `max_tokens` or `max_usd`
+- `validation_budget` is partitioned; enforced via separate CostLease (`budget_pool=validation`)
 - Cost budget must not be exceeded
 - Expected outputs must have valid ContractDefinitions
-- `retry_state.attempts` must not exceed `retry_policy.max_attempts`
-- Agent circuit breaker lives on AgentScorecard only (never on Task)
+- `retry_state.attempts` must not exceed `retry_policy.max_attempts` (incremented in same transaction as AgentSession create)
+- Default `retry_on` includes `infrastructure` (transient); excludes `budget_exceeded`
+- Agent circuit breaker lives on AgentScorecard only (never on Task); hard-filter reject → `circuit_breaker_open`
 
 ### AgentSession Aggregate (Execution) — Central Runtime Unit
 
@@ -114,14 +118,18 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 High-frequency telemetry is **not** stored unbounded on the session document. See checkpoint, tool-call, cost-record, and cost-lease contracts; storage: [`sql/execution.sql`](../contract/sql/execution.sql).
 
-**Lifecycle**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / Compensating / TimedOut / Cancelled
+**Lifecycle**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / TimedOut / Cancelled
+
+**Note:** Compensation is a WorkflowInstance concern. CostLease revocation → `cancelled` + `last_failure_category=budget_exceeded`. There is no session-level `compensating` status.
 
 **Invariants**:
 - Must belong to exactly one Task
-- Owns exactly one Workspace for its lifetime
+- Owns exactly one Workspace for its lifetime (`workspace_id` **required**; session create atomic with workspace create)
 - attempt_number must be >= 1
 - High-frequency data (full tool_calls, full checkpoints, usage history) lives in events/linked stores — not unbounded on the session document
+- `validation_result` and `feedback_artifact` are **IDs only** (never embed full objects)
 - resource_limits must include at least one cost ceiling
+- `cost_lease_id` required while status ∈ starting/running/waiting_for_input/producing_artifact/validating
 - Live resource_usage must not exceed resource_limits (sidecar enforces via CostLease)
 
 ### Workspace Aggregate (Execution)
@@ -131,12 +139,14 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 **Lifecycle**: Created → Active → Observed → Cleaned
 
 **Invariants**:
-- session_id must reference exactly one AgentSession
+- session_id must reference exactly one AgentSession (unique in DDL)
 - Task 1 → 1..* Workspace (one new workspace per retry attempt)
 - baseline_commit / baseline_tree_hash set before agent execution
 - current_commit updated after observation
+- **Auto-commit before cleanup**: AgentExecutor MUST ensure durable commit exists and update `durable_effects.head_commit`; effects_log appends incrementally during execution
 - Ephemeral filesystem may be cleaned while durable_effects remain for saga compensation
-- Security Context enforces SandboxPolicy at creation; does not own the Workspace
+- Security Context evaluates SandboxPolicy (intersection merge) at creation; does not own the Workspace
+- `security_context.effective_allowlist_hash` must match the SandboxPolicy evaluation
 
 ### Artifact Aggregate (Execution)
 
@@ -157,12 +167,14 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 > - Step results: [`step-result.schema.yaml`](../contract/schemas/step-result.schema.yaml)
 > - Storage: [`sql/workflow.sql`](../contract/sql/workflow.sql)
 
-**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / CompensationBlocked
+**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / CompensationBlocked / Rejected
 
 **Invariants**:
 - State transitions must follow WorkflowDefinition
-- compensation_stack must have entry for each completed step
+- compensation_stack (LIFO) must have entry for each completed step (see workflow.schema.yaml)
 - step_results must be ordered by sequence
+- Approval gates default to `auto_approve=false` (opt-in only)
+- `continue_on_compensation_failure=false` default → CompensationBlocked + EscalationSignal with `assigned_to`
 
 ---
 
