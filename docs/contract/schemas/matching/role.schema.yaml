@@ -82,7 +82,8 @@ properties:
   
   # Capability requirements are objective hard filters + soft scoring inputs.
   # Subjective proficiency enums are prohibited; use tools/constraints instead.
-  # Items mirror Capability shape for hard-filter evaluation (skill + tools + network).
+  # Intentional hard-filter projection (not full Capability $ref): skill + tools +
+  # network + max_file_size only. Full Capability lives on AgentDefinition.
   required_capabilities:
     type: array
     items:

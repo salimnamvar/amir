@@ -53,11 +53,13 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 
 **Lifecycle (Task)**: Pending → Assigned → Running → Validating → Completed / Failed / Cancelled
 
-**Lifecycle (AgentSession)**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / Compensating / TimedOut / Cancelled
+**Lifecycle (AgentSession)**: Pending → Starting → Running → WaitingForInput → ProducingArtifact → Validating → Succeeded / Failed / TimedOut / Cancelled
+
+> Compensation is a **WorkflowInstance** concern (durable_effects). AgentSession has no `compensating` status. CostLease revocation → `Cancelled` + `last_failure_category=budget_exceeded`.
 
 **Storage**: SQLite / PostgreSQL
 
-**Events**: Task.Created, Task.Assigned, Task.Started, Task.Completed, Task.Failed, AgentSession.Started, AgentSession.Progress, AgentSession.WaitingForInput, AgentSession.Completed, AgentSession.Checkpoint, Artifact.Produced, Artifact.Validated, Artifact.Rejected, MatchingDecision.Made, Workspace.Observed
+**Events**: Task.Created, Task.Assigned, Task.Started, Task.Completed, Task.Failed, AgentSession.Started, AgentSession.Progress, AgentSession.WaitingForInput, AgentSession.Completed, AgentSession.Failed, AgentSession.Cancelled, AgentSession.Checkpoint, AgentSession.ToolCall, Artifact.Produced, Artifact.Validated, Artifact.Rejected, MatchingDecision.Made, Workspace.Observed, Workspace.AutoCommitFailed (see event.md for full taxonomy)
 
 **Integration Points**:
 - Configuration Context: Reads definitions, skills, capabilities

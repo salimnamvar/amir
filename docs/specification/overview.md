@@ -8,6 +8,25 @@
 
 ## Audit Findings Synthesis
 
+### Round 8 Residual (pool + mimo)
+
+| Priority | Issue | Resolution |
+|----------|-------|------------|
+| P0 | context.md AgentSession still listed Compensating | Removed; Workflow-owned note |
+| P0 | Adapter session continuity unspecified | session_continuity on agent-adapter + agent.md protocol |
+| P0 | Compensation silent on stale git/PR refs | verification + target_kind + verification_failed status |
+| P1 | ParserRegistry no strategy failure policy | strategy_failure_policy + strategy_attempts |
+| P1 | WorkflowEngine interface thin | Full methods/inputs/outputs/invariants |
+| P1 | ToolCall/Checkpoint no sequence | sequence required + SQL unique |
+| P1 | waiting_for_input timeout no escalation | on_timeout + escalation_signal_id |
+| P1 | Workspace auto-commit failure undefined | auto_commit_failed status + auto_commit object |
+| P1 | Escalation ownership / concurrency | authorized_acknowledgers + resolution_revision |
+| P1 | Story path amir-config/contracts/ | docs/contract/schemas/ |
+| P1 | replay_metadata invocation vs session | Seed payload documented on invocation |
+| P1 | ContractDefinition missing schema | Scoped as config-level entity in compatibility.md |
+| P1 | scoring_weights sum | Runtime normalize documented |
+| P1 | ValidationMetric session_id always required | Conditional on target_type |
+
 ### Round 7 Residual (Follow-up Audits)
 
 | Priority | Issue | Resolution |

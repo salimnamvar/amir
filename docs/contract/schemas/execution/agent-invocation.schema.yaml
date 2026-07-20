@@ -114,9 +114,16 @@ properties:
       - required: [max_tokens]
       - required: [max_usd]
 
-  # Replay metadata
+  # Replay metadata — SEED payload only (not the full session shape).
+  # During AgentSession initialization, Execution expands this into the full
+  # replay-metadata.schema.yaml object by adding session_id, prompt_hash,
+  # full_prompt, sandbox_profile_hash, adapter_type, tool_call_stream_ref.
+  # Do NOT pass this object unmodified as AgentSession.replay_metadata.
   replay_metadata:
     type: object
+    description: >
+      Seed fields known at invocation time. Expanded to full
+      replay-metadata.schema.yaml during session start (see agent.md).
     properties:
       model_identifier:
         type: string

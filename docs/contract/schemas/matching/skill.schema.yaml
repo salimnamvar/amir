@@ -1,5 +1,11 @@
 # Skill Contract Schema
-# Hierarchical skill taxonomy entry for capability matching
+# Hierarchical skill taxonomy entry for capability matching.
+#
+# Relationship to Capability: Skill is the taxonomy identity (id + version + tools).
+# Capability is the full scoring-facing shape (Skill + description, parent_skills,
+# constraints). Role.required_capabilities uses an intentional hard-filter projection
+# (skill + required_tools + requires_network + max_file_size_bytes) — not a full
+# Capability $ref — because matching only needs hard filters at role definition time.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 

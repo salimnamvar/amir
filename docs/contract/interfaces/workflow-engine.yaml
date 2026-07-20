@@ -1,18 +1,41 @@
 # WorkflowEngine Interface Contract
+# Durable multi-step orchestration with compensation, approvals, and escalation
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/interfaces/workflow-engine"
 
 type: object
-required: [interface, methods]
+required: [interface, methods, invariants]
 properties:
   interface:
     const: WorkflowEngine
+
+  invariants:
+    type: object
+    properties:
+      create_persists_before_return:
+        type: boolean
+        const: true
+        description: "CreateWorkflow MUST persist WorkflowInstance before returning"
+      compensate_lifo:
+        type: boolean
+        const: true
+        description: "CompensateWorkflow executes compensation_stack in reverse order"
+      continue_on_compensation_failure_default:
+        type: boolean
+        const: false
+      escalate_on_blocked_default:
+        type: boolean
+        const: true
+      step_results_ordered_by_sequence:
+        type: boolean
+        const: true
+
   methods:
     type: array
     items:
       type: object
-      required: [name]
+      required: [name, purpose, inputs, outputs]
       properties:
         name:
           type: string
@@ -28,3 +51,38 @@ properties:
             - ResumeWorkflow
         purpose:
           type: string
+        inputs:
+          type: array
+          items:
+            type: string
+        outputs:
+          type: array
+          items:
+            type: string
+
+# Canonical method semantics:
+# CreateWorkflow(definition_ref, team_id, idempotency_key, inputs?) ->
+#   { workflow_instance_id, instance_status: pending|running }
+#   - Persists instance + outbox event atomically before return
+# ExecuteStep(workflow_instance_id, step_id, task_id?) ->
+#   { step_result_id, status, sequence }
+#   - On success: push CompensationAction to compensation_stack if declared
+#   - Records StepResult with durable_effects_snapshot when session completes
+# WaitForSignal(workflow_instance_id, signal_name, timeout_seconds) ->
+#   { received: bool, payload? }
+#   - Used for approval gates (auto_approve=false) and external human signals
+# CompleteWorkflow(workflow_instance_id) -> { instance_status: succeeded }
+# GetState(workflow_instance_id) -> WorkflowInstance snapshot (status, stack, step_results)
+# FailWorkflow(workflow_instance_id, reason, last_failure_category?) ->
+#   { instance_status: failed|compensating }
+#   - If compensation enabled: transition to compensating and call CompensateWorkflow
+# CompensateWorkflow(workflow_instance_id) ->
+#   { blocked: bool, actions_executed, actions_failed }
+#   - LIFO over compensation_stack; each concrete action has idempotency_key
+#   - On failure with continue_on_compensation_failure=false:
+#       instance_status=compensation_blocked; emit EscalationSignal(assigned_to required)
+#   - Pre-execution: verify durable targets still exist (see compensation-action verification)
+# RegisterSignalHandler(signal_name, handler_ref) -> void
+# ResumeWorkflow(workflow_instance_id, resolution, resolution_notes?) ->
+#   { instance_status }
+#   - Used after EscalationSignal.resolution in {resumed, aborted, compensated}

@@ -84,7 +84,21 @@ properties:
 
   acknowledged_by:
     type: string
-    description: "Who acknowledged the escalation"
+    description: "Who acknowledged the escalation (must be authorized principal)"
+
+  acknowledged_by_role:
+    type: string
+    description: "Role of acknowledger (e.g. oncall, workflow_admin, security_admin)"
+
+  # Who may acknowledge/resolve (authorization model)
+  authorized_acknowledgers:
+    type: array
+    items:
+      type: string
+    description: >
+      Principal or role IDs allowed to acknowledge/resolve. Default: assigned_to only.
+      Concurrent resolution: last-writer loses — resolution uses optimistic concurrency
+      via resolution_revision.
 
   resolution:
     type: string
@@ -92,6 +106,27 @@ properties:
     default: "pending"
     description: "Current resolution state"
 
+  resolution_timestamp:
+    type: string
+    format: date-time
+    description: "When resolution was set (required when resolution != pending)"
+
+  resolution_revision:
+    type: integer
+    minimum: 0
+    default: 0
+    description: "Optimistic concurrency token; increment on every resolution write"
+
   resolution_notes:
     type: string
     description: "Notes on how the escalation was resolved"
+
+# When resolved, require timestamp and acknowledger
+allOf:
+  - if:
+      properties:
+        resolution:
+          enum: [resumed, aborted, compensated]
+      required: [resolution]
+    then:
+      required: [resolution_timestamp, acknowledged_by]

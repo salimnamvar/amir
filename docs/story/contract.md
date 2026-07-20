@@ -68,7 +68,7 @@ I want central contract registry
 So that all contracts are versioned
 
 Acceptance:
-- All contracts in amir-config/contracts/
+- All contracts under docs/contract/schemas/ (see docs/contract/README.md catalog)
 - SemVer enforced on all changes
 - Compatibility matrix maintained
 - New contract types registered

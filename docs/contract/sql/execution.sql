@@ -84,7 +84,8 @@ CREATE TABLE workspaces (
     repo_url TEXT,
     branch TEXT,
     workdir TEXT,
-    status TEXT NOT NULL CHECK (status IN ('created', 'active', 'observed', 'cleaned', 'failed')),
+    status TEXT NOT NULL CHECK (status IN ('created', 'active', 'observed', 'auto_commit_failed', 'cleaned', 'failed')),
+    auto_commit JSONB,
     baseline_commit TEXT,
     current_commit TEXT,
     baseline_tree_hash TEXT,
@@ -135,23 +136,29 @@ CREATE TABLE artifacts (
 CREATE TABLE checkpoints (
     checkpoint_id UUID PRIMARY KEY,
     session_id UUID REFERENCES agent_sessions(session_id),
+    sequence INTEGER NOT NULL,  -- monotonic per session for replay ordering
     state TEXT NOT NULL,
     payload JSONB,  -- bounded; large state via external refs
     workspace_snapshot TEXT,
-    created_at TIMESTAMP
+    created_at TIMESTAMP,
+    UNIQUE (session_id, sequence)
 );
 
 -- Full tool-call history (session document holds only a recent ring buffer of IDs)
 CREATE TABLE tool_call_events (
     tool_call_id UUID PRIMARY KEY,
     session_id UUID REFERENCES agent_sessions(session_id) NOT NULL,
+    sequence INTEGER NOT NULL,  -- monotonic per session for replay ordering
     tool_name TEXT NOT NULL,
     tool_input JSONB,
     tool_output JSONB,
     status TEXT NOT NULL,
     started_at TIMESTAMP NOT NULL,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    UNIQUE (session_id, sequence)
 );
+
+CREATE INDEX idx_tool_call_session_seq ON tool_call_events(session_id, sequence);
 
 CREATE TABLE cost_leases (
     lease_id UUID PRIMARY KEY,

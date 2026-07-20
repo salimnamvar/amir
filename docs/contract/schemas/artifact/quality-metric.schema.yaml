@@ -12,6 +12,9 @@ properties:
   target_type:
     type: string
     enum: [artifact, agent_session, task]
+    description: >
+      Quality can be measured on artifacts (primary), on an agent_session
+      (aggregate quality of its produced artifacts), or on a task (across attempts).
   target_id:
     type: string
     format: uuid

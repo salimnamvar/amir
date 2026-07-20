@@ -98,12 +98,34 @@ properties:
             - send_notification
         target:
           type: string
-          description: "Commit SHA, branch name, PR number, artifact id, or token ref"
+          description: >
+            Commit SHA (git_revert), branch name (branch_delete), PR number as string
+            (pr_close), artifact UUID (artifact_delete), token/resource ref otherwise
+        target_kind:
+          type: string
+          enum: [commit_sha, branch_name, pr_number, artifact_id, token_ref, resource_ref, url]
+          description: "Discriminates how target is interpreted for verification"
         idempotency_key:
           type: string
           description: "Per-concrete-action idempotency key"
         parameters:
           type: object
+        # Pre-execution verification (prevents silent failure on stale refs)
+        verification:
+          type: object
+          description: "Result of checking that target still exists before compensating"
+          properties:
+            verified_at:
+              type: string
+              format: date-time
+            exists:
+              type: boolean
+              description: "False if commit/PR/branch/artifact no longer found"
+            remote_checked:
+              type: boolean
+              default: true
+            verification_error:
+              type: string
         attempts:
           type: integer
           minimum: 0
@@ -126,7 +148,8 @@ properties:
 
   status:
     type: string
-    enum: [pending, completed, failed, skipped]
+    enum: [pending, completed, failed, skipped, verification_failed]
+    description: "verification_failed when target no longer exists; escalate via EscalationSignal"
 
   executed_at:
     type: string

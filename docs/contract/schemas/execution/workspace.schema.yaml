@@ -46,10 +46,40 @@ properties:
     default: "/workspace"
 
   # Lifecycle
+  # observed requires successful auto-commit of durable changes (or no changes).
+  # auto_commit_failed: observation done but durable commit/push failed — must not clean
+  # until operator remediation or retry; durable_effects may be partial.
   status:
     type: string
-    enum: [created, active, observed, cleaned, failed]
+    enum: [created, active, observed, auto_commit_failed, cleaned, failed]
     description: "Workspace lifecycle state"
+
+  auto_commit:
+    type: object
+    description: "Control-plane auto-commit outcome before cleanup"
+    properties:
+      attempted:
+        type: boolean
+        default: false
+      committed:
+        type: boolean
+      pushed:
+        type: boolean
+        description: "False if local commit ok but remote push failed"
+      head_commit:
+        type: string
+      error:
+        type: string
+        description: "Present when status=auto_commit_failed"
+      attempted_at:
+        type: string
+        format: date-time
+      atomic_with_observation:
+        type: boolean
+        default: true
+        description: >
+          When true, durable_effects update and observation record are written
+          in the same transaction as the local commit record.
 
   # Isolation markers
   sandbox_id:

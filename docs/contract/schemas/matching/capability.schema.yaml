@@ -9,8 +9,8 @@ properties:
   # Unique skill identifier (hierarchical dot notation)
   skill:
     type: string
-    description: "Hierarchical skill identifier"
-    pattern: "^[a-z][a-z0-9-\\.]*$"
+    description: "Hierarchical skill identifier (same pattern as skill.schema.yaml)"
+    pattern: "^[a-z][a-z0-9.-]*$"
     examples:
       - "code-generation"
       - "testing.unit"

@@ -7,12 +7,26 @@
 # - Sidecar detects lease revocation and signals the sandbox process; Adapter.cancel
 #   is invoked by AgentExecutor; Sidecar MUST NOT write Execution DB.
 # - health() interval: implementers SHOULD poll every health_check_interval_seconds (default 30).
+#
+# Session continuity protocol (normative for CLI agents):
+# - start() returns handle containing { session_id, native_id?, adapter_type }
+# - native_id maps the control-plane session_id to the agent-native session/conversation
+#   (e.g. Claude Code / Codex session file id). Adapter persists this mapping.
+# - Between pump() invocations the agent process (or native session) is the continuity
+#   store; the control plane does NOT re-send full history unless reconnecting.
+# - Lost session: if pump() fails with connection_lost or health() unhealthy:
+#   1. Adapter attempts reconnect using native_id within reconnect_timeout_seconds (default 30)
+#   2. On reconnect: replay from last checkpoint + tool_call_stream_ref via replay_metadata
+#   3. On reconnect failure: emit failed with last_failure_category=infrastructure;
+#      set AgentSession.replay_status=replay_incomplete if history incomplete
+# - replay_metadata full shape is required for reconstruction; invocation seed is expanded
+#   at session start (see agent-invocation.schema.yaml + replay-metadata.schema.yaml)
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/interfaces/agent-adapter"
 
 type: object
-required: [interface, methods, process_supervision]
+required: [interface, methods, process_supervision, session_continuity]
 properties:
   interface:
     const: AgentAdapter
@@ -42,6 +56,23 @@ properties:
         default: 30
         description: "Recommended health poll interval"
 
+  session_continuity:
+    type: object
+    required: [reconnect_timeout_seconds, use_replay_metadata_on_reconnect]
+    properties:
+      reconnect_timeout_seconds:
+        type: integer
+        minimum: 1
+        default: 30
+      use_replay_metadata_on_reconnect:
+        type: boolean
+        const: true
+        description: "On reconnect, reconstruct from ReplayMetadata + last checkpoint"
+      native_id_required:
+        type: boolean
+        default: false
+        description: "If true, adapter must return native_id from start() for reconnect"
+
   methods:
     type: array
     items:
@@ -70,7 +101,9 @@ properties:
 
 # Canonical method semantics (authority for implementers):
 # start(session, compiled_prompt, sandbox) -> handle
-# pump(handle) -> event stream chunks: output_chunk | tool_call | needs_input | completed | failed | timed_out
+#   handle = { session_id, native_id?, adapter_type, reconnect_token? }
+# pump(handle) -> event stream chunks:
+#   output_chunk | tool_call | needs_input | completed | failed | timed_out | connection_lost
 # respond_input(handle, text) -> void  (only when waiting_for_input)
 # inject_feedback(handle, feedback_artifact) -> void
 # cancel(handle, cancellation_reason, grace_period_seconds?) -> { cancel_acknowledged: bool }

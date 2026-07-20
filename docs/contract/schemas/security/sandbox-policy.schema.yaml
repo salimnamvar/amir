@@ -123,3 +123,7 @@ properties:
   evaluated_at:
     type: string
     format: date-time
+
+  # Note: Durable effects (commits, PRs, branches) are NOT recorded on SandboxPolicy.
+  # They live on Workspace.durable_effects / effects_log and CompensationAction
+  # durable_effects_snapshot. SandboxPolicy is admission-control only (allowlist + runtime).

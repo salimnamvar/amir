@@ -71,10 +71,15 @@ properties:
         minimum: 1
         default: 10
 
-  # Default scoring weights for agent matching (must sum to 1.0)
+  # Default scoring weights for agent matching.
+  # Runtime MUST normalize to sum=1.0 if provided weights do not sum to 1.0
+  # (pragmatic: YAML configs often drift; garbage-in is corrected at matching time).
+  # MatchingDecision.weights records the actual normalized weights used.
   scoring_weights:
     type: object
-    description: "Default weights for capability matching; sum must equal 1.0"
+    description: >
+      Default weights for capability matching. Runtime normalizes to sum 1.0.
+      If all weights are 0 or omitted, equal weights across 7 dimensions are used.
     properties:
       skill_match:
         type: number

@@ -4,6 +4,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
+required: [persistence_backend]
 properties:
   start_to_close_timeout_seconds:
     type: integer
@@ -21,3 +22,4 @@ properties:
     type: string
     enum: [sqlite, postgres]
     default: postgres
+    description: "Storage backend for durable workflow/session state (required)"

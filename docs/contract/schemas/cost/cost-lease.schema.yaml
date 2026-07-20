@@ -43,13 +43,17 @@ properties:
     format: uuid
     description: "Current session holding this lease"
 
-  # Which budget pool this lease meters (execution vs validation isolation)
+  # Which budget pool this lease meters (execution vs validation isolation).
+  # Only execution and validation use synchronous CostLease gates.
+  # CostRecord.budget_pool also allows compensation and orchestration for
+  # attribution-only spend (not hard-killed via lease; no CostLease for those).
   budget_pool:
     type: string
     enum: [execution, validation]
     description: >
       execution = agent/worker spend; validation = validator/repair spend.
       Validation budget cannot be stolen by execution and vice versa.
+      compensation/orchestration costs are recorded on CostRecord only (no lease).
 
   # Reservation amounts
   reserved_usd:

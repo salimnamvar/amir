@@ -162,6 +162,23 @@ properties:
       timeout_seconds:
         type: integer
         minimum: 1
+        description: >
+          When expired without respond_input: emit EscalationSignal
+          (escalation_type depends on input_kind; default manual_trigger),
+          set input_timeout_reason, transition toward failed/cancelled per policy
+      input_timeout_reason:
+        type: string
+        enum: [operator_timeout, auto_response_miss, policy_deny, deadline_exceeded]
+        description: "Set when waiting_for_input times out"
+      escalation_signal_id:
+        type: string
+        format: uuid
+        description: "EscalationSignal created on input timeout (if escalated)"
+      on_timeout:
+        type: string
+        enum: [escalate, cancel, fail]
+        default: escalate
+        description: "Policy when timeout_seconds elapses without input"
   
   # References only — never embed full ValidationResult or Feedback
   validation_result_id:

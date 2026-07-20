@@ -4,9 +4,18 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [session_id, parser_strategy_used, structural_valid]
+required: [parser_strategy_used, structural_valid, target_type]
 properties:
+  # session_id required when target is agent_session or artifact produced by a session;
+  # optional for standalone workspace_observation without an active session
   session_id:
+    type: string
+    format: uuid
+    description: "Required when target_type is agent_session or artifact (from a session)"
+  target_type:
+    type: string
+    enum: [artifact, agent_session, compiled_prompt, workspace_observation]
+  target_id:
     type: string
     format: uuid
   validation_result_id:
@@ -20,6 +29,23 @@ properties:
       - markdown_block
       - workspace_observation
       - llm_coercion
+  strategy_attempts:
+    type: array
+    description: "Per-strategy outcomes from ParserRegistry.parse"
+    items:
+      type: object
+      required: [strategy, outcome]
+      properties:
+        strategy:
+          type: string
+        outcome:
+          type: string
+          enum: [success, failed, timed_out, skipped]
+        error_category:
+          type: string
+        duration_ms:
+          type: integer
+          minimum: 0
   parser_attempts:
     type: integer
     minimum: 0
@@ -34,3 +60,12 @@ properties:
     type: boolean
   retry_triggered:
     type: boolean
+
+allOf:
+  - if:
+      properties:
+        target_type:
+          enum: [artifact, agent_session]
+      required: [target_type]
+    then:
+      required: [session_id]

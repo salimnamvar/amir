@@ -116,6 +116,15 @@ CLI agents are unreliable: they may hang on interactive prompts, rewrite history
 
 > **Interface contract:** [`docs/contract/interfaces/agent-adapter.yaml`](../contract/interfaces/agent-adapter.yaml)
 
+### Session Continuity Protocol
+
+CLI agents (Claude Code, Codex, etc.) hold native session state outside Amir.
+
+1. **`start()`** returns `handle = { session_id, native_id?, adapter_type }`. `native_id` maps Amir `session_id` to the agent-native conversation/session file.
+2. **Between `pump()` calls** continuity lives in the agent process/native session — the control plane does not re-send full history.
+3. **Lost connection**: `pump` emits `connection_lost` or `health()` → unhealthy → Adapter reconnects using `native_id` within `reconnect_timeout_seconds` (default 30s).
+4. **On reconnect**: reconstruct from full `ReplayMetadata` (expanded from invocation seed at session start) + last checkpoint + `tool_call_stream_ref`.
+5. **On reconnect failure**: session → `failed` with `last_failure_category=infrastructure`; set `replay_status=replay_incomplete` if history is incomplete; operator may re-run from last checkpoint.
 
 ### Interactive Prompt Protocol
 
@@ -124,6 +133,9 @@ When a CLI agent blocks on stdin (confirmations, choices, clarifications):
 1. Adapter detects prompt pattern → emits `needs_input` → session status `waiting_for_input`.
 2. Control plane evaluates **auto-response rules** (role/task scoped, deny-by-default for destructive ops).
 3. If a rule matches → `respond_input` immediately.
+4. If `pending_input.timeout_seconds` elapses without input: apply `on_timeout` policy
+   (`escalate` default → emit `EscalationSignal` with `assigned_to`, set `input_timeout_reason`;
+   or `cancel` / `fail`).
 4. If no rule → escalate per task policy (timeout, human approval, or fail).
 5. Secrets are never auto-answered into agent stdin; they flow only via SecretBinding tmpfs / proxy.
 
@@ -252,6 +264,9 @@ Agent output is treated as untrusted narrative. The filesystem is ground truth.
    - AgentExecutor MUST ensure a durable commit exists for any working-tree changes
    - If the agent produced no commit, synthesize one from the diff and update durable_effects.head_commit
    - Append durable_effects.effects_log incrementally as effects are created (not only at end)
+   - Local commit + durable_effects update SHOULD be atomic with observation record
+   - If push fails after local commit: set Workspace.status=`auto_commit_failed`, record `auto_commit.error`;
+     do NOT clean ephemeral workspace until remediated; emit Workspace.AutoCommitFailed
    - Observation without a durable commit is invalid for compensation-capable sessions
 
 4. Claim Reconciliation (mandatory for CodeChangeArtifact):

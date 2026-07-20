@@ -55,6 +55,15 @@ Complete inventory (data schemas, SQL DDL, interfaces) lives in:
 
 Do not restate field lists here. This file is **versioning policy only**.
 
+### ContractDefinition scope
+
+`ContractDefinition` (referenced in stories and versioning prose) is a **configuration-level
+registry entity**, not a runtime JSON Schema under `schemas/`. Its shape is defined by the
+config loader (e.g. Pydantic models / GitOps YAML for published contract types and versions).
+Runtime data contracts are the files under `docs/contract/schemas/`. Do not expect
+`contract-definition.schema.yaml` unless a future round promotes registry management to a
+first-class runtime aggregate.
+
 ## Breaking Change Rules
 
 ### Prohibited (Requires MAJOR)
