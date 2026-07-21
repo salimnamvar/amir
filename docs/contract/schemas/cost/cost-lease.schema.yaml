@@ -97,11 +97,12 @@ properties:
   kill_threshold_pct:
     type: number
     minimum: 50
-    maximum: 100
+    maximum: 99
     default: 95
     description: >
-      Percentage of reserved_usd/reserved_tokens at which the lease is revoked.
-      Default 95 leaves headroom for in-flight tool completion before hard ceiling.
+      P2-KILL-THRESHOLD-100: Max reduced from 100 to 99. At 100%, the threshold
+      is never proactively triggered — only at commit time. 99% ensures proactive
+      revocation before budget exhaustion.
 
   # Monotonic revision for lease state changes (create/heartbeat/commit/revoke)
   # P1-LEASE-MONOTONICITY: strictly monotonic per lease_id. Implementations MUST reject

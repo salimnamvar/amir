@@ -35,7 +35,8 @@ properties:
     type: string
   retention_policy_id:
     type: string
-    description: "Retention policy for this outbox entry (e.g. permanent, 365d, 90d)"
+    enum: [permanent, 365d, 180d, 90d, 30d, 7d]
+    description: "P2-RETENTION-FREE: Retention policy for this outbox entry"
   created_at:
     type: string
     format: date-time

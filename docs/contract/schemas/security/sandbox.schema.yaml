@@ -64,7 +64,6 @@ properties:
   environment:
     type: string
     enum: [development, staging, production]
-    default: production
     description: "Deployment environment (required). docker only valid in development/staging."
   
   # Resource limits

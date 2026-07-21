@@ -80,7 +80,8 @@ properties:
   # Audit trail for coercion / multi-approver decisions
   audit_trail:
     type: array
-    description: "Append-only audit entries (required for approval_type=coercion when granted)"
+    maxItems: 100
+    description: "P2-APPROVAL-UNBOUNDED: Append-only audit entries (required for approval_type=coercion when granted)"
     items:
       type: object
       required: [at, actor, action]

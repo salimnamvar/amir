@@ -64,9 +64,11 @@ properties:
     description: "Artifact IDs this artifact was derived from"
   
   supersedes:
-    type: string
-    format: uuid
-    description: "Artifact ID this artifact replaces"
+    type: array
+    items:
+      type: string
+      format: uuid
+    description: "P2-SUPERSEDES-ARRAY: Artifact IDs this artifact replaces (array for multi-supersede)"
   
   # Observation method (how content was derived — distinct from ParserStrategy)
   # ParserStrategy (structured_output, tool_call_interception, …) lives on ValidationResult.

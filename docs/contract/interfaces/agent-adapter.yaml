@@ -62,7 +62,11 @@ properties:
       orphan_reap:
         type: boolean
         default: true
-        description: "Reap child processes left by CLI agents after kill"
+        description: >
+          P2-ORPHAN-REAP: Reap = SIGKILL all descendant processes in the same process group
+          + close inherited file descriptors. Does NOT include filesystem cleanup
+          (sandbox teardown handles that). Network sockets and named pipes are closed
+          via file descriptor inheritance.
       health_check_interval_seconds:
         type: integer
         minimum: 5
