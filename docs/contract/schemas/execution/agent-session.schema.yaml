@@ -109,35 +109,18 @@ properties:
       - required: [max_tokens]
       - required: [max_usd]
   
-  # --- Aggregate hygiene (anti–God Object) ---
-  # Full histories:
+  # --- Aggregate invariant (anti–God Object): P0-AGENTSESSION-GOD ---
+  # AgentSession retains ONLY: identity, status, references, replay metadata, timestamps.
+  # Full histories live in their own tables/streams:
   #   checkpoints  → checkpoints table + AgentSession.Checkpoint events
   #   tool_calls   → tool_call_events stream + AgentSession.ToolCall events
-  #   resource_usage history → CostRecord + Cost.Recorded events
+  #   resource_usage history → CostRecord + Cost.Recorded events (NOT here)
   #   validation   → ValidationResult table (validation_result_id only)
   #   feedback     → Feedback table (feedback_artifact_id only)
-
-  # Recent checkpoint IDs only; full Checkpoint rows are linked artifacts/events
-  recent_checkpoint_ids:
-    type: array
-    maxItems: 20
-    items:
-      type: string
-      format: uuid
-    description: "Ring buffer of latest checkpoint IDs; authoritative store is checkpoints table / events"
-
-  # Recent tool-call IDs only (not embedded full objects)
-  recent_tool_call_ids:
-    type: array
-    maxItems: 50
-    items:
-      type: string
-      format: uuid
-    description: "Ring buffer of recent tool-call IDs; full history in event stream"
-
-  tool_call_event_stream_ref:
-    type: string
-    description: "Reference to full tool-call event stream (topic/partition or object key)"
+  # Ring buffers (recent_checkpoint_ids, recent_tool_call_ids) are REMOVED — query
+  # linked tables ordered by sequence. event_retention is REMOVED — configured at
+  # deployment level, not per-session. resource_usage is REMOVED — live metering
+  # lives on CostRecord; CostLease synchronous check reads from CostEnforcer state.
 
   # Interactive prompt handling (CLI agents that request input)
   pending_input:
@@ -184,24 +167,6 @@ properties:
     format: uuid
     description: "Reference to Feedback artifact (if retry path produced one)"
   
-  # Live metering (sidecar); not the durable CostRecord
-  # For long-running sessions, this is the latest snapshot; full history in CostRecord.
-  # CostLease cancellation check is synchronous on each metering tick.
-  resource_usage:
-    type: object
-    description: "Latest usage snapshot; authoritative accounting is CostRecord. Checked against CostLease for synchronous hard kill."
-    properties:
-      tokens_consumed:
-        type: integer
-      cost_usd:
-        type: number
-      duration_seconds:
-        type: number
-      cpu_seconds:
-        type: number
-      memory_peak_mb:
-        type: number
-
   cost_record_id:
     type: string
     format: uuid
@@ -227,22 +192,6 @@ properties:
       complete = full event history available for reconstruction;
       replay_incomplete = older events missing — operator intervention required;
       not_applicable = session still live / not under replay.
-  event_retention:
-    type: object
-    description: "Retention windows for session-linked streams (days; 0 = permanent)"
-    properties:
-      tool_call_stream_days:
-        type: integer
-        minimum: 0
-        default: 90
-      checkpoint_stream_days:
-        type: integer
-        minimum: 0
-        default: 365
-      cost_meter_stream_days:
-        type: integer
-        minimum: 0
-        default: 365
   
   started_at:
     type: string

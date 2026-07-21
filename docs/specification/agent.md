@@ -55,15 +55,15 @@ Pending → Starting → Running ⇄ WaitingForInput
 
 > **Contract:** [`docs/contract/schemas/execution/agent-session.schema.yaml`](../contract/schemas/execution/agent-session.schema.yaml)
 
-AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry. Full `ValidationResult` and `Feedback` objects are **never** embedded — IDs only. Checkpoints and tool calls keep ring-buffer **IDs** only (max 20 / 50).
+AgentSession is the central durable aggregate, **not** a dump of high-frequency telemetry. Full `ValidationResult` and `Feedback` objects are **never** embedded — IDs only. Ring buffers (`recent_checkpoint_ids`, `recent_tool_call_ids`) and live metering (`resource_usage`) have been removed (P0-AGENTSESSION-GOD); query linked tables directly.
 
 | Concern | On session document | Authoritative store |
 |---------|---------------------|---------------------|
 | Identity, status, limits, refs | Yes | Session row / agent-session contract |
 | `workspace_id` | **Required** | Workspace row (1:1) |
-| Checkpoints (full history) | `recent_checkpoint_ids` only | [`execution/checkpoint.schema.yaml`](../contract/schemas/execution/checkpoint.schema.yaml) + SQL |
-| Tool calls (full history) | `recent_tool_call_ids` only | [`execution/tool-call.schema.yaml`](../contract/schemas/execution/tool-call.schema.yaml) + stream |
-| Live meters | Latest snapshot | [`cost/cost-record.schema.yaml`](../contract/schemas/cost/cost-record.schema.yaml) |
+| Checkpoints (full history) | Query by session_id | [`execution/checkpoint.schema.yaml`](../contract/schemas/execution/checkpoint.schema.yaml) + SQL |
+| Tool calls (full history) | Query by session_id | [`execution/tool-call.schema.yaml`](../contract/schemas/execution/tool-call.schema.yaml) + stream |
+| Live meters | CostRecord (not on session) | [`cost/cost-record.schema.yaml`](../contract/schemas/cost/cost-record.schema.yaml) |
 | Validation / feedback | `validation_result_id` / `feedback_artifact_id` only | validation-result / feedback contracts |
 | Cost hard kill | `cost_lease_id` (required while running) | [`cost/cost-lease.schema.yaml`](../contract/schemas/cost/cost-lease.schema.yaml) |
 

@@ -68,12 +68,8 @@ CREATE TABLE agent_sessions (
     max_tokens INTEGER,
     max_usd REAL,
     timeout_seconds INTEGER NOT NULL,
-    -- High-frequency telemetry is NOT stored as unbounded JSON on this row:
-    -- checkpoints → checkpoints table; tool_calls → event stream; usage history → cost_records
-    recent_checkpoint_ids UUID[],  -- ring buffer max 20
-    recent_tool_call_ids UUID[],   -- ring buffer max 50
-    tool_call_event_stream_ref TEXT,
-    resource_usage_snapshot JSONB,  -- latest meters only
+    -- High-frequency telemetry is NOT stored on this row (P0-AGENTSESSION-GOD):
+    -- checkpoints → checkpoints table; tool_calls → event stream; usage → cost_records
     started_at TIMESTAMP,
     completed_at TIMESTAMP,
     CHECK (max_tokens IS NOT NULL OR max_usd IS NOT NULL),
