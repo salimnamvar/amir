@@ -2,6 +2,14 @@
 # Outcome store for idempotent mutable operations
 # Required for: Task, AgentSession, Artifact, Workflow, Approval, CostLease,
 # MatchingDecision, EscalationSignal, SecretBinding, CompensationAction
+#
+# P1-IDEMPOTENCY-SCOPE: Scope-to-operation mapping:
+#   global   = cross-tenant uniqueness (rare; e.g., platform-wide config changes)
+#   tenant   = unique within tenant (e.g., tenant.create)
+#   team     = unique within team (e.g., task.create, session.create)
+#   task     = unique within task (e.g., validation.run, feedback.submit)
+#   agent    = unique within agent (e.g., agent.heartbeat, agent.health)
+# Retention: keys expire after expires_at (default 30 days). DDL enforces UNIQUE(key, scope).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
@@ -13,12 +21,27 @@ properties:
     description: "Opaque idempotency key (e.g. SHA256 of natural key material)"
   operation_type:
     type: string
-    description: "e.g. task.create, session.create, lease.reserve, workflow.start"
+    enum:
+      - task.create
+      - session.create
+      - lease.reserve
+      - lease.heartbeat
+      - lease.commit
+      - lease.revoke
+      - workflow.start
+      - approval.request
+      - approval.grant
+      - artifact.submit
+      - compensation.execute
+      - escalation.create
+      - secret.inject
+      - matching.decide
+    description: "P1-IDEMPOTENCY-SCOPE: exhaustive list of mutable operation types"
   scope:
     type: string
     enum: [global, tenant, team, task, agent]
     default: global
-    description: "Collision scope; keys are unique within scope"
+    description: "Collision scope; keys are unique within scope. See scope-to-operation mapping in header."
   outcome:
     type: object
     description: "Serialized successful result for replay on duplicate request"
@@ -28,3 +51,4 @@ properties:
   expires_at:
     type: string
     format: date-time
+    description: "Key TTL (default 30 days). Expired keys are eligible for garbage collection."

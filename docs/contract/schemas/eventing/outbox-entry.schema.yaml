@@ -1,10 +1,15 @@
 # OutboxEntry Contract Schema
 # Reliable publish record for domain events
+#
+# P1-EVENT-CATEGORIZATION: Events are categorized for delivery guarantees:
+#   domain     = state-change events (at-least-once delivery, hash-chained)
+#   integration = cross-system events (exactly-once via idempotency_key)
+#   audit      = security/ops events (append-only, tamper-evident, long retention)
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status, event_id, idempotency_key]
+required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status, event_id, idempotency_key, event_category]
 properties:
   sequence:
     type: integer
@@ -15,6 +20,10 @@ properties:
     description: "Correlates to DomainEvent.event_id"
   event_type:
     type: string
+  event_category:
+    type: string
+    enum: [domain, integration, audit]
+    description: "P1-EVENT-CATEGORIZATION: domain = state-change; integration = cross-system; audit = security/ops"
   aggregate_id:
     type: string
     format: uuid

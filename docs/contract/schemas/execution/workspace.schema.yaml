@@ -3,6 +3,14 @@
 # Cardinality: Task 1 → 1..* Workspace (one Workspace per AgentSession attempt).
 # Security Context enforces policy; it does not own the Workspace aggregate.
 #
+# P1-WORKSPACE-AGG-REDUNDANCY: Workspace is a separate aggregate root from AgentSession
+# despite 1:1 cardinality. This is a deliberate design decision:
+# - Workspace owns durable_effects (compensation targets) — independent lifecycle
+# - Workspace.security_context is evaluated by Security Context (cross-context concern)
+# - Workspace cleanup can be deferred after session terminal (auto_commit_failed path)
+# - Subsuming into AgentSession would leak Security Context concerns into Execution
+# The 1:1 is enforced by UNIQUE(session_id) in DDL, not by aggregate ownership.
+#
 # Auto-commit invariant (normative):
 # After observation and BEFORE ephemeral cleanup, AgentExecutor MUST ensure a durable
 # commit exists for any working-tree changes and update durable_effects.head_commit.
