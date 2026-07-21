@@ -44,6 +44,18 @@ properties:
           the lease is auto-revoked with cancellation_reason=heartbeat_timeout.
           Sidecar hard-kill ≤100ms after auto-revoke. Prevents indefinite lease
           retention when agent process hangs silently (compute-bound, no SIGTERM trigger).
+      # P0-KILL-BOUND: total time from lease.revoked to session.cancelled must be bounded
+      total_kill_latency_ms:
+        type: integer
+        minimum: 1000
+        maximum: 10000
+        default: 7000
+        description: >
+          Maximum total time (ms) from lease status=revoked to AgentSession.status=cancelled.
+          Composed of: sidecar tick (≤100ms) + SIGTERM grace (≤5s) + SIGKILL + orphan reap
+          + cancel_acknowledged return (≤grace+2s). Worst case with grace=5s: 100+5000+2000=7100ms.
+          Agents consuming compute beyond this bound are a budget overrun violation.
+          Implementations MUST enforce this as a hard upper bound on the kill chain.
 
   methods:
     type: array

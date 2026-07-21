@@ -4,8 +4,17 @@
 # Process-supervision contract (normative for CostLease hard-kill):
 # - cancel is best-effort but BOUNDED: SIGTERM → wait grace_period_seconds (default 5)
 #   → SIGKILL → reap orphans. Returns cancel_acknowledged boolean.
-# - Sidecar detects lease revocation and signals the sandbox process; Adapter.cancel
-#   is invoked by AgentExecutor; Sidecar MUST NOT write Execution DB.
+# - P0-KILL-BOUND: Sidecar MUST NOT directly signal the sandbox process.
+#   Sidecar signals AgentExecutor (or AgentAdapter directly), which holds sole
+#   responsibility for sending signals (SIGTERM → SIGKILL) to the child process
+#   and reaping orphans. This eliminates the dual-supervision race condition.
+# - AgentExecutor transitions AgentSession on cancel/ack
+# - P0-SIDECAR-TRUST: Hard-kill is enforced by the Sandbox Manager (cgroups, process
+#   tree termination, microVM stop) driven by Observability's lease state. The sidecar
+#   is relegated to telemetry and log shipping only — not enforcement.
+# - cancel_acknowledged=false consequence: caller MUST escalate to SIGKILL immediately
+#   (no additional grace period). Log cancellation_bypass_reason=ack_not_received.
+#   This is NOT an error path — it is the expected behavior for unresponsive agents.
 # - health() interval: implementers SHOULD poll every health_check_interval_seconds (default 30).
 #
 # Session continuity protocol (normative for CLI agents):
@@ -43,9 +52,9 @@ properties:
       sigterm_grace_period_seconds:
         type: integer
         minimum: 1
-        maximum: 30
+        maximum: 5
         default: 5
-        description: "Max wait after SIGTERM before SIGKILL (CostLease hard-kill bound)"
+        description: "Max wait after SIGTERM before SIGKILL (P0-KILL-BOUND: reduced from 30s to 5s to bound total kill latency)"
       sigkill_escalation:
         type: boolean
         default: true

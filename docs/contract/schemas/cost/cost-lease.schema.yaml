@@ -5,11 +5,16 @@
 # Kill protocol (normative):
 # 1. Observability marks lease status=revoked with revocation_revision + cancellation_reason.
 # 2. Sidecar/egress observes revoked status on next ≤100ms tick (or sooner via push).
-# 3. Sidecar sends SIGTERM to sandbox process; does NOT write Execution DB.
+# 3. P0-KILL-BOUND: Sidecar MUST NOT directly signal the sandbox process. Instead, sidecar
+#    signals AgentExecutor (or AgentAdapter), which holds sole process-signaling responsibility.
 # 4. AgentAdapter.cancel(handle, cancellation_reason, grace_period_seconds=5) → SIGTERM→SIGKILL.
+#    P0-KILL-BOUND: grace_period_seconds max is 5s (reduced from 30s). cancel_acknowledged=false
+#    triggers immediate SIGKILL with no additional grace.
 # 5. AgentExecutor observes process exit, transitions AgentSession to cancelled with
 #    last_failure_category=budget_exceeded, then Workflow runs compensation on durable_effects.
 # 6. Durable effects are appended as created (not only at session completion).
+# P0-KILL-BOUND: Total kill chain is bounded at total_kill_latency_ms (default 7s, max 10s).
+# Worst case: 100ms tick + 5s grace + 2s SIGKILL/reap = 7.1s.
 #
 # Hierarchical cascade model (normative — single-lease-per-session):
 # - Each in-flight session holds ONE active CostLease with scope=invocation
