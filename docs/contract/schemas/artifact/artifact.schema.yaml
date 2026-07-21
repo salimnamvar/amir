@@ -120,6 +120,34 @@ allOf:
           enum: [validated, accepted]
     then:
       required: [validation_result_id]
+  # P0-ARTIFACT-DISCRIM: content discriminator — validate content shape per contract_type
+  - if:
+      properties:
+        contract_type:
+          const: CodeChangeArtifact
+      required: [contract_type]
+    then:
+      properties:
+        content:
+          required: [files, changes]
+  - if:
+      properties:
+        contract_type:
+          const: TestResultArtifact
+      required: [contract_type]
+    then:
+      properties:
+        content:
+          required: [passed, failed, skipped]
+  - if:
+      properties:
+        contract_type:
+          const: ReviewResultArtifact
+      required: [contract_type]
+    then:
+      properties:
+        content:
+          required: [approved, comments]
 
 # Contract-specific content shapes (reference definitions).
 # Discriminator: contract_type selects the expected content shape.
