@@ -122,6 +122,7 @@ properties:
     description: "Notes on how the escalation was resolved"
 
 # When resolved, require timestamp and acknowledger
+# P0-COMPENSATION-DEADLOCK: compensation_blocked always requires remediation_plan
 allOf:
   - if:
       properties:
@@ -130,3 +131,11 @@ allOf:
       required: [resolution]
     then:
       required: [resolution_timestamp, acknowledged_by]
+  - if:
+      properties:
+        escalation_type:
+          const: compensation_blocked
+      required: [escalation_type]
+    then:
+      required: [remediation_plan]
+      description: "Compensation blocked escalations MUST carry structured remediation steps"

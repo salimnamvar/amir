@@ -126,6 +126,24 @@ properties:
               default: true
             verification_error:
               type: string
+            # P0-COMPENSATION-DEADLOCK: merge commit and divergence handling
+            merge_commit:
+              type: boolean
+              default: false
+              description: "True when target is a merge commit (requires -m flag for revert)"
+            requires_revert_strategy:
+              type: string
+              enum: [simple, revert_merge, revert_no_commit]
+              description: >
+                Determines revert behavior. simple = standard git_revert.
+                revert_merge = merge commit requires -m flag.
+                revert_no_commit = revert without committing (for manual resolution).
+            diverged:
+              type: boolean
+              default: false
+              description: >
+                True when target exists but state has changed (force-push, commit-SHA
+                mismatch, already-closed PR). Sets status=diverged for operator intervention.
         attempts:
           type: integer
           minimum: 0
@@ -148,8 +166,11 @@ properties:
 
   status:
     type: string
-    enum: [pending, completed, failed, skipped, verification_failed]
-    description: "verification_failed when target no longer exists; escalate via EscalationSignal"
+    enum: [pending, completed, failed, skipped, verification_failed, diverged]
+    description: >
+      verification_failed = target no longer exists; escalate via EscalationSignal.
+      diverged = target exists but state has changed (force-push, commit-SHA mismatch,
+      already-closed PR); requires operator intervention or revert-strategy selection.
 
   executed_at:
     type: string
@@ -164,15 +185,34 @@ properties:
       type: string
     description: "Structured remediation when status=failed (required for EscalationSignal path)"
 
+  # P0-COMPENSATION-DEADLOCK: verification timeout and retry
+  verification_timeout_seconds:
+    type: integer
+    minimum: 1
+    default: 30
+    description: "Max seconds to wait for remote verification (git, PR API) before failing"
+  verification_retry_policy:
+    type: object
+    properties:
+      max_attempts:
+        type: integer
+        minimum: 1
+        default: 3
+      backoff_seconds:
+        type: integer
+        minimum: 1
+        default: 5
+    description: "Retry policy for transient verification failures (network, rate limit)"
+
 allOf:
   - if:
       properties:
         status:
-          enum: [failed, verification_failed]
+          enum: [failed, verification_failed, diverged]
       required: [status]
     then:
       required: [error, remediation_steps]
-      description: "Failed compensation MUST carry remediation for EscalationSignal path"
+      description: "Failed/verification_failed/diverged compensation MUST carry remediation for EscalationSignal path"
   - if:
       properties:
         action_type:
