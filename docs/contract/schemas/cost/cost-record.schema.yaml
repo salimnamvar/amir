@@ -120,3 +120,9 @@ properties:
     type: integer
     minimum: 0
     default: 0
+
+  # P1-COSTRECORD-VALIDLEASE: link validation spend to its gating lease
+  validation_lease_id:
+    type: string
+    format: uuid
+    description: "CostLease (budget_pool=validation) that gated this validation spend. Optional; when budget_pool=validation, links to the lease that was checked synchronously."

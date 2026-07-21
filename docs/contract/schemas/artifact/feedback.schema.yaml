@@ -84,3 +84,23 @@ properties:
     type: string
     format: uuid
     description: "ValidationResult that produced this feedback (canonical; owns claim_reconciliation)"
+
+# P1-FEEDBACK-DUPLICATION: consistency between feedback_strategy and parser_strategy_hint
+allOf:
+  - if:
+      properties:
+        feedback_strategy:
+          const: strategy_change
+      required: [feedback_strategy]
+    then:
+      required: [parser_strategy_hint]
+      description: "strategy_change must carry a parser_strategy_hint (which strategy to change to)"
+  - if:
+      properties:
+        feedback_strategy:
+          enum: [structural_hint, semantic_hint, agent_change, human_intervention]
+      required: [feedback_strategy]
+    then:
+      not:
+        required: [parser_strategy_hint]
+      description: "Non-strategy-change feedback must not carry parser_strategy_hint"

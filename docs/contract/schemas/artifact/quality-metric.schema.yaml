@@ -11,10 +11,11 @@ properties:
     format: uuid
   target_type:
     type: string
-    enum: [artifact, agent_session, task]
+    enum: [artifact, agent_session, task, compiled_prompt, workspace_observation]
     description: >
-      Quality can be measured on artifacts (primary), on an agent_session
-      (aggregate quality of its produced artifacts), or on a task (across attempts).
+      P1-METRIC-MISMATCH: Aligned with ValidationMetric.target_type.
+      Quality can be measured on artifacts, agent_sessions, tasks,
+      compiled_prompts (prompt effectiveness), or workspace_observations.
   target_id:
     type: string
     format: uuid

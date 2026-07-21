@@ -54,6 +54,14 @@ properties:
       remote_url:
         type: string
         format: uri
+      # P1-DURABLE-EFFECTS-SNAPSHOT: content-addressed snapshot for drift detection
+      snapshot_captured_at:
+        type: string
+        format: date-time
+        description: "When this snapshot was captured from Workspace.durable_effects"
+      workspace_durable_effects_hash:
+        type: string
+        description: "SHA256 of Workspace.durable_effects at capture time; CI verifies hash matches canonical"
 
   started_at:
     type: string

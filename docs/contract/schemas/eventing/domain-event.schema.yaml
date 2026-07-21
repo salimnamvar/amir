@@ -99,9 +99,15 @@ allOf:
           minimum: 1
       required: [sequence]
     then:
-      required: [prev_hash]
+      required: [prev_hash, signature, key_ref]
       properties:
         prev_hash:
           type: string
           minLength: 1
           description: "P1-HASH-CHAIN-BOTTLENECK: must be non-null SHA256 when sequence > 0"
+        signature:
+          minLength: 1
+          description: "P1-SIGNATURE-REQUIREMENT: cryptographic signature required for chain integrity"
+        key_ref:
+          minLength: 1
+          description: "P1-SIGNATURE-REQUIREMENT: signing key reference required for verification"
