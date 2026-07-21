@@ -1,5 +1,11 @@
 # MatchingDecision Contract Schema
 # Auditable agent selection decision produced by capability scoring + contract negotiation
+#
+# P1-MATCHING-NO-WINNER: This schema serves dual purpose:
+# - AssignmentDecision: hard_filters.passed=true + selected_agent_id present = agent assigned
+# - NoMatchResult: hard_filters.passed=false + no selected_agent_id = no eligible agent found
+# Both are "decisions" — one succeeds, one documents failure to find a match.
+# The task_id and candidates array are always present for auditability.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 

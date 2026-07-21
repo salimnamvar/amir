@@ -175,3 +175,19 @@ Used by SandboxPolicy profile expansion before intersection merge. Platform LLM 
 3. **No field dumps in MD** — link to the contract path instead.
 4. **Examples in MD** may show *values* of a contract (short instance snippets) only when needed for clarity; they must not redefine the schema.
 5. **Idempotency** — all mutable operations require `idempotency_key` (see `idempotency-key.schema.yaml`).
+
+## Core Invariants (Normative)
+
+P1-OBSERVATION-INVARIANT: The following invariants are machine-verifiable and non-negotiable:
+
+1. **Workspace > Agent Claims**: For all reconciliation paths, `workspace_state > agent_claim`. The filesystem is the ground truth. Agent self-reports are untrusted. `ValidationResult.claim_reconciliation.authoritative_source` is always `workspace` (const).
+
+2. **Fail-Closed Cost**: If CostEnforcer (Observability Context) is unreachable, Execution MUST pause all new consumption and cancel in-flight sessions. `lease_authority_unreachable => execution_paused_or_cancelled`.
+
+3. **Fail-Closed Parser**: If workspace_observation is unavailable, the parser chain MUST fail-closed (reject artifact). Do NOT silently skip the ground-truth arbiter.
+
+4. **Lease Revision Monotonicity**: `lease_revision` increments by exactly 1 per mutation. Implementations MUST reject non-monotonic writes.
+
+5. **Retry Ceiling**: `retry_state.attempts <= retry_policy.max_attempts` is a hard invariant enforced by CI.
+
+6. **Aggregate Boundaries**: Cross-aggregate references are by ID only. No distributed invariants across aggregate boundaries.

@@ -250,3 +250,25 @@ All mutable operations require idempotency keys. Stored with operation outcome t
 ### Cost Ceilings
 
 `Task.cost_budget` and session/invocation `resource_limits` structurally require at least one of `max_tokens` or `max_usd` via JSON Schema `anyOf`. Empty budgets are invalid by construction.
+
+## Three-Way Version Contract Matrix (P1-VERSION-CONTRACT)
+
+The design maintains three independent versioning axes. This matrix documents their dependency relationships:
+
+| Axis | Owner | Version Format | Changes When |
+|------|-------|----------------|--------------|
+| Business contracts | Amir (Configuration Context) | SemVer (e.g., CodeChangeArtifact v1.1.0) | Artifact content shape changes |
+| Parser strategies | ParserRegistry (Execution Context) | Strategy version | Output format parsing changes |
+| Agent versions | AgentDefinition (Configuration Context) | SemVer (e.g., claude-v2.1.0) | Agent implementation changes |
+
+**Dependency rules:**
+- Business contract version changes may require parser strategy updates (new content shapes need new parsers)
+- Agent version changes may require adapter/strategy updates (new output formats)
+- Parser strategy changes are independent of business contracts (strategies are composable)
+- When business contract v1.2.0 changes content shape, the corresponding parser strategy must support the new shape — check `Agent.supported_contracts` for version compatibility
+
+**Resolution order:**
+1. Agent version determines adapter selection
+2. Adapter determines available parser strategies
+3. Business contract determines expected output shape
+4. ParserRegistry selects strategy chain from intersection of agent capabilities and contract requirements

@@ -48,6 +48,11 @@ properties:
       Opt-in only. Selecting llm_coercion requires approval_ref (Approval with status=granted
       and approval_type=coercion) at parse time (fail-closed). Produced artifacts MUST have
       observation_method=synthesized and coercion_approval_id set.
+      P1-SYNC-COERCION: To avoid blocking the synchronous parse chain on human approval
+      (default timeout 86400s), coercion approvals MUST be pre-granted at Task/Role
+      configuration level (e.g., Role.allow_llm_coercion: true with a pre-created Approval
+      entity). The parser verifies the pre-granted approval at parse time; it does not
+      create a new Approval request synchronously.
 
   # Per-strategy and total failure handling
   strategy_failure_policy:

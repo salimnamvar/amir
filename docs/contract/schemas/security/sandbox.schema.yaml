@@ -80,6 +80,20 @@ properties:
       pids_limit:
         type: integer
         minimum: 1
+      # P1-RESOURCE-LIMITS: additional resource constraints
+      memory_limit_mb:
+        type: integer
+        minimum: 64
+        description: "Hard memory limit in MB (prevents resource exhaustion attacks)"
+      max_concurrent_sessions:
+        type: integer
+        minimum: 1
+        default: 1
+        description: "Maximum concurrent AgentSessions in this sandbox"
+      egress_rate_limit_bps:
+        type: integer
+        minimum: 1
+        description: "Network egress rate limit in bits per second"
   
   # Security profile
   security_profile:

@@ -230,7 +230,12 @@ properties:
   # Task-scoped attempt state (distinct from agent-level circuit breaker)
   retry_state:
     type: object
-    description: "Per-task retry bookkeeping. Circuit breakers live on AgentScorecard only."
+    description: >
+      Per-task retry bookkeeping. Circuit breakers live on AgentScorecard only.
+      P1-TASK-RETRY-ATTEMPTS: attempts is incremented atomically with AgentSession
+      creation via a saga coordinator. If AgentSession creation fails after attempts
+      is incremented, the saga rolls back the increment. Event-sourced consistency:
+      the increment event is part of the AgentSession creation event.
     properties:
       attempts:
         type: integer

@@ -1,0 +1,184 @@
+# Amir Aggregate Map
+# Normative ownership table for all Aggregate Roots.
+# P1-AGGREGATE-MAP: Canonical reference for bounded context boundaries.
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+
+# Aggregate ownership invariant:
+# Each Aggregate Root owns its entities. Cross-aggregate references are by ID only.
+# No distributed invariants across aggregate boundaries — use events for consistency.
+
+aggregates:
+  Task:
+    owns:
+      - retry_state
+      - retry_policy
+      - validation_budget
+      - cost_budget
+    references_by_id:
+      - AgentSession (via active_session_id)
+      - Workspace (via active_workspace_id)
+      - MatchingDecision (via matching_decision_id)
+      - CostLease (via validation_lease_id)
+    invariants:
+      - cost_budget requires max_tokens OR max_usd (anyOf)
+      - validation_budget required (partitioned from execution)
+      - committed requires lease_check_revision match
+      - terminal failed/cancelled requires last_failure_category
+    cross_aggregate_operations:
+      - Create AgentSession (saga: increment attempts atomically)
+      - Transition to committing after session terminal
+
+  AgentSession:
+    owns:
+      - status lifecycle
+      - attempt metadata
+      - resource_limits
+      - replay_metadata
+    references_by_id:
+      - Task (via task_id)
+      - Workspace (via workspace_id)
+      - CostLease (via cost_lease_id)
+      - AgentDefinition (via agent_definition_id)
+      - MatchingDecision (via matching_decision_id)
+      - CompiledPrompt (via compiled_prompt_id)
+      - ValidationResult (via validation_result_id)
+      - Feedback (via feedback_artifact_id)
+      - CostRecord (via cost_record_id)
+    invariants:
+      - workspace_id required (1 session : 1 workspace)
+      - cost_lease_id required when actively consuming
+      - lease_check_revision required before succeeded
+      - last_failure_category required on terminal failure/cancel
+    cross_aggregate_operations:
+      - Read CostLease for synchronous kill check
+      - Append DomainEvents (outbox)
+
+  Workspace:
+    owns:
+      - durable_effects
+      - auto_commit state
+      - security_context
+      - observation baselines
+    references_by_id:
+      - Task (via task_id)
+      - AgentSession (via session_id)
+      - SandboxPolicy (via sandbox_policy_id)
+    invariants:
+      - session_id unique (1:1 with AgentSession)
+      - status=observed requires auto_commit.committed=true
+      - status=cleaned requires auto_commit NOT committed=false
+      - sandbox_id requires security_context with effective_allowlist_hash
+      - durable_effects is append-only
+    cross_aggregate_operations:
+      - None (Workspace is a leaf aggregate owned by Execution)
+
+  AgentDefinition:
+    owns:
+      - adapter_config
+      - capabilities
+      - resource_limits
+      - security_profile
+    references_by_id: []
+    invariants:
+      - version required
+      - status=published required for MatchingDecision eligibility
+      - adapter_config conditionally required by adapter_type
+    cross_aggregate_operations:
+      - None (Configuration Context entity)
+
+  AgentScorecard:
+    owns:
+      - success_rate
+      - failure_patterns
+      - circuit_breaker
+      - rolling metrics
+    references_by_id:
+      - AgentDefinition (via agent_definition_id)
+    invariants:
+      - circuit_breaker is agent-scoped only (not task-scoped)
+      - warm_started indicates inherited metrics from prior version
+    cross_aggregate_operations:
+      - Read by MatchingDecision for scoring
+
+  CostLease:
+    owns:
+      - status lifecycle
+      - lease_revision
+      - consumption tracking
+    references_by_id:
+      - Task (via task_id)
+      - AgentSession (via agent_session_id)
+    invariants:
+      - status=revoked is the SOLE kill signal
+      - fail_closed_on_unavailable default true
+      - lease_revision strictly monotonic (+1 per mutation)
+      - revoked requires cancellation_reason + revocation_revision + timestamp
+      - active requires agent_session_id
+      - non-retryable reasons force retryable=false
+    cross_aggregate_operations:
+      - Emit DomainEvent on status transition
+      - Trigger AgentSession cancellation via revoke signal
+
+  MatchingDecision:
+    owns:
+      - hard_filters result
+      - dimension_scores
+      - negotiation outcome
+    references_by_id:
+      - Task (via task_id)
+      - AgentDefinition (via selected_agent_id)
+    invariants:
+      - hard_filters.passed=false when no selected_agent_id
+    cross_aggregate_operations:
+      - Read AgentScorecard for scoring
+      - Read AgentDefinition for capability matching
+
+  Workflow:
+    owns:
+      - state machine
+      - compensation_stack
+      - step_results
+    references_by_id:
+      - Task (via step tasks)
+      - AgentSession (via step sessions)
+      - Approval (via approval gates)
+    invariants:
+      - max_steps bounded (default 50)
+      - max_concurrent_steps bounded (default 10)
+      - continue_on_compensation_failure default false
+    cross_aggregate_operations:
+      - Create Tasks per step
+      - Emit EscalationSignal on compensation_blocked
+
+  ValidationResult:
+    owns:
+      - claim_reconciliation
+      - validators
+      - error_categories
+    references_by_id:
+      - AgentSession (via session_id)
+      - Task (via task_id)
+    invariants:
+      - authoritative_source always workspace
+      - claim_reconciliation required when target_type=artifact
+      - llm_coercion requires coercion_approval_id
+    cross_aggregate_operations:
+      - Referenced by Artifact via validation_result_id
+
+  Artifact:
+    owns:
+      - content
+      - provenance
+      - lineage
+    references_by_id:
+      - ValidationResult (via validation_result_id)
+      - Approval (via coercion_approval_id)
+      - AgentDefinition (via produced_by_agent_id)
+    invariants:
+      - validated/accepted requires validation_result_id
+      - synthesized requires coercion_approval_id
+      - checksum required
+      - content shape validated per contract_type discriminator
+    cross_aggregate_operations:
+      - Referenced by CompensationAction for artifact_delete

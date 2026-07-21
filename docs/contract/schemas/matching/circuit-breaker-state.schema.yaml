@@ -27,3 +27,12 @@ properties:
     type: integer
     minimum: 1
     default: 1
+  # P1-CIRCUIT-BREAKER: limit concurrent probes in half_open state
+  half_open_concurrent_limit:
+    type: integer
+    minimum: 1
+    default: 1
+    description: >
+      Maximum concurrent tasks allowed in half_open state. Prevents multiple parallel
+      probes from all succeeding/failing simultaneously. When limit reached, additional
+      tasks are routed to other agents or queued.
