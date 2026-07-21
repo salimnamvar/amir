@@ -115,16 +115,24 @@ properties:
       - required: [max_usd]
 
   # Replay metadata — SEED payload only (not the full session shape).
+  # P0-REPLAY-CIRCULAR: metadata_version=1 identifies this as the seed form.
   # During AgentSession initialization, Execution expands this into the full
-  # replay-metadata.schema.yaml object by adding session_id, prompt_hash,
-  # full_prompt, sandbox_profile_hash, adapter_type, tool_call_stream_ref.
+  # replay-metadata.schema.yaml object (metadata_version=2) by adding session_id,
+  # prompt_hash, full_prompt, sandbox_profile_hash, adapter_type, tool_call_stream_ref.
   # Do NOT pass this object unmodified as AgentSession.replay_metadata.
   replay_metadata:
     type: object
+    required: [metadata_version, model_identifier, seed, agent_version]
     description: >
-      Seed fields known at invocation time. Expanded to full
-      replay-metadata.schema.yaml during session start (see agent.md).
+      Seed fields known at invocation time (metadata_version=1). Expanded to full
+      replay-metadata.schema.yaml (metadata_version=2) during session start.
+      The version field makes the seed→expanded transition explicit and machine-verifiable.
     properties:
+      metadata_version:
+        type: integer
+        enum: [1]
+        const: 1
+        description: "Seed form. Expanded to v2 during AgentSession initialization"
       model_identifier:
         type: string
       seed:

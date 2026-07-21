@@ -1,11 +1,22 @@
 # ReplayMetadata Contract Schema
 # Material required to reproduce an AgentSession execution
+#
+# P0-REPLAY-CIRCULAR: This is the EXPANDED form (v2). The invocation seed (v1)
+# contains only model_identifier, seed, agent_version. During AgentSession
+# initialization, Execution expands the seed into this full object by adding
+# session_id, prompt_hash, full_prompt, sandbox_profile_hash, adapter_type,
+# tool_call_stream_ref. The metadata_version field makes the transition explicit.
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [session_id, model_identifier, prompt_hash, agent_version]
+required: [metadata_version, session_id, model_identifier, prompt_hash, agent_version]
 properties:
+  metadata_version:
+    type: integer
+    enum: [2]
+    const: 2
+    description: "Expanded form (v2). Seed form is v1 (see agent-invocation.schema.yaml)"
   session_id:
     type: string
     format: uuid
