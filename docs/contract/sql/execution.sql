@@ -31,9 +31,9 @@ CREATE TABLE tasks (
     updated_at TIMESTAMP,
     CHECK (cost_budget_max_tokens IS NOT NULL OR cost_budget_max_usd IS NOT NULL),
     CHECK (validation_budget_max_tokens IS NOT NULL OR validation_budget_max_usd IS NOT NULL),
-    -- assigned/running/validating require matching_decision_id
+    -- assigned/running/committing require matching_decision_id
     CHECK (
-      status NOT IN ('assigned', 'running', 'validating')
+      status NOT IN ('assigned', 'running', 'committing')
       OR matching_decision_id IS NOT NULL
     ),
     -- terminal failed/cancelled require last_failure_category

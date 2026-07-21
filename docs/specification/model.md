@@ -225,17 +225,17 @@ stateDiagram-v2
     [*] --> Pending
     Pending --> Assigned: assign_agent()
     Assigned --> Running: start_execution()
-    Running --> Validating: session_terminal_output()
-    Validating --> Succeeded: artifact_valid()
-    Validating --> Failed: artifact_invalid AND retries_exhausted
-    Validating --> Running: start_new_attempt_session
-    note right of Validating: Task re-enters Running with NEW AgentSession+Workspace\nPrior session stays failed (no session re-entry)
+    Running --> Committing: session_terminal_output()
+    Committing --> Succeeded: artifact_valid()
+    Committing --> Failed: artifact_invalid AND retries_exhausted
+    Committing --> Running: start_new_attempt_session
+    note right of Committing: Task re-enters Running with NEW AgentSession+Workspace\nPrior session stays failed (no session re-entry)
     Running --> Failed: session_failed AND retries_exhausted
     Running --> Escalated: escalate_after OR budget_exceeded_team_plus
     Pending --> Cancelled: cancel()
     Assigned --> Cancelled: cancel()
     Running --> Cancelled: cancel()
-    Validating --> Cancelled: cancel()
+    Committing --> Cancelled: cancel()
     Failed --> Assigned: reassign_after_escalation()
     Escalated --> Assigned: human_or_policy_reassign()
 ```

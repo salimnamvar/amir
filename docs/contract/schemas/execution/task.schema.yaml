@@ -48,14 +48,14 @@ properties:
     format: uuid
 
   # Lifecycle status
-  # Aligns with model.md Task state diagram: Pending → Assigned → Running → Validating → terminal
+  # Aligns with model.md Task state diagram: Pending → Assigned → Running → Committing → terminal
   status:
     type: string
     enum:
       - pending
       - assigned
       - running
-      - validating
+      - committing
       - succeeded
       - failed
       - cancelled
@@ -63,8 +63,10 @@ properties:
     default: pending
     description: >
       Task lifecycle. Success terminal is succeeded (event Task.Completed maps here).
-      matching_decision_id required for assigned/running/validating.
+      matching_decision_id required for assigned/running/committing.
       last_failure_category required for failed/cancelled.
+      committing (renamed from validating — P0-TASKVALIDATING): post-session-terminal
+      phase. Distinct from AgentSession.status=validating (OutputParser running).
       escalated = human/agent reassignment path (EscalationSignal); not a session status.
 
   # Input artifacts
@@ -280,7 +282,7 @@ allOf:
   - if:
       properties:
         status:
-          enum: [assigned, running, validating]
+          enum: [assigned, running, committing]
     then:
       required: [matching_decision_id]
   # Terminal failure/cancel requires category for retry eligibility

@@ -187,7 +187,7 @@ $defs:
       - pending
       - assigned
       - running
-      - validating
+      - committing
       - succeeded
       - failed
       - cancelled
@@ -195,6 +195,9 @@ $defs:
     description: >
       Success terminal is succeeded (not completed).
       Event Task.Completed maps to status=succeeded.
+      committing (renamed from validating — P0-TASKVALIDATING): post-session-terminal
+      phase where cost lease is committed, scorecard updated, and workspace observation
+      finalized. Distinct from AgentSession.status=validating (which is OutputParser running).
       Escalation is Task.status=escalated + EscalationSignal (not a session status).
 
   ApprovalStatus:
