@@ -24,6 +24,10 @@ properties:
       Fixed ordered tuple (prefixItems). MUST be applied in this exact order; stop at first success.
       llm_coercion is NOT included. workspace_observation is always last.
       Any permutation is schema-invalid.
+      P1-WORKSPACE-OBS-FALLBACK: If workspace_observation is unavailable (network, permission,
+      filesystem error), the parser chain MUST fail-closed: reject the artifact with
+      structural error. Do NOT silently skip workspace_observation — it is the ground-truth
+      arbiter and skipping it defeats the entire observation model.
     prefixItems:
       - const: structured_output
       - const: tool_call_interception

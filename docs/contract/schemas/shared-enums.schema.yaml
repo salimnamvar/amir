@@ -64,8 +64,10 @@ $defs:
       - test_execution
     description: >
       last_failure_category on AgentSession and Task.
-      When a validator emits behavioral/test_execution, Execution stores that
-      category (or maps to quality) before evaluating Task.retry_policy.retry_on.
+      P1-FAILURE-CATEGORY-MAP: When a validator emits behavioral/test_execution,
+      Execution stores that EXACT category (no remapping to quality). The
+      retry_policy.retry_on list determines retry eligibility from this vocabulary.
+      This makes the mapping deterministic and auditable.
 
   # Default Task.retry_policy.retry_on (excludes budget_exceeded, cancelled, circuit_breaker_open)
   RetryableFailureCategory:

@@ -104,10 +104,12 @@ properties:
       Default 95 leaves headroom for in-flight tool completion before hard ceiling.
 
   # Monotonic revision for lease state changes (create/heartbeat/commit/revoke)
+  # P1-LEASE-MONOTONICITY: strictly monotonic per lease_id. Implementations MUST reject
+  # any mutation that does not increment lease_revision by exactly 1.
   lease_revision:
     type: integer
     minimum: 0
-    description: "Monotonic revision; every mutation increments"
+    description: "Monotonic revision; every mutation increments by exactly 1 (application-level invariant)"
 
   revocation_revision:
     type: integer

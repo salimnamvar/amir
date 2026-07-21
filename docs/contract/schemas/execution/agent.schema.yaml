@@ -14,6 +14,35 @@ properties:
     pattern: "^[a-z0-9-]+$"
     maxLength: 100
   
+  # P1-AGENT-LIFECYCLE: lifecycle status for routing eligibility
+  status:
+    type: string
+    enum: [draft, validating, published, deprecated, retired]
+    default: draft
+    description: >
+      Agent lifecycle. Only status=published agents are eligible for MatchingDecision.
+      deprecated agents complete in-flight sessions but accept no new assignments.
+      retired agents are excluded from all routing.
+  
+  published_at:
+    type: string
+    format: date-time
+    description: "When agent was first published (required when status=published)"
+  
+  deprecated_at:
+    type: string
+    format: date-time
+    description: "When agent was deprecated (required when status=deprecated)"
+  
+  deprecated_notice:
+    type: string
+    description: "Migration guidance for deprecated agents"
+  
+  retired_at:
+    type: string
+    format: date-time
+    description: "When agent was retired (required when status=retired)"
+  
   description:
     type: string
     description: "Human-readable description of agent capabilities"
@@ -171,3 +200,25 @@ allOf:
       properties:
         adapter_config:
           required: [command]
+  # P1-AGENT-LIFECYCLE: status-specific timestamp requirements
+  - if:
+      properties:
+        status:
+          const: published
+      required: [status]
+    then:
+      required: [published_at]
+  - if:
+      properties:
+        status:
+          const: deprecated
+      required: [status]
+    then:
+      required: [deprecated_at]
+  - if:
+      properties:
+        status:
+          const: retired
+      required: [status]
+    then:
+      required: [retired_at]

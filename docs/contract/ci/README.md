@@ -37,6 +37,18 @@ Normative checks that MUST run on every change under `docs/contract/`.
    Every SandboxPolicy profile enum value (`llm_only`, `coding_standard`, `container_build`, `custom`) must have
    expansion source under `allowlists/` except `custom` (inline).
 
+10. **Task retry ceiling** (P1-RETRY-CEILING)  
+    Reject Task instances where `retry_state.attempts > retry_policy.max_attempts`.
+    This is a semantic cross-field check that JSON Schema cannot enforce.
+
+11. **Lease revision monotonicity** (P1-LEASE-MONOTONICITY)  
+    Reject CostLease mutations where `lease_revision` does not increment by exactly 1.
+    Implementations MUST reject any mutation that does not increment lease_revision by exactly 1.
+
+12. **Agent lifecycle status** (P1-AGENT-LIFECYCLE)  
+    Reject Agent instances with `status=deprecated` or `status=retired` from MatchingDecision
+    candidate sets. Only `status=published` agents are eligible for assignment.
+
 ## CI Check Entrypoints
 
 ```bash
