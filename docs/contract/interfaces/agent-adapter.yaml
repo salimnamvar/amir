@@ -78,6 +78,11 @@ properties:
         type: integer
         minimum: 1
         default: 30
+        description: >
+          P0-RECONNECT-LEASE: This timeout is further bounded by the lease TTL at runtime.
+          If lease is revoked during reconnect, reconnect MUST fail immediately — the agent
+          must not resume with an expired/revoked lease. Effective reconnect window is
+          min(reconnect_timeout_seconds, remaining_lease_ttl_seconds).
       use_replay_metadata_on_reconnect:
         type: boolean
         const: true
@@ -86,6 +91,13 @@ properties:
         type: boolean
         default: false
         description: "If true, adapter must return native_id from start() for reconnect"
+      lease_check_on_reconnect:
+        type: boolean
+        default: true
+        description: >
+          P0-RECONNECT-LEASE: Before resuming after reconnect, adapter MUST verify lease
+          is still active (status=active). If revoked, fail immediately with
+          last_failure_category=budget_exceeded.
 
   methods:
     type: array
