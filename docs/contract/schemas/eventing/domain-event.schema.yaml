@@ -51,6 +51,15 @@ properties:
   payload:
     type: object
     description: "Event-type-specific body"
+
+  # P0-DOMAINPAYLOAD: per-event-type payload schema enforcement
+  payload_schema_ref:
+    type: string
+    description: >
+      $ref to per-event-type payload schema under schemas/eventing/payloads/.
+      CI must validate that no event is emitted without a registered payload schema.
+      Example: amir://contract/schemas/eventing/payloads/task-created.schema.yaml
+      The referenced schema defines the exact shape of this event's payload.
   signature:
     type: string
     description: "Cryptographic signature over event material"
