@@ -216,6 +216,7 @@ allOf:
             - org_budget_exceeded
             - validation_budget_exceeded
             - manual_revocation
+            - heartbeat_timeout
       required: [cancellation_reason]
     then:
       properties:

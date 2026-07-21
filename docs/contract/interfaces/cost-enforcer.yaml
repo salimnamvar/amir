@@ -33,6 +33,17 @@ properties:
         description: >
           Default value only. Callers MAY override within [50, 100] per
           CostLease.kill_threshold_pct schema.
+      # P0-COSTENFORCER-HEARTBEAT: stale leases auto-revoked when agent hangs
+      heartbeat_timeout_seconds:
+        type: integer
+        minimum: 1
+        maximum: 300
+        default: 60
+        description: >
+          If no heartbeat received from the agent sidecar within this window,
+          the lease is auto-revoked with cancellation_reason=heartbeat_timeout.
+          Sidecar hard-kill ≤100ms after auto-revoke. Prevents indefinite lease
+          retention when agent process hangs silently (compute-bound, no SIGTERM trigger).
 
   methods:
     type: array

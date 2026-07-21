@@ -147,6 +147,10 @@ $defs:
       - validation_budget_exceeded
       - session_timeout
       - manual_revocation
+      - heartbeat_timeout
+    description: >
+      heartbeat_timeout: agent sidecar failed to send heartbeat within
+      heartbeat_timeout_seconds; lease auto-revoked (P0-COSTENFORCER-HEARTBEAT).
 
   NetworkMode:
     type: string
