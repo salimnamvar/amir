@@ -61,6 +61,7 @@ CREATE TABLE agent_sessions (
     sandbox_attestation_id UUID,
     compiled_prompt_id UUID,
     cost_lease_id UUID,  -- required when status in (starting, running, waiting_for_input, producing_artifact, validating)
+    lease_check_revision INTEGER,  -- P0-COSTLEASE-RACE: must match CostLease.lease_revision before succeeded
     validation_result_id UUID,  -- ID only; never embed full ValidationResult
     feedback_artifact_id UUID,  -- ID only; never embed full Feedback
     cost_record_id UUID,

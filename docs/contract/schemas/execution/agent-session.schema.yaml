@@ -90,6 +90,18 @@ properties:
     format: uuid
     description: "CostLease reference for synchronous hard kill on budget breach"
 
+  # P0-COSTLEASE-RACE: Atomic lease check for session completion guard.
+  # Must match CostLease.lease_revision for any transition from running to succeeded.
+  # Mismatch forces cancellation — prevents session completion between revocation and observation.
+  # Updated by sidecar on each lease check tick; Execution validates before terminal transition.
+  lease_check_revision:
+    type: integer
+    minimum: 0
+    description: >
+      Last observed CostLease.lease_revision. Execution MUST verify
+      lease_check_revision == CostLease.lease_revision before transitioning
+      from running/validating to succeeded. Mismatch → cancel with budget_exceeded.
+
   # Hard resource ceilings (structurally enforced)
   resource_limits:
     type: object
@@ -222,3 +234,14 @@ allOf:
           const: waiting_for_input
     then:
       required: [pending_input]
+  # P0-COSTLEASE-RACE: succeeded requires lease_check_revision (atomic lease check guard)
+  - if:
+      properties:
+        status:
+          const: succeeded
+    then:
+      required: [lease_check_revision]
+      description: >
+        lease_check_revision must be set before succeeded transition.
+        Execution validates lease_check_revision == CostLease.lease_revision;
+        mismatch forces cancellation with budget_exceeded.

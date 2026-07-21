@@ -2,11 +2,20 @@
 # Synchronous lease check boundary for sidecar / egress / executor
 #
 # Trust boundary:
-# - Observability owns CostLease shared-state gate
-# - Execution holds lease_id on AgentSession
+# - P0-COSTLEASE-RACE: Observability Context is the SOLE authority for CostLease
+#   status mutations (active → revoked/expired/released). No other component may
+#   write CostLease.status. Execution Context holds a read-only lease_id reference.
+# - Execution holds lease_id on AgentSession (read-only projection)
 # - Sidecar/egress checks lease synchronously on each metering tick (≤100ms)
-# - Sidecar MUST NOT write Execution DB; only signals process / returns check result
+# - Sidecar MUST NOT write Execution DB or CostLease; only signals process / returns check result
 # - AgentExecutor transitions AgentSession on cancel/ack
+# - P0-COSTLEASE-RACE: fail-closed invariant:
+#   lease_authority_unreachable => execution_paused_or_cancelled
+#   If CostEnforcer (Observability Context) becomes unreachable, Execution MUST
+#   pause all new consumption and cancel in-flight sessions. No silent degradation.
+# - P0-COSTLEASE-RACE: lease_check_revision on AgentSession must match
+#   CostLease.lease_revision for any transition from running to succeeded.
+#   Mismatch forces cancellation (prevents session completion between revocation and observation).
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/interfaces/cost-enforcer"
