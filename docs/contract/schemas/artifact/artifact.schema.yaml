@@ -5,7 +5,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [contract_type, contract_version, content, idempotency_key]
+required: [contract_type, contract_version, content, idempotency_key, checksum]
 properties:
   # Contract identity
   contract_type:

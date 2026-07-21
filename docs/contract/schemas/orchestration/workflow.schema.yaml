@@ -48,6 +48,17 @@ properties:
     description: "WorkflowInstance lifecycle status"
   
   # State machine definition
+  # P1-WORKFLOW-MAX-STEPS: bounded fan-out to prevent unbounded workflow complexity
+  max_steps:
+    type: integer
+    minimum: 1
+    default: 50
+    description: "Maximum number of states in this workflow definition"
+  max_concurrent_steps:
+    type: integer
+    minimum: 1
+    default: 10
+    description: "Maximum number of steps executing concurrently"
   states:
     type: array
     items:
@@ -72,9 +83,10 @@ properties:
               compensation:
                 $ref: "compensation-action.schema.yaml"
                 description: >
-                  Compensation is declared at two layers: abstract intent (workflow)
-                  and concrete effect (execution). See compensation-action contract.
-                  Targets durable side effects — never the ephemeral Workspace filesystem.
+                  P1-COMPENSATION-PRECEDENCE: Step-level compensation overrides workflow-level.
+                  If step-level is absent, workflow-level (compensation) applies.
+                  If both absent, no compensation for that step.
+                  Compensation targets durable side effects — never the ephemeral Workspace filesystem.
         approval_gate:
           type: boolean
           default: false

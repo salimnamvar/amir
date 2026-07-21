@@ -97,8 +97,9 @@ properties:
       type: string
     description: >
       Principal or role IDs allowed to acknowledge/resolve. Default: assigned_to only.
-      Concurrent resolution: last-writer loses — resolution uses optimistic concurrency
-      via resolution_revision.
+      P1-ESCALATION-CONCURRENCY: Concurrent resolution uses first-writer-wins via
+      resolution_revision. The second writer receives a revision mismatch error (409 Conflict)
+      and must re-read the current state before attempting resolution again.
 
   resolution:
     type: string

@@ -163,11 +163,6 @@ properties:
       network_mode:
         $ref: "../shared-enums.schema.yaml#/$defs/NetworkMode"
         default: proxy
-      network_allowlist:
-        type: array
-        items:
-          type: string
-        description: "Effective allowlist after SandboxPolicy intersection merge (alias of effective_allowlist)"
       effective_allowlist:
         type: array
         items:
@@ -235,4 +230,16 @@ allOf:
             committed:
               const: true
               description: "Required when status=observed; compensation needs durable commit target"
+  # P1-WORKSPACE-SECURITY: sandbox_id requires security_context with effective_allowlist_hash
+  - if:
+      properties:
+        sandbox_id:
+          type: string
+      required: [sandbox_id]
+    then:
+      required: [security_context]
+      properties:
+        security_context:
+          required: [effective_allowlist, effective_allowlist_hash]
+          description: "When sandbox exists, security context must be fully populated"
 
