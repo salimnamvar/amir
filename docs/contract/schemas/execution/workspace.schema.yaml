@@ -6,7 +6,10 @@
 # Auto-commit invariant (normative):
 # After observation and BEFORE ephemeral cleanup, AgentExecutor MUST ensure a durable
 # commit exists for any working-tree changes and update durable_effects.head_commit.
-# If the agent produced no commit, the control plane synthesizes one from the diff.
+# P0-GIT-SYNTHESIS: The control plane does NOT author Git commits. The sandbox/agent
+# must produce the commit. If auto-commit fails (network, auth, conflict), workspace
+# transitions to auto_commit_failed and requires human/agent remediation.
+# The control plane VERIFIES commits; it does not SYNTHESIZE them.
 # Observation without a durable commit is invalid for compensation-capable sessions.
 # durable_effects are appended incrementally as effects are created (not only at end).
 
