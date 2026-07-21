@@ -100,3 +100,8 @@ allOf:
       required: [sequence]
     then:
       required: [prev_hash]
+      properties:
+        prev_hash:
+          type: string
+          minLength: 1
+          description: "P1-HASH-CHAIN-BOTTLENECK: must be non-null SHA256 when sequence > 0"
