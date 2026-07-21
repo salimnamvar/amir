@@ -4,7 +4,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
 type: object
-required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status, event_id]
+required: [sequence, event_type, aggregate_id, aggregate_type, payload, delivery_status, event_id, idempotency_key]
 properties:
   sequence:
     type: integer
