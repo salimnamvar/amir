@@ -99,6 +99,7 @@ properties:
   # this via validation_result_id — they MUST NOT duplicate this structure.
   claim_reconciliation:
     type: object
+    required: [authoritative_source]
     description: >
       Comparison of agent/parser claims against workspace ground truth.
       This is the single authoritative shape; workspace always wins on divergence.
@@ -108,11 +109,10 @@ properties:
       claims_match_observation:
         type: boolean
         description: "True when agent/parser claims are consistent with workspace state"
-      # authoritative_source is fixed to workspace; retained as const for explicit audit.
+      # P0-CLAIM-RECONCILIATION-ENFORCEMENT: authoritative_source always workspace
       authoritative_source:
         type: string
         const: workspace
-        default: workspace
         description: "Always workspace; parser/agent claims never override filesystem ground truth"
       baseline_commit:
         type: string
