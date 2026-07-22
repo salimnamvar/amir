@@ -18,6 +18,7 @@ required:
   - producer
   - timestamp
   - payload
+  - payload_schema_ref
   - sequence
 properties:
   event_id:
