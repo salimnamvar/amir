@@ -114,12 +114,12 @@ allOf:
           const: synthesized
     then:
       required: [coercion_approval_id]
-  # P0-ARTIFACT-VALID-STATUS: validated/accepted requires validation_result_id
+  # P0-ARTIFACT-VALID-STATUS: validated/accepted/rejected requires validation_result_id
   # (observation beats claims — agent-produced artifacts cannot self-validate)
   - if:
       properties:
         status:
-          enum: [validated, accepted]
+          enum: [validated, accepted, rejected]
     then:
       required: [validation_result_id]
   # P0-ARTIFACT-DISCRIM: content discriminator — validate content shape per contract_type
