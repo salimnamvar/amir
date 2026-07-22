@@ -213,7 +213,7 @@ allOf:
   # If no winner selected, hard_filters.passed must be false (no compatible agent found)
   - if:
       not:
-        required: [selected_agent_id]
+      required: [selected_agent_id]
     then:
       properties:
         hard_filters:
@@ -222,3 +222,21 @@ allOf:
             passed:
               const: false
               description: "Must be false when no agent is selected (no compatible alternatives)"
+  # When contract_negotiation.compatible=false, selected_agent_id must be absent and fallback_used=true
+  - if:
+      properties:
+        contract_negotiation:
+          properties:
+            compatible:
+              const: false
+      required: [contract_negotiation]
+    then:
+      properties:
+        contract_negotiation:
+          required: [fallback_used]
+          properties:
+            fallback_used:
+              const: true
+              description: "Must be true when top-ranked agent was skipped for incompatibility"
+      not:
+        required: [selected_agent_id]

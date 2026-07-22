@@ -138,6 +138,7 @@ properties:
   pending_input:
     type: object
     description: "Present when status=waiting_for_input"
+    required: [prompt_text, input_kind, timeout_seconds, on_timeout]
     properties:
       prompt_text:
         type: string
@@ -245,3 +246,17 @@ allOf:
         lease_check_revision must be set before succeeded transition.
         Execution validates lease_check_revision == CostLease.lease_revision;
         mismatch forces cancellation with budget_exceeded.
+  # P0-REPLAY-METADATA-VERSION: replay_metadata must be expanded v2 when present
+  - if:
+      properties:
+        replay_metadata:
+          type: object
+      required: [replay_metadata]
+    then:
+      properties:
+        replay_metadata:
+          properties:
+            metadata_version:
+              const: 2
+          required: [metadata_version]
+      required: [replay_metadata]
