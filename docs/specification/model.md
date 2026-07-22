@@ -63,7 +63,7 @@ Key derivation:
 
 > **Contract:** [`docs/contract/schemas/matching/role.schema.yaml`](../contract/schemas/matching/role.schema.yaml)
 
-**Lifecycle**: Draft → Validating → Published → Deprecated
+**Lifecycle**: Draft → Validating → Published → Deprecated → Retired
 
 **Invariants**:
 - All output contracts must be Published
@@ -74,7 +74,7 @@ Key derivation:
 
 > **Contract:** [`docs/contract/schemas/execution/agent.schema.yaml`](../contract/schemas/execution/agent.schema.yaml)
 
-**Lifecycle**: Draft → Validating → Published → Deprecated
+**Lifecycle**: Draft → Validating → Published → Deprecated → Retired
 
 **Invariants**:
 - If sandbox_required=true, network must be limited to proxy
@@ -87,7 +87,7 @@ Key derivation:
 
 Contract definitions are the versioned schema documents under `docs/contract/schemas/`. Compatibility rules: [`docs/contract/compatibility.md`](../contract/compatibility.md).
 
-**Lifecycle**: Draft → Validating → Published → Deprecated
+**Lifecycle**: Draft → Validating → Published → Deprecated → Retired
 
 **Invariants**:
 - Schema must be valid JSON/YAML Schema
