@@ -108,7 +108,7 @@ So that they can't escape isolation
 
 Acceptance:
 - gVisor runtime mandatory in production
-- Docker available only in dev mode
+- Docker available only in development/staging
 - Container runs as UID 65534
 - Root filesystem is read-only
 - Only /workspace is writable
