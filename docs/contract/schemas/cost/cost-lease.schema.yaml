@@ -260,36 +260,3 @@ allOf:
       required: [status]
     then:
       required: [agent_session_id]
-  # cancellation_reason must be consistent with scope when scope is parent-level
-  # Parent-level cascade reasons (team/tenant/org_budget_exceeded) require matching scope
-  # to prevent invalid state where invocation lease has team-level reason
-  - if:
-      properties:
-        cancellation_reason:
-          const: team_budget_exceeded
-      required: [cancellation_reason]
-    then:
-      properties:
-        scope:
-          const: team
-      required: [team_id]
-  - if:
-      properties:
-        cancellation_reason:
-          const: tenant_budget_exceeded
-      required: [cancellation_reason]
-    then:
-      properties:
-        scope:
-          const: tenant
-      required: [tenant_id]
-  - if:
-      properties:
-        cancellation_reason:
-          const: org_budget_exceeded
-      required: [cancellation_reason]
-    then:
-      properties:
-        scope:
-          const: org
-      required: [org_id]
