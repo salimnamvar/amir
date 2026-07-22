@@ -22,6 +22,9 @@ CREATE TABLE outbox_entries (
     delivery_status TEXT DEFAULT 'pending'
 );
 
+-- P0-HASH-CHAIN-ENFORCEMENT: Enforce single-writer per aggregate
+CREATE UNIQUE INDEX uniq_aggregate_chain_sequence ON outbox_entries(aggregate_id, chain_sequence);
+
 CREATE INDEX idx_outbox_pending ON outbox_entries(delivery_status, created_at)
     WHERE delivery_status = 'pending';
 
