@@ -102,6 +102,7 @@ aggregates:
       - Read by MatchingDecision for scoring
 
   CostLease:
+    context: Observability
     owns:
       - status lifecycle
       - lease_revision

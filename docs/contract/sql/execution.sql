@@ -205,7 +205,8 @@ CREATE TABLE cost_leases (
       OR agent_session_id IS NOT NULL
     )
 );
--- CostLease authority: Observability Context owns the gate; Execution holds cost_lease_id on session.
+-- CostLease authority: Observability Context owns the CostLease aggregate and lifecycle.
+-- Execution Context holds cost_lease_id reference on AgentSession and Task.
 -- Hierarchical cascade: CostEnforcer.revoke_by_scope revokes all active leases for team/tenant/org.
 
 

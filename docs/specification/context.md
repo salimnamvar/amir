@@ -133,7 +133,7 @@ Platform signing keys for SandboxAttestation and linear hash-chain audit roots:
 - Metric - Time-series data point
 - CostRecord - Token/cost consumption with multi-dimensional attribution (authoritative)
 - CostSummary - Aggregated cost by period/team/agent
-- CostLease - **Synchronous cost lease for in-flight session cancellation** (Observability authority; Execution holds `cost_lease_id`; storage may co-locate in execution SQL with Observability ownership — see cost-lease.schema.yaml)
+- CostLease - **Synchronous cost lease for in-flight session cancellation** (Observability Context owns CostLease authority and lifecycle; Execution Context holds `cost_lease_id` reference; storage co-locates in execution SQL but ownership is Observability — see cost-lease.schema.yaml)
 - QualityMetric - Artifact quality assessment
 - AgentScorecard - Historical performance metrics + **circuit breaker state**
 - ValidationMetric - Validation pipeline performance

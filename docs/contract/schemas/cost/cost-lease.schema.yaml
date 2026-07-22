@@ -27,6 +27,9 @@
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
+# P0-COSTLEASE-OWNERSHIP-CLARITY: Ownership authority is Observability Context
+owner_context: "observability"
+
 type: object
 required:
   - lease_id
