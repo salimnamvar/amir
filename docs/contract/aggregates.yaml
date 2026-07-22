@@ -10,6 +10,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 
 aggregates:
   Task:
+    context: Execution
     owns:
       - retry_state
       - retry_policy
@@ -23,13 +24,13 @@ aggregates:
     invariants:
       - cost_budget requires max_tokens OR max_usd (anyOf)
       - validation_budget required (partitioned from execution)
-      - committed requires lease_check_revision match
       - terminal failed/cancelled requires last_failure_category
     cross_aggregate_operations:
       - Create AgentSession (saga: increment attempts atomically)
       - Transition to committing after session terminal
 
   AgentSession:
+    context: Execution
     owns:
       - status lifecycle
       - attempt metadata
@@ -55,6 +56,7 @@ aggregates:
       - Append DomainEvents (outbox)
 
   Workspace:
+    context: Execution
     owns:
       - durable_effects
       - auto_commit state
@@ -74,6 +76,7 @@ aggregates:
       - None (Workspace is a leaf aggregate owned by Execution)
 
   AgentDefinition:
+    context: Configuration
     owns:
       - adapter_config
       - capabilities
@@ -88,6 +91,7 @@ aggregates:
       - None (Configuration Context entity)
 
   AgentScorecard:
+    context: Observability
     owns:
       - success_rate
       - failure_patterns
@@ -122,6 +126,7 @@ aggregates:
       - Trigger AgentSession cancellation via revoke signal
 
   MatchingDecision:
+    context: Execution
     owns:
       - hard_filters result
       - dimension_scores
@@ -136,6 +141,7 @@ aggregates:
       - Read AgentDefinition for capability matching
 
   WorkflowInstance:
+    context: Workflow
     owns:
       - state machine
       - compensation_stack
@@ -153,6 +159,7 @@ aggregates:
       - Emit EscalationSignal on compensation_blocked
 
   ValidationResult:
+    context: Execution
     owns:
       - claim_reconciliation
       - validators
@@ -168,6 +175,7 @@ aggregates:
       - Referenced by Artifact via validation_result_id
 
   Artifact:
+    context: Execution
     owns:
       - content
       - provenance
