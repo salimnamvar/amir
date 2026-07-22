@@ -134,7 +134,7 @@ aggregates:
       - Read AgentScorecard for scoring
       - Read AgentDefinition for capability matching
 
-  Workflow:
+  WorkflowInstance:
     owns:
       - state machine
       - compensation_stack
