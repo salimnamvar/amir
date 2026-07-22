@@ -45,7 +45,7 @@ I want to GET /tasks/{id} for current status
 So that I can monitor progress
 
 Acceptance:
-- Returns current state (pending|assigned|running|validating|succeeded|failed|cancelled|escalated)
+- Returns current state (pending|assigned|running|committing|succeeded|failed|cancelled|escalated)
 - Returns assigned agent / matching_decision_id
 - Returns AgentSession checkpoints (current attempt)
 - Returns artifact if status=succeeded (event Task.Completed)

@@ -99,11 +99,11 @@ Contract definitions are the versioned schema documents under `docs/contract/sch
 
 > **Contract:** [`docs/contract/schemas/execution/task.schema.yaml`](../contract/schemas/execution/task.schema.yaml)
 
-**Lifecycle**: Pending → Assigned → Running → Validating → Succeeded / Failed / Cancelled / Escalated
+**Lifecycle**: Pending → Assigned → Running → Committing → Succeeded / Failed / Cancelled / Escalated
 
 **Invariants**:
 - Must have Assignment before Running
-- `matching_decision_id` required when status is `assigned`, `running`, or `validating`
+- `matching_decision_id` required when status is `assigned`, `running`, or `committing`
 - `retry_state.last_failure_category` required when status is `failed` or `cancelled`
 - `cost_budget` must include at least one of `max_tokens` or `max_usd`
 - `validation_budget` is **required** and partitioned; enforced via separate CostLease (`budget_pool=validation`)
@@ -240,7 +240,7 @@ stateDiagram-v2
     Escalated --> Assigned: human_or_policy_reassign()
 ```
 
-**Retry model (normative):** each validation/retry attempt creates a **new AgentSession** and **new Workspace**. Task stays alive and increments `retry_state.attempts`. Session status never re-enters `running` after `validating` on the same session. Event `Task.Completed` maps to status **`succeeded`**.
+**Retry model (normative):** each validation/retry attempt creates a **new AgentSession** and **new Workspace**. Task stays alive and increments `retry_state.attempts`. Session status never re-enters `running` after `committing` on the same session. Event `Task.Completed` maps to status **`succeeded`**.
 
 ### AgentSession States
 

@@ -51,7 +51,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - FeedbackArtifact - Corrections and suggested strategy for retry (refs ValidationResult)
 - MatchingDecision - Agent selection audit (hard filters + scores + negotiation + exploration)
 
-**Lifecycle (Task)**: Pending → Assigned → Running → Validating → Succeeded / Failed / Cancelled / Escalated
+**Lifecycle (Task)**: Pending → Assigned → Running → Committing → Succeeded / Failed / Cancelled / Escalated
 
 > Event `Task.Completed` maps to status **`succeeded`**. Each retry attempt = new AgentSession + new Workspace.
 
