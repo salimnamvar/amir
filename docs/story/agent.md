@@ -17,7 +17,7 @@ I want to POST /agents with adapter config
 So that Amir can invoke my agent
 
 Acceptance:
-- AgentDefinition created (GitOps lifecycle Draft→Published is Configuration Context; agent.schema has no runtime status field)
+- AgentDefinition created with `status=draft`; GitOps promotion to `published` is a Configuration Context concern; only `status=published` agents are eligible for `MatchingDecision` (see `agent.schema.yaml#status`, CI check P1-AGENT-LIFECYCLE)
 - Adapter config validated per adapter_type conditionals
 - Supported output modes declared (json_schema, tool_use, markdown_yaml, workspace_observation)
 - Agent appears in registry when Published
