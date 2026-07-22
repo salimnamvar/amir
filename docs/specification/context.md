@@ -208,7 +208,7 @@ WorkflowContext(Workflow.StepFailed)
             → Else: log and continue (default: false)
         → Ephemeral Workspace cleanup is independent and usually already done
     → If all compensation succeeded:
-        → WorkflowContext(Workflow.Failed)
+        → WorkflowContext(Workflow.Compensated)
     → ObservabilityContext(Compensation metrics recorded)
 ```
 
