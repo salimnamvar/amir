@@ -68,9 +68,39 @@ CREATE TABLE secret_bindings (
     consumer_pubkey_ref TEXT,
     created_by TEXT,
     revoked_at TIMESTAMP,
+    -- P0-SECRET-BINDING-LIFECYCLE: status=used requires consumed_at, consumer_session_id, consumption_signature
+    -- P0-SECRET-BINDING-LIFECYCLE: expired/revoked cannot become active
     CHECK (
-      NOT (single_use = TRUE AND status = 'used')
+      status IS DISTINCT FROM 'used'
       OR (consumed_at IS NOT NULL AND consumer_session_id IS NOT NULL AND consumption_signature IS NOT NULL)
+    ),
+    CHECK (
+      status IS DISTINCT FROM 'active'
+      OR expires_at > injected_at
+    ),
+    CHECK (
+      expires_at IS NOT NULL AND expires_at > NOW()
+      OR status IN ('used', 'revoked')
+    )
+);
+
+-- P0-SANDBOX-DDL: Sandboxes table DDL for security aggregate
+CREATE TABLE sandboxes (
+    sandbox_id UUID PRIMARY KEY,
+    runtime TEXT NOT NULL CHECK (runtime IN ('gvisor', 'firecracker', 'docker')),
+    environment TEXT NOT NULL CHECK (environment IN ('development', 'staging', 'production')),
+    network_mode TEXT NOT NULL CHECK (network_mode IN ('proxy', 'none')),
+    user_id INTEGER DEFAULT 65534,
+    read_only_root BOOLEAN DEFAULT TRUE,
+    tmpfs_workspaces BOOLEAN DEFAULT TRUE,
+    network_allowlist JSONB,
+    network_allowlist_profile TEXT,
+    security_profile TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    -- P0-SANDBOX-RUNTIME-AUTHORITY: docker illegal in production
+    CHECK (
+      environment IS DISTINCT FROM 'production'
+      OR runtime IN ('gvisor', 'firecracker')
     )
 );
 
