@@ -69,6 +69,7 @@ CREATE TABLE agent_sessions (
     max_tokens INTEGER,
     max_usd REAL,
     timeout_seconds INTEGER NOT NULL,
+    pending_input JSONB,  -- P0-PENDING-INPUT-DDL: interactive prompts durable
     -- High-frequency telemetry is NOT stored on this row (P0-AGENTSESSION-GOD):
     -- checkpoints → checkpoints table; tool_calls → event stream; usage → cost_records
     started_at TIMESTAMP,
@@ -81,6 +82,11 @@ CREATE TABLE agent_sessions (
     CHECK (
       status NOT IN ('failed', 'cancelled', 'timed_out')
       OR last_failure_category IS NOT NULL
+    ),
+    -- P0-PENDING-INPUT-ENFORCEMENT: required fields inside pending_input
+    CHECK (
+      status IS DISTINCT FROM 'waiting_for_input'
+      OR (pending_input IS NOT NULL AND pending_input ? 'prompt_text' AND pending_input ? 'input_kind' AND pending_input ? 'timeout_seconds' AND pending_input ? 'on_timeout')
     )
 );
 
@@ -92,17 +98,23 @@ CREATE TABLE workspaces (
     branch TEXT,
     workdir TEXT,
     status TEXT NOT NULL CHECK (status IN ('created', 'active', 'observed', 'auto_commit_failed', 'cleaned', 'failed')),
-    auto_commit JSONB,
+    auto_commit JSONB,  -- P0-AUTO-COMMIT-CHECK: committed=true required when status=observed
     baseline_commit TEXT,
     current_commit TEXT,
     baseline_tree_hash TEXT,
     durable_effects JSONB,  -- commit/branch/PR targets for compensation; append-only effects_log
     ephemeral BOOLEAN DEFAULT TRUE,
     sandbox_policy_id UUID,
+    sandbox_attestation_id UUID,  -- P1-SANDBOX-ATTESTATION-DDL: attestation reference for sandbox
     effective_allowlist_hash TEXT,
     created_at TIMESTAMP,
     observed_at TIMESTAMP,
-    cleaned_at TIMESTAMP
+    cleaned_at TIMESTAMP,
+    -- P0-AUTO-COMMIT-CHECK: workspace can only be observed after successful auto-commit
+    CHECK (
+      status IS DISTINCT FROM 'observed'
+      OR (auto_commit IS NOT NULL AND (auto_commit->>'committed')::boolean = true)
+    )
 );
 
 -- Circuit breaker lives with agent performance, not tasks
@@ -127,7 +139,7 @@ CREATE TABLE artifacts (
     provenance JSONB,
     checksum TEXT,
     derived_from UUID[],
-    supersedes UUID,
+    supersedes UUID[],  -- P1-SUPERSEDES-ARRAY: multi-artifact supersession
     observation_method TEXT,
     validation_result_id UUID,  -- canonical claim_reconciliation lives on validation_results
     coercion_approval_id UUID,  -- required when observation_method=synthesized
@@ -205,6 +217,24 @@ CREATE TABLE cost_leases (
       OR agent_session_id IS NOT NULL
     )
 );
+-- P0-LEASE-REVISION-MONOTONICITY: Trigger to enforce lease_revision increments by exactly 1 per mutation
+CREATE OR REPLACE FUNCTION enforce_lease_revision_monotonicity()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.lease_revision IS NOT NULL THEN
+    IF NEW.lease_revision != OLD.lease_revision + 1 THEN
+      RAISE EXCEPTION 'lease_revision must increment by exactly 1 per mutation (got % from %)', 
+        NEW.lease_revision, OLD.lease_revision;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER cost_lease_revision_check
+  BEFORE UPDATE ON cost_leases
+  FOR EACH ROW EXECUTE FUNCTION enforce_lease_revision_monotonicity();
+
 -- CostLease authority: Observability Context owns the CostLease aggregate and lifecycle.
 -- Execution Context holds cost_lease_id reference on AgentSession and Task.
 -- Hierarchical cascade: CostEnforcer.revoke_by_scope revokes all active leases for team/tenant/org.
