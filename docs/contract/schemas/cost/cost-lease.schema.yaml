@@ -198,14 +198,14 @@ properties:
 
 # Structural conditionals (lease protocol invariants)
 allOf:
-  # When revoked: reason + revision + timestamp required
+  # When revoked: reason + revision + timestamp + retryable required
   - if:
       properties:
         status:
           const: revoked
       required: [status]
     then:
-      required: [cancellation_reason, revocation_revision, revocation_timestamp]
+      required: [cancellation_reason, revocation_revision, revocation_timestamp, retryable]
   # When not revoked: revocation fields must be absent
   - if:
       properties:
