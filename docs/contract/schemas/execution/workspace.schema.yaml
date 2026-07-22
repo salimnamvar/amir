@@ -130,11 +130,15 @@ properties:
         format: uri
       effects_log:
         type: array
-        description: "Incremental log of durable effects as they were created"
+        description: "Incremental log of durable effects as they were created (P0-EFFECTS-LOG-DIVERGENCE)"
         items:
           type: object
-          required: [effect_type, target, created_at]
+          required: [sequence, effect_type, target, created_at]
           properties:
+            sequence:
+              type: integer
+              minimum: 0
+              description: "Monotonic ordering key; compensation MUST iterate in descending sequence order"
             effect_type:
               type: string
               enum: [branch_create, commit, pr_open, artifact_publish, other]
