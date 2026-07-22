@@ -90,7 +90,7 @@ Amir is organized into five bounded contexts, each with clear ownership and resp
 - CompensationAction - Abstract rollback intent with concrete effect mapping
 - StepResult - Ordered execution history with compensation info
 
-**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / **CompensationBlocked** / Rejected
+**Lifecycle**: pending → running → awaiting_approval → succeeded / failed / compensating / compensation_blocked / escalated / rejected / cancelled
 
 **Storage**: PostgreSQL (durable state) + Event Store (event sourcing)
 

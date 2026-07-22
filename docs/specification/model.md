@@ -168,7 +168,9 @@ High-frequency telemetry is **not** stored unbounded on the session document. Se
 > - Step results: [`orchestration/step-result.schema.yaml`](../contract/schemas/orchestration/step-result.schema.yaml)
 > - Storage: [`sql/workflow.sql`](../contract/sql/workflow.sql)
 
-**Lifecycle**: Requested → Planned → Implementation → Testing → Review → Approved → Completed / Failed / Cancelled / Escalated / Compensating / CompensationBlocked / Rejected
+**Lifecycle**: pending → running → awaiting_approval → succeeded / failed / compensating / compensation_blocked / escalated / rejected / cancelled
+
+> **Note**: The SDLC-style lifecycle (Requested → Planned → Implementation → Testing → Review → Approved → Completed) shown below is an **example workflow template** (see US-WORKFLOW-001), not the generic WorkflowInstance aggregate lifecycle. The canonical instance_status enum is defined in `workflow.schema.yaml`.
 
 **Invariants**:
 - State transitions must follow WorkflowDefinition
@@ -274,6 +276,11 @@ stateDiagram-v2
 
 ### WorkflowInstance States
 
+> **Example SDLC Workflow Template** (see US-WORKFLOW-001 in `docs/story/workflow.md`):
+>
+> The diagram below illustrates a specific SDLC pipeline template. This is NOT the generic WorkflowInstance lifecycle.
+> For the canonical `instance_status` enum, see `workflow.schema.yaml` (contract) and the lifecycle line above.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Requested
@@ -295,6 +302,35 @@ stateDiagram-v2
     Implementation --> Escalated: manual_or_slo
     Escalated --> [*]
 ```
+
+> **Canonical WorkflowInstance Lifecycle** (from `workflow.schema.yaml`):
+>
+> ```mermaid
+> stateDiagram-v2
+>     [*] --> pending
+>     pending --> running: start()
+>     running --> awaiting_approval: approval_gate_reached()
+>     awaiting_approval --> running: approval_granted()
+>     running --> succeeded: all_steps_complete()
+>     running --> failed: step_failed AND no_compensation
+>     running --> compensating: step_failed AND compensation_available
+>     compensating --> succeeded: compensation_complete
+>     compensating --> compensation_blocked: compensation_failed AND continue_on_failure_false
+>     compensation_blocked --> escalated: emit_EscalationSignal
+>     compensation_blocked --> compensating: human_resume
+>     compensation_blocked --> failed: human_abort
+>     running --> escalated: manual_or_slo
+>     awaiting_approval --> rejected: approval_rejected()
+>     pending --> cancelled: cancel()
+>     running --> cancelled: cancel()
+>     compensating --> cancelled: cancel()
+>     escalated --> [*]
+>     succeeded --> [*]
+>     failed --> [*]
+>     rejected --> [*]
+>     cancelled --> [*]
+>     compensation_blocked --> [*]
+> ```
 
 ---
 

@@ -71,6 +71,7 @@ properties:
 # WaitForSignal(workflow_instance_id, signal_name, timeout_seconds) ->
 #   { received: bool, payload? }
 #   - Used for approval gates (auto_approve=false) and external human signals
+#   - When approval granted: instance_status transitions from awaiting_approval to running
 # CompleteWorkflow(workflow_instance_id) -> { instance_status: succeeded }
 # GetState(workflow_instance_id) -> WorkflowInstance snapshot (status, stack, step_results)
 # FailWorkflow(workflow_instance_id, reason, last_failure_category?) ->
