@@ -220,6 +220,27 @@ WorkflowInstance ──→ * CompensationAction (abstract; maps to durable_effec
 
 ## State Machines
 
+### Task/CostLease State Mapping
+
+Task and CostLease state machines are aligned through explicit transition rules:
+
+| Task Status | CostLease Status | Transition Rule |
+|------------|------------------|-----------------|
+| pending | — | No CostLease yet |
+| assigned | — | No CostLease yet |
+| running | active | CostLease reserved on session start |
+| committing | active | CostLease still active during commit phase |
+| succeeded | released | CostLease committed on successful completion |
+| failed | released/released | CostLease released on failure |
+| cancelled | revoked | CostLease revoked on cancellation |
+| escalated | active | CostLease remains active during escalation |
+
+**Transition rules:**
+- Task.completed → CostLease.commit() → status=released
+- Task.failed → CostLease.commit() → status=released
+- Task.cancelled → CostLease.revoke(manual_revocation) → status=revoked
+- CostLease.revoked → AgentSession.cancelled → Task.cancelled (if running)
+
 ### Task States
 
 ```mermaid
