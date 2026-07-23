@@ -3,6 +3,13 @@
 # Strategy order is an ordered tuple, not a set. Strategies MUST be tried in order;
 # stop at first success. workspace_observation is the final ground-truth arbiter
 # in the default chain. llm_coercion is opt-in only and requires Approval at parse time.
+#
+# P1-PARSER-REGISTRY-VALIDATION: Parser registry YAML MUST be validated at load time.
+# Malformed entries cause cascading parse failures. Implementations MUST:
+# 1. Validate YAML syntax before parsing
+# 2. Validate against this schema ($ref)
+# 3. Reject registry on any validation failure (fail-closed)
+# 4. Log validation errors with line numbers for debugging
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "amir://contract/interfaces/parser-registry"
