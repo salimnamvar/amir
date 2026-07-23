@@ -1,0 +1,215 @@
+# SecurityInterface Contract
+# Formal security interface for aggregate delegation
+#
+# Trust boundary:
+# - All aggregates MUST reference a Security implementation for access control
+# - Security decisions are delegated to the SecurityInterface
+# - Trust boundaries are defined per aggregate context
+# - Delegation rules specify who can authorize what
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "amir://contract/interfaces/security-interface"
+
+type: object
+required: [interface, methods, invariants, trust_boundaries]
+properties:
+  interface:
+    const: SecurityInterface
+
+  invariants:
+    type: object
+    properties:
+      fail_closed_default:
+        type: boolean
+        const: true
+        description: "Security checks fail-closed by default"
+      audit_trail_required:
+        type: boolean
+        const: true
+        description: "All security decisions must be audited"
+      delegation_chain_bounded:
+        type: boolean
+        const: true
+        description: "Delegation chains must be bounded to prevent privilege escalation"
+
+  trust_boundaries:
+    type: object
+    description: "Trust boundary definitions per context"
+    required: [execution, observability, configuration, workflow]
+    properties:
+      execution:
+        type: object
+        description: "Execution Context trust boundary"
+        properties:
+          description:
+            type: string
+            const: "Agent sandboxes, egress proxy, workspace isolation"
+          principal_scope:
+            type: string
+            const: "task"
+          allowed_operations:
+            type: array
+            items:
+              type: string
+            enum:
+              - sandbox_create
+              - workspace_access
+              - egress_proxy
+              - secret_inject
+              - cost_check
+      observability:
+        type: object
+        description: "Observability Context trust boundary"
+        properties:
+          description:
+            type: string
+            const: "CostLease, AgentScorecard, metrics, audit log"
+          principal_scope:
+            type: string
+            const: "tenant"
+          allowed_operations:
+            type: array
+            items:
+              type: string
+            enum:
+              - cost_lease_mutate
+              - scorecard_read
+              - metrics_write
+              - audit_log_append
+      configuration:
+        type: object
+        description: "Configuration Context trust boundary"
+        properties:
+          description:
+            type: string
+            const: "AgentDefinition, Role, Team configuration"
+          principal_scope:
+            type: string
+            const: "team"
+          allowed_operations:
+            type: array
+            items:
+              type: string
+            enum:
+              - agent_define
+              - role_assign
+              - team_config
+      workflow:
+        type: object
+        description: "Workflow Context trust boundary"
+        properties:
+          description:
+            type: string
+            const: "WorkflowInstance, CompensationAction, Approval"
+          principal_scope:
+            type: string
+            const: "workflow"
+          allowed_operations:
+            type: array
+            items:
+              type: string
+            enum:
+              - workflow_execute
+              - compensation_execute
+              - approval_grant
+
+  policies:
+    type: object
+    description: "Security policies for access control"
+    required: [access_control, delegation, audit]
+    properties:
+      access_control:
+        type: object
+        description: "Access control policy"
+        properties:
+          model:
+            type: string
+            enum: [rbac, abac, hybrid]
+            default: hybrid
+          default_deny:
+            type: boolean
+            const: true
+          require_justification:
+            type: boolean
+            const: true
+            description: "Security decisions must include justification"
+      delegation:
+        type: object
+        description: "Delegation policy"
+        properties:
+          max_depth:
+            type: integer
+            minimum: 1
+            maximum: 3
+            default: 2
+            description: "Maximum delegation chain depth"
+          require_explicit:
+            type: boolean
+            const: true
+            description: "Delegation must be explicit, not implicit"
+          audit_delegation:
+            type: boolean
+            const: true
+            description: "All delegations must be audited"
+      audit:
+        type: object
+        description: "Audit policy"
+        properties:
+          log_all_decisions:
+            type: boolean
+            const: true
+            description: "Log all security decisions (access grant/deny)"
+          retention_days:
+            type: integer
+            minimum: 90
+            default: 365
+          tamper_evident:
+            type: boolean
+            const: true
+            description: "Audit log must be tamper-evident"
+
+  methods:
+    type: array
+    items:
+      type: object
+      required: [name, purpose, inputs, outputs]
+      properties:
+        name:
+          type: string
+          enum:
+            - check_access
+            - delegate_authority
+            - revoke_authority
+            - audit_decision
+            - get_trust_boundary
+            - validate_delegation_chain
+        purpose:
+          type: string
+        inputs:
+          type: array
+          items:
+            type: string
+        outputs:
+          type: array
+          items:
+            type: string
+
+# Canonical method semantics:
+# check_access(principal, action, resource, context) ->
+#   { allowed: bool, reason, audit_id }
+#   - Evaluates RBAC/ABAC policies
+#   - Fails closed on error
+#   - Records audit trail
+# delegate_authority(delegator, delegatee, scope, constraints, expiry) ->
+#   { delegation_id, chain_depth }
+#   - Validates delegation chain depth <= max_depth
+#   - Records delegation in audit trail
+# revoke_authority(delegation_id, reason) -> { revoked: bool }
+#   - Immediate revocation, no grace period
+# audit_decision(audit_id) -> AuditEvent
+#   - Retrieves full audit record
+# get_trust_boundary(context) -> TrustBoundary
+#   - Returns trust boundary definition for context
+# validate_delegation_chain(principal) ->
+#   { valid: bool, chain: Principal[], depth: int }
+#   - Validates entire delegation chain is valid and bounded
