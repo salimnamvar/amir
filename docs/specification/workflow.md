@@ -297,6 +297,22 @@ async def execute_step(self, workflow_id: UUID, task_spec: TaskSpec) -> None:
     return result
 ```
 
+### Request Handler Idempotency
+
+All request handlers that perform mutable operations MUST include an idempotency key:
+
+| Handler | Idempotency Key | Scope | Description |
+|---------|----------------|-------|-------------|
+| AgentStartRequest | `idempotency_key` | team | Prevent duplicate agent creation |
+| AgentStopRequest | `idempotency_key` | team | Prevent duplicate stop signals |
+| PoolScaleRequest | `idempotency_key` | team | Prevent duplicate scaling operations |
+| FleetDeployRequest | `idempotency_key` | team | Prevent duplicate fleet deployments |
+| SessionCreateRequest | `idempotency_key` | task | Prevent duplicate session creation |
+
+On receipt, handlers MUST check if a request with the same key has already been processed. If so, return the cached result instead of re-executing. Use the `IdempotencyKey` contract for storage and TTL.
+
+> **Contract:** [`docs/contract/schemas/eventing/idempotency-key.schema.yaml`](../contract/schemas/eventing/idempotency-key.schema.yaml)
+
 ### Workflow-as-Event-Sourced Aggregate
 
 WorkflowInstance state is derived from events, not stored directly:
