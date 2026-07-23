@@ -2,6 +2,32 @@
 
 ## Security Principles
 
+### Trust Boundaries
+
+| Context | Trust Boundary | Principal Scope | Allowed Operations |
+|---------|---------------|-----------------|-------------------|
+| Execution | Agent sandboxes, egress proxy, workspace isolation | task | sandbox_create, workspace_access, egress_proxy, secret_inject, cost_check |
+| Observability | CostLease, AgentScorecard, metrics, audit log | tenant | cost_lease_mutate, scorecard_read, metrics_write, audit_log_append |
+| Configuration | AgentDefinition, Role, Team configuration | team | agent_define, role_assign, team_config |
+| Workflow | WorkflowInstance, CompensationAction, Approval | workflow | workflow_execute, compensation_execute, approval_grant |
+
+### Security Policies
+
+| Policy | Description | Enforcement |
+|--------|-------------|-------------|
+| Access Control | RBAC/ABAC hybrid with default deny | PolicyEngine |
+| Delegation | Max depth 2, explicit delegation required | SecurityInterface |
+| Audit | All decisions logged, tamper-evident | Linear hash chain |
+| Fail-Closed | Default deny on error | SecurityInterface |
+
+### Delegation Rules
+
+1. Delegation MUST be explicit (no implicit delegation)
+2. Delegation chain depth MUST NOT exceed 2
+3. All delegations MUST be audited
+4. Delegation MAY be revoked at any time
+5. Delegation scope MUST be bounded
+
 ### Zero Trust Execution
 
 Every agent runs in complete isolation with:
