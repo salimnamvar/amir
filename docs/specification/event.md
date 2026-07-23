@@ -167,6 +167,38 @@ Every event includes:
 
 Verification: recompute hash chain from first event for the aggregate. Any tampering breaks the chain. Periodic root-commit of chain tips to an external transparency log is optional hardening.
 
+## Event Schema Versioning
+
+All event schemas MUST follow semantic versioning (SemVer) with the following rules:
+
+| Version Change | When | Example |
+|---------------|------|---------|
+| MAJOR | Breaking change to event shape | 1.0.0 → 2.0.0 |
+| MINOR | New optional field added | 1.0.0 → 1.1.0 |
+| PATCH | Bug fix, no shape change | 1.0.0 → 1.0.1 |
+
+**Versioning rules:**
+1. Event `version` field (on DomainEvent envelope) tracks envelope version
+2. `payload_schema_ref` points to versioned payload schema
+3. Consumers MUST handle N-1 minor version compatibility
+4. Breaking changes require MAJOR version bump and migration guide
+5. Deprecated fields MUST remain for at least one MINOR version
+
+**Compatibility matrix:**
+
+| Change Type | Backward Compatible | Forward Compatible | Action Required |
+|------------|--------------------|--------------------|-----------------|
+| Add optional field | Yes | Yes | None |
+| Add required field | No | Yes | New consumer version |
+| Remove optional field | Yes | No | Deprecate first |
+| Remove required field | No | No | MAJOR bump |
+| Change field type | No | No | MAJOR bump + migration |
+
+**Schema registry:**
+- All event schemas registered under `docs/contract/schemas/eventing/payloads/`
+- CI validates no event emitted without registered payload schema
+- Registry tracks version history and compatibility
+
 ---
 
 ## Event Publishing
