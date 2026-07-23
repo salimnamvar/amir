@@ -39,6 +39,10 @@ Events are linear hash-chained (`sequence`, `prev_hash`, optional `signature` / 
 | Workflow.Completed | WorkflowEngine | workflow_id, status |
 | Workflow.Compensated | WorkflowEngine | workflow_id, actions_executed, actions_succeeded |
 | MatchingDecision.Made | CapabilityMatcher | task_id, agent_id, score, dimension_scores |
+| Fleet.Deployed | Orchestrator | fleet_id, agent_count, deployment_config |
+| Fleet.DeployFailed | Orchestrator | fleet_id, error, retry_state |
+| Fleet.Scaled | Orchestrator | fleet_id, previous_count, target_count |
+| Fleet.ScaleFailed | Orchestrator | fleet_id, error, target_count |
 
 ### Progress Events (Configurable Retention)
 
