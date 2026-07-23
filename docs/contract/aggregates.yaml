@@ -25,6 +25,13 @@ aggregates:
       - cost_budget requires max_tokens OR max_usd (anyOf)
       - validation_budget required (partitioned from execution)
       - terminal failed/cancelled requires last_failure_category
+    events:
+      - Task.Created
+      - Task.Assigned
+      - Task.Started
+      - Task.Completed
+      - Task.Failed
+      - Task.Cancelled
     cross_aggregate_operations:
       - Create AgentSession (saga: increment attempts atomically)
       - Transition to committing after session terminal
