@@ -1,6 +1,12 @@
 # Cost Record Schema
 # Multi-dimensional cost tracking with orchestration/worker separation
 # Supports 4-level hierarchy: invocation → team → tenant → org
+#
+# Cost unit definition (P1-COST-UNIT):
+# - tokens: Input and output tokens (LLM billing unit)
+# - cost_usd: USD cost (financial billing unit)
+# - duration_seconds: Wall-clock time (operational metric)
+# - Each cost record tracks all three units for multi-dimensional billing
 
 $schema: "https://json-schema.org/draft/2020-12/schema"
 
