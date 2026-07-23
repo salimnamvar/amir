@@ -13,6 +13,12 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # Audit events MUST include: timestamp, actor, previous state, new state, reason.
 # Audit trail MUST be append-only and tamper-evident (linear hash chain).
 
+# Timestamp invariant (P1-TIMESTAMP):
+# All aggregates MUST include created_at and updated_at timestamps.
+# Terminal states MUST include a terminal timestamp (completed_at, failed_at, cancelled_at).
+# Timestamps MUST be in UTC ISO 8601 format.
+# Timestamps are used for audit trail, duration calculation, and time-based queries.
+
 aggregates:
   Task:
     context: Execution
