@@ -155,7 +155,17 @@ properties:
 
   cancellation_reason:
     $ref: "../shared-enums.schema.yaml#/$defs/CancellationReason"
-    description: "Why the lease was revoked (required when status=revoked)"
+    description: >
+      Why the lease was revoked (required when status=revoked).
+      Semantic distinction (P0-LEASE-REVOCATION-SEMANTICS):
+      - User-initiated: manual_revocation (deliberate, voluntary termination)
+      - System-enforced: session_timeout, heartbeat_timeout (automated policy enforcement)
+      - Budget-triggered: invocation_budget_exceeded, team/tenant/org_budget_exceeded,
+        validation_budget_exceeded (financial limit reached — distinct from revocation)
+      Event consumers MUST pattern-match on cancellation_reason to determine response:
+      - manual_revocation → cleanup and notify user
+      - session_timeout/heartbeat_timeout → incident response, check agent health
+      - budget_exceeded → financial workflows, budget alert, no retry by default
 
   # Whether a new attempt may retry after this revocation
   retryable:
