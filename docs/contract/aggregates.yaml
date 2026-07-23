@@ -111,6 +111,7 @@ aggregates:
       - status lifecycle
       - lease_revision
       - consumption tracking
+      - security_profile
     references_by_id:
       - Task (via task_id)
       - AgentSession (via agent_session_id)
@@ -121,6 +122,8 @@ aggregates:
       - revoked requires cancellation_reason + revocation_revision + timestamp
       - active requires agent_session_id
       - non-retryable reasons force retryable=false
+      - security_profile required (trust boundary for financial operations)
+      - only authorized principals may revoke leases (delegation_rules)
     cross_aggregate_operations:
       - Emit DomainEvent on status transition
       - Trigger AgentSession cancellation via revoke signal
