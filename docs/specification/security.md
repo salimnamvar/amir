@@ -134,6 +134,23 @@ LLM Provider
 6. Provide runtime attestation (signed sandbox state)
 7. Destroy sandbox and cleanup all resources
 
+### Container Image Security
+
+Container images used for agent execution MUST meet these security requirements:
+
+| Requirement | Description | Enforcement |
+|------------|-------------|-------------|
+| Non-root user | Container processes MUST NOT run as root | Dockerfile USER directive |
+| Read-only rootfs | Root filesystem MUST be read-only | Docker --read-only |
+| No hardcoded secrets | Credentials MUST NOT be embedded in image layers | Secret injection via tmpfs |
+| Health checks | Images MUST include HEALTHCHECK instructions | CI validation |
+| Multi-stage builds | Build artifacts MUST NOT leak into runtime image | Dockerfile validation |
+| Image signing | Images MUST be signed with cosign/notation | CI/CD pipeline |
+| SBOM generation | Software bill of materials MUST be generated | CI/CD pipeline |
+| Base image pinning | Base images MUST be pinned by digest | Dockerfile policy |
+
+**Production Docker ban**: Production sandboxes MUST NOT use Docker runtime. Docker is allowed only for development/testing with seccomp profiles. Production requires gVisor or Firecracker.
+
 ### Workspace Isolation
 
 - **Task 1 → 1..* Workspace** (one exclusive workspace per AgentSession attempt; retries get a new workspace)
