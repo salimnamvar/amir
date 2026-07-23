@@ -67,6 +67,31 @@ Structural authority for tables and columns is **not** in this document.
 Configuration Context remains Git (`amir-config/`: agents, roles, contracts, workflows, teams, skills, prompts).
 
 
+## CQRS Boundary
+
+Read and write operations are separated to optimize for their respective workloads:
+
+### Write Model (Commands)
+- Task, AgentSession, Workspace, CostLease, WorkflowInstance
+- Optimized for consistency and durability
+- Event-sourced for audit trail
+
+### Read Model (Queries)
+- AgentScorecard, CostSummary, TaskStatus, WorkflowStatus
+- Optimized for query performance
+- Projected from write model via events
+
+### Projection Rules
+1. Query handlers MUST access read models only
+2. Command handlers MUST access write models only
+3. Projections MUST be eventually consistent (bounded staleness)
+4. Read models MUST be rebuilt from events on schema change
+
+### Consistency Guarantees
+- **Strong consistency**: Write model (event sourcing)
+- **Eventual consistency**: Read model (projection lag < 1s)
+- **Read-your-writes**: Query after command returns projected state
+
 ## Migration Paths
 
 ### SQLite to PostgreSQL
