@@ -195,6 +195,37 @@ retry_allowed?
     └─ NO → Compensate + Fail workflow
 ```
 
+### Fleet Deployment Retry and Fallback
+
+Fleet deployment operations MUST have defined retry and fallback semantics:
+
+| Component | Retry Policy | Fallback Path | Circuit Breaker |
+|-----------|-------------|---------------|-----------------|
+| FleetDeployRequest | exponential backoff, max 3 retries | Rollback to previous version | Per-fleet |
+| FleetScaleRequest | exponential backoff, max 2 retries | Maintain current scale | Per-fleet |
+| AgentStartRequest | linear backoff, max 2 retries | Fail task | Per-agent |
+| AgentStopRequest | immediate retry, max 1 retry | Force kill | Per-agent |
+| PoolScaleRequest | exponential backoff, max 2 retries | Maintain current pool | Per-pool |
+
+**Retry policy:**
+- `max_retries`: Maximum number of retry attempts
+- `backoff_strategy`: exponential | linear | fixed
+- `backoff_seconds`: Initial backoff duration
+- `retryable_errors`: List of error codes that trigger retry
+- `non_retryable_errors`: List of error codes that fail immediately
+
+**Fallback paths:**
+- Fleet deployment failure → rollback to previous version, emit `Fleet.DeployFailed`
+- Fleet scale failure → maintain current scale, emit `Fleet.ScaleFailed`
+- Agent start failure → fail task with `infrastructure` category
+- Agent stop failure → force kill process, emit `AgentSession.Cancelled`
+
+**Circuit breaker:**
+- Per-entity (fleet, agent, pool) circuit breakers
+- Open after 3 consecutive failures
+- Half-open after 60 seconds
+- Close on successful probe
+
 ## Approval Model
 
 
