@@ -226,6 +226,42 @@ Fleet deployment operations MUST have defined retry and fallback semantics:
 - Half-open after 60 seconds
 - Close on successful probe
 
+### Centralized Retry Policy
+
+All retry logic MUST use the centralized retry policy defined in `RetryPolicy`:
+
+```yaml
+# Centralized retry policy (canonical reference)
+RetryPolicy:
+  max_attempts: 3
+  backoff_strategy: exponential
+  backoff_seconds: 60
+  retry_on:
+    - structural
+    - semantic
+    - policy
+    - quality
+    - timeout
+    - infrastructure
+    - behavioral
+    - test_execution
+  escalate_after: 2
+  jitter: true
+  jitter_max_seconds: 10
+```
+
+**Retry policy rules:**
+1. All handlers MUST use the centralized `RetryPolicy` from Task schema
+2. Custom retry logic MUST be documented and justified
+3. Retry metrics MUST be emitted for observability
+4. Retry behavior MUST be consistent across handlers
+
+**Retry metrics:**
+- `retry.attempts`: Number of retry attempts
+- `retry.success_rate`: Success rate after retry
+- `retry.escalation_rate`: Rate of escalation to different agent
+- `retry.backoff_seconds`: Actual backoff duration used
+
 ## Approval Model
 
 
