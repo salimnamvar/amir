@@ -191,3 +191,22 @@ P1-OBSERVATION-INVARIANT: The following invariants are machine-verifiable and no
 5. **Retry Ceiling**: `retry_state.attempts <= retry_policy.max_attempts` is a hard invariant enforced by CI.
 
 6. **Aggregate Boundaries**: Cross-aggregate references are by ID only. No distributed invariants across aggregate boundaries.
+
+## Config Validation
+
+All configuration files MUST be validated at load time:
+
+| Validation | Description | Enforcement |
+|-----------|-------------|-------------|
+| YAML syntax | Valid YAML 1.2 | Loader |
+| JSON Schema | Validate against registered schema | CI + loader |
+| Required fields | All required fields present | Schema |
+| Type validation | Field types match schema | Schema |
+| Enum validation | Enum values are valid | Schema |
+| Conditional validation | allOf/if-then rules | Schema |
+
+**Validation rules:**
+1. All config files MUST have a `$schema` reference
+2. CI MUST validate all config files against their schemas
+3. Loaders MUST reject invalid config with descriptive errors
+4. Config validation MUST be fail-closed (reject on error)
