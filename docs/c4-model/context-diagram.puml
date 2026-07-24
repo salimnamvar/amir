@@ -42,6 +42,7 @@ System_Ext(registries, "Package & Container Registries", "PyPI, npm, ghcr.io, qu
 System_Ext(message_queue, "Message Queue (optional)", "Kafka / NATS — high-throughput domain event publishing (alternative to outbox table)")
 System_Ext(transparency_log, "Transparency Log (optional)", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
+System_Ext(policy_engine, "Policy Decision Engine", "Evaluates authorization, execution constraints, security policies and governance rules")
 System_Ext(sandbox, "Sandbox Runtime Platform", "Provides isolated execution environments, filesystem isolation, network enforcement, resource limits and runtime attestation")
 
 System_Ext(agents, "AI Agent Runtime Providers", "Claude Code, Codex, OpenCode, Gemini CLI, MCP agents — heterogeneous, non-deterministic, untrusted runtime processes")
@@ -78,6 +79,7 @@ Rel(amir, registries, "Agent dependency installs and sandbox image pulls via egr
 Rel(amir, message_queue, "Publishes domain events via outbox or direct", "Kafka / NATS")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
+Rel(amir, policy_engine, "Requests policy decisions", "Policy evaluation API")
 Rel(amir, sandbox, "Creates and controls isolated execution environments", "Sandbox API")
 
 ' ──────────────────────────────────────────────────────────────────
