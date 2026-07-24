@@ -109,4 +109,12 @@ note bottom of agents
   llm_coercion requires explicit human Approval.
 end note
 
+note top of object_storage
+  **Event Retention Policies**
+  • Lifecycle events: Permanent
+  • Security / Compensation: Permanent
+  • Cost events: 365 days
+  • Progress events: Configurable
+end note
+
 @enduml
