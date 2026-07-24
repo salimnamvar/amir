@@ -86,5 +86,6 @@ Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects Compi
 Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
 Rel(agents, git_repos, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
 Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
+Rel_R(llm_providers, amir, "Metered consumption recorded as CostRecord (budget_pool=execution|validation)", "Egress proxy → CostEnforcer")
 
 @enduml
