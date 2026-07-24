@@ -92,6 +92,20 @@ Rel(amir, agents, "Invokes via AgentAdapter; injects CompiledPrompt + secrets; o
 ' NOTES
 ' ──────────────────────────────────────────────────────────────────
 
+note right of amir
+  **P1 Architectural Invariants**
+  · Workspace observation is ground truth (not agent claims)
+  · CostLease is the sole synchronous hard-kill signal (fail-closed)
+  · lease_revision increments by exactly +1 per mutation
+  · Production runtime in {gVisor, Firecracker} only
+  · Allowlist merge = intersection only
+  · validation_budget required and partitioned from execution
+  · All mutable operations require idempotency keys
+  · AgentSession is the central durable aggregate
+  · Task 1 → 1..* Workspace (one per retry attempt)
+  · Linear hash-chained events per aggregate (single-writer)
+end note
+
 note bottom of agents
   Agents are **untrusted external processes** isolated in sandboxes.
   They have zero direct network access. All egress is intercepted,
