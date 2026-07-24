@@ -43,6 +43,8 @@ System_Ext(message_queue, "Message Queue", "Kafka / NATS — high-throughput dom
 System_Ext(transparency_log, "Transparency Log", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
 
+System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemini CLI, MCP servers, API agents — heterogeneous, non-deterministic, untrusted")
+
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — ACTORS → AMIR
 ' ──────────────────────────────────────────────────────────────────
@@ -75,5 +77,14 @@ Rel(amir, container_registries, "Sandbox base image pulls routed through egress 
 Rel(amir, message_queue, "Publishes domain events (categorized by retention policy)", "Kafka / NATS protocol")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes for tamper-evidence anchoring", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
+
+' ──────────────────────────────────────────────────────────────────
+' RELATIONSHIPS — AGENTS → EXTERNAL SYSTEMS (via egress proxy)
+' ──────────────────────────────────────────────────────────────────
+
+Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
+Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
+Rel(agents, git_repos, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
+Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
 
 @enduml
