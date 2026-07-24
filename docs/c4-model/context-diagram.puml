@@ -86,4 +86,20 @@ Rel(agents, git_vcs, "Commits code changes, pushes durable effects (when policy 
 Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
 Rel_R(llm_providers, amir, "Metered consumption recorded as CostRecord (budget_pool=execution|validation)", "Egress proxy → CostEnforcer")
 
+' ──────────────────────────────────────────────────────────────────
+' NOTES
+' ──────────────────────────────────────────────────────────────────
+
+note right of amir
+  **P1 Architectural Invariants**
+  • Workspace > agent claims (ground truth)
+  • Fail-closed cost (CostLease revoked = sole kill signal)
+  • Fail-closed parser (workspace_observation unavailable = reject)
+  • lease_revision increments by exactly +1 per mutation
+  • Production runtime in {gVisor, Firecracker} only
+  • Allowlist merge = intersection only
+  • validation_budget required and partitioned
+  • All mutable operations require idempotency keys
+end note
+
 @enduml
