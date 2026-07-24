@@ -67,7 +67,7 @@ Rel(debugger, amir, "Inspects agent sessions, replays failed executions", "REST 
 
 Rel(amir, config_repo, "Reads GitOps definitions and policies", "Git")
 Rel(amir, source_repo, "Clones workspaces, executes git-native compensation", "Git")
-Rel(amir, ci_cd, "Produces PRs for external CI validation", "Webhook")
+Rel(amir, ci_cd, "Indirect: pushes PRs to Git VCS, which triggers CI via webhook", "Via Git VCS")
 
 Rel(amir, llm_providers, "Routes agent LLM calls through egress proxy", "mTLS via egress proxy")
 Rel(amir, secret_manager, "Creates SecretBindings and authorizes secret retrieval", "Vault API")
