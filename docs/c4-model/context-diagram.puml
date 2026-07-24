@@ -16,6 +16,7 @@ Person(agent_owner, "Agent Owner", "Registers and configures agent adapters, dec
 Person(security_officer, "Security Officer", "Enforces sandbox policy, network allowlists, secret injection, attestation verification")
 Person(financial_controller, "Financial Controller", "Defines budget caps (team/tenant/org), monitors cost tracking and enforcements")
 Person(compliance_officer, "Compliance Officer", "Audits linear hash-chained events, verifies tamper-evidence, reviews retention policies")
+Person(project_manager, "Project Manager", "Tracks workflow progress, monitors feature delivery and compensation status")
 
 ' ──────────────────────────────────────────────────────────────────
 ' AMIR SYSTEM
@@ -47,6 +48,7 @@ Rel(agent_owner, amir, "Register agent adapters, declare capabilities, configure
 Rel(security_officer, amir, "Define sandbox policies, network allowlists, secret bindings, attestation rules", "REST API / Config")
 Rel(financial_controller, amir, "Define budget caps (team/tenant/org), review cost reports", "REST API / Dashboard")
 Rel(compliance_officer, amir, "Audit events, verify hash chain, review retention policies", "API / Object Storage")
+Rel(project_manager, amir, "Track workflow progress, monitor feature delivery status", "REST API / Dashboard")
 
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — AMIR → EXTERNAL SYSTEMS
