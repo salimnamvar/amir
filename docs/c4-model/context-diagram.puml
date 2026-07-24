@@ -49,14 +49,14 @@ System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemi
 ' ──────────────────────────────────────────────────────────────────
 
 Rel(developer, amir, "Creates tasks, monitors execution, debugs agent output", "REST API (JWT)")
-Rel(platform_operator, amir, "Manage definitions, monitor metrics/cost/health, configure teams", "REST API / Dashboard")
-Rel(approver, amir, "Grant approvals (workflow gates, coercion), resolve escalation signals", "REST API / Notifications")
-Rel(agent_owner, amir, "Register agent adapters, declare capabilities, configure output modes", "REST API")
-Rel(security_officer, amir, "Define sandbox policies, network allowlists, secret bindings, attestation rules", "REST API / Config")
-Rel(financial_controller, amir, "Define budget caps (team/tenant/org), review cost reports", "REST API / Dashboard")
-Rel(compliance_officer, amir, "Audit events, verify hash chain, review retention policies", "API / Object Storage")
-Rel(project_manager, amir, "Track workflow progress, monitor feature delivery status", "REST API / Dashboard")
-Rel(debugger, amir, "Inspect agent sessions, replay failed executions", "REST API / Dashboard")
+Rel(platform_operator, amir, "Manages definitions, monitors metrics/cost/health, configures teams", "REST API / Dashboard")
+Rel(approver, amir, "Grants approvals (workflow gates, coercion), resolves escalation signals", "REST API / Notifications")
+Rel(agent_owner, amir, "Registers agent adapters, declares capabilities, configures output modes", "REST API")
+Rel(security_officer, amir, "Defines sandbox policies, network allowlists, secret bindings, attestation rules", "REST API / Config")
+Rel(financial_controller, amir, "Defines budget caps (team/tenant/org), reviews cost reports", "REST API / Dashboard")
+Rel(compliance_officer, amir, "Audits events, verifies hash chain, reviews retention policies", "API / Object Storage")
+Rel(project_manager, amir, "Tracks workflow progress, monitors feature delivery status", "REST API / Dashboard")
+Rel(debugger, amir, "Inspects agent sessions, replays failed executions", "REST API / Dashboard")
 
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — AMIR → EXTERNAL SYSTEMS
