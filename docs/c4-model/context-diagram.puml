@@ -1,0 +1,35 @@
+@startuml Amir-System-Context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Amir System Context Diagram — AI Agent Orchestration Control Plane
+
+Person(developer, "Developer", "Creates tasks programmatically via API, monitors execution progress")
+Person(platform_operator, "Platform Operator", "Manages team/agent definitions, monitors system health and cost")
+Person(approver, "Approver / Reviewer", "Grants human approvals, handles escalations (compensation blocked, cost limit exceeded)")
+
+System(amir, "Amir Control Plane", "Orchestrates external AI coding agents: task assignment, session management, workspace observation, cost governance, security enforcement, and workflow compensation")
+
+System_Ext(git_repos, "Git Repositories (VCS)", "Source code repositories cloned per workspace; branch/PR compensation targets. System of record for code promotion.")
+System_Ext(git_config, "amir-config/ Git Repo", "GitOps-managed: AgentDefinitions, RoleDefinitions, TeamDefinitions, WorkflowDefinitions, Contract/Schema versions")
+System_Ext(ci_cd, "CI/CD Pipeline", "Validates workflow artifacts (PRs, code changes); separate system but may trigger from Amir")
+System_Ext(llm_providers, "LLM Providers", "OpenAI, Anthropic, Google, etc. — external API endpoints agents call through Amir's egress proxy")
+System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage; JIT secret injection via SecretBinding with TTL. Signing keys for audit chain attestation.")
+System_Ext(prometheus, "Prometheus / OpenTelemetry", "Metrics collection from Amir components; observability backend")
+System_Ext(object_storage, "Object Storage (WORM)", "Permanent audit log retention, replay metadata, large artifact storage")
+
+Rel(developer, amir, "POST /tasks, GET /tasks/{id}", "REST API (JWT)")
+Rel(platform_operator, amir, "Manage definitions, monitor metrics/cost", "REST API / Dashboard")
+Rel(approver, amir, "Grant approvals, resolve escalations", "REST API / Notifications")
+
+Rel(amir, git_config, "Reads Agent/Role/Team/Workflow definitions", "Git clone/fetch (GitOps)")
+Rel(amir, git_repos, "Clone per workspace, observe workspace state, auto-commit, git-native compensation", "Git (clone, diff, commit, push)")
+Rel(amir, ci_cd, "Produced PRs validated by external CI", "PR creation")
+
+Rel(amir, llm_providers, "Agent LLM calls routed through egress proxy", "mTLS via egress proxy")
+Rel(amir, vault, "Fetch secrets, inject via SecretBinding (JIT, TTL)", "Vault API (mTLS)")
+Rel(amir, prometheus, "Emits metrics, cost records, scorecard updates", "Prometheus / OpenTelemetry")
+Rel(amir, object_storage, "Store permanent audit logs, replay metadata", "Object Storage API")
+
+@enduml
