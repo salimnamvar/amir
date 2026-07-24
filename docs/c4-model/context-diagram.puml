@@ -37,6 +37,7 @@ System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage for JIT injection via
 System_Ext(prometheus, "Prometheus / OpenTelemetry", "Metrics collection (cost records, agent performance, validation pipeline); distributed tracing via W3C trace context")
 System_Ext(object_storage, "Object Storage (WORM)", "Permanent audit log retention (linear hash-chained events), replay metadata, large artifact storage, transparency log root-commits")
 System_Ext(notification_system, "Notification System", "Delivers EscalationSignals to assigned recipients (cost_limit_exceeded, compensation_blocked, input_timeout); approval request routing")
+System_Ext(pkg_registries, "Package Registries", "PyPI, npm, crates.io, Maven, RubyGems — agent dependency installs via egress proxy (coding_standard allowlist profile)")
 
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — ACTORS → AMIR
@@ -65,5 +66,6 @@ Rel(amir, vault, "Fetch secrets (JIT, TTL), inject via SecretBinding (tmpfs/prox
 Rel(amir, prometheus, "Emits metrics, cost records, agent scorecard updates, validation metrics, traces", "Prometheus / OpenTelemetry")
 Rel(amir, object_storage, "Store permanent audit logs (WORM), replay metadata, large artifacts, transparency log root-commits", "Object Storage API")
 Rel(amir, notification_system, "Delivers EscalationSignals (cost_limit_exceeded, compensation_blocked, input_timeout), approval requests to assigned recipients", "Webhook / API")
+Rel(amir, pkg_registries, "Agent dependency installs routed through egress proxy (coding_standard allowlist profile)", "mTLS via egress proxy")
 
 @enduml
