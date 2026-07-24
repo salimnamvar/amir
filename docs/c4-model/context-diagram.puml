@@ -39,7 +39,7 @@ System_Ext(notification_system, "Notification System", "Delivers EscalationSigna
 System_Ext(pkg_registries, "Package Registries", "PyPI, npm, crates.io, Maven, RubyGems — agent dependency installs via egress proxy (coding_standard allowlist profile)")
 System_Ext(container_registries, "Container Registries", "ghcr.io, quay.io — base image pulls for sandbox runtimes (container_build profile only)")
 System_Ext(message_queue, "Message Queue (optional)", "Kafka / NATS — high-throughput domain event publishing (alternative to outbox table)")
-System_Ext(transparency_log, "Transparency Log", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
+System_Ext(transparency_log, "Transparency Log (optional)", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
 
 System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemini CLI, MCP servers, API agents — heterogeneous, non-deterministic, untrusted")
