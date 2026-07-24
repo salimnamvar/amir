@@ -36,8 +36,7 @@ System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage for JIT injection via
 System_Ext(prometheus, "Prometheus / OpenTelemetry", "Metrics collection (cost records, agent performance, validation pipeline); distributed tracing via W3C trace context")
 System_Ext(object_storage, "Object Storage (WORM)", "Permanent audit log retention (linear hash-chained events), replay metadata, large artifact storage, transparency log root-commits")
 System_Ext(notification_system, "Notification System", "Delivers EscalationSignals to assigned recipients (cost_limit_exceeded, compensation_blocked, input_timeout); approval request routing")
-System_Ext(pkg_registries, "Package Registries", "PyPI, npm, crates.io, Maven, RubyGems — agent dependency installs via egress proxy (coding_standard allowlist profile)")
-System_Ext(container_registries, "Container Registries", "ghcr.io, quay.io — base image pulls for sandbox runtimes (container_build profile only; runtime=docker is structurally illegal in production)")
+System_Ext(registries, "Package & Container Registries", "PyPI, npm, ghcr.io, quay.io — agent dependency installs (coding_standard profile) and sandbox image pulls (container_build profile only)")
 System_Ext(message_queue, "Message Queue (optional)", "Kafka / NATS — high-throughput domain event publishing (alternative to outbox table)")
 System_Ext(transparency_log, "Transparency Log (optional)", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
@@ -70,8 +69,7 @@ Rel(amir, vault, "Fetch secrets (JIT, TTL), inject via SecretBinding (tmpfs/prox
 Rel(amir, prometheus, "Emits metrics, cost records, agent scorecard updates, validation metrics, traces", "Prometheus / OpenTelemetry")
 Rel(amir, object_storage, "Store permanent audit logs (WORM), replay metadata, large artifacts, transparency log root-commits", "Object Storage API")
 Rel(amir, notification_system, "Delivers EscalationSignals (cost_limit_exceeded, compensation_blocked, input_timeout), approval requests to assigned recipients", "Webhook / API")
-Rel(amir, pkg_registries, "Agent dependency installs routed through egress proxy (coding_standard allowlist profile)", "mTLS via egress proxy")
-Rel(amir, container_registries, "Sandbox base image pulls routed through egress proxy (container_build profile only)", "mTLS via egress proxy")
+Rel(amir, registries, "Agent dependency installs and sandbox image pulls via egress proxy (coding_standard + container_build profiles)", "mTLS via egress proxy")
 Rel(amir, message_queue, "Publishes domain events via outbox table (primary) or direct to queue (alternative)", "Kafka / NATS")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes for tamper-evidence anchoring", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
@@ -83,7 +81,7 @@ Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAu
 Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
 Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
 Rel(agents, git_vcs, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
-Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
+Rel(agents, registries, "Pulls package dependencies and sandbox images (only hosts in effective allowlist)", "HTTPS via egress proxy")
 
 ' ──────────────────────────────────────────────────────────────────
 ' NOTES
