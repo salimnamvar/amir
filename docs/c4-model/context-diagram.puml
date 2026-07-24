@@ -5,31 +5,61 @@ LAYOUT_WITH_LEGEND()
 
 title Amir System Context Diagram — AI Agent Orchestration Control Plane
 
-Person(developer, "Developer", "Creates tasks programmatically via API, monitors execution progress")
-Person(platform_operator, "Platform Operator", "Manages team/agent definitions, monitors system health and cost")
-Person(approver, "Approver / Reviewer", "Grants human approvals, handles escalations (compensation blocked, cost limit exceeded)")
+' ──────────────────────────────────────────────────────────────────
+' ACTORS
+' ──────────────────────────────────────────────────────────────────
 
-System(amir, "Amir Control Plane", "Orchestrates external AI coding agents: task assignment, session management, workspace observation, cost governance, security enforcement, and workflow compensation")
+Person(developer, "Developer", "Creates tasks programmatically via API, monitors execution progress, debugs agent output")
+Person(platform_operator, "Platform Operator", "Manages team/agent/workflow definitions, monitors system health, cost, and agent performance")
+Person(approver, "Approver / Reviewer", "Grants human approvals (workflow gates, coercion), resolves escalation signals")
+Person(agent_owner, "Agent Owner", "Registers and configures agent adapters, declares capabilities and output modes")
+Person(security_officer, "Security Officer", "Enforces sandbox policy, network allowlists, secret injection, attestation verification")
+Person(financial_controller, "Financial Controller", "Defines budget caps (team/tenant/org), monitors cost tracking and enforcements")
+Person(compliance_officer, "Compliance Officer", "Audits linear hash-chained events, verifies tamper-evidence, reviews retention policies")
 
-System_Ext(git_repos, "Git Repositories (VCS)", "Source code repositories cloned per workspace; branch/PR compensation targets. System of record for code promotion.")
-System_Ext(git_config, "amir-config/ Git Repo", "GitOps-managed: AgentDefinitions, RoleDefinitions, TeamDefinitions, WorkflowDefinitions, Contract/Schema versions")
-System_Ext(ci_cd, "CI/CD Pipeline", "Validates workflow artifacts (PRs, code changes); separate system but may trigger from Amir")
-System_Ext(llm_providers, "LLM Providers", "OpenAI, Anthropic, Google, etc. — external API endpoints agents call through Amir's egress proxy")
-System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage; JIT secret injection via SecretBinding with TTL. Signing keys for audit chain attestation.")
-System_Ext(prometheus, "Prometheus / OpenTelemetry", "Metrics collection from Amir components; observability backend")
-System_Ext(object_storage, "Object Storage (WORM)", "Permanent audit log retention, replay metadata, large artifact storage")
+' ──────────────────────────────────────────────────────────────────
+' AMIR SYSTEM
+' ──────────────────────────────────────────────────────────────────
 
-Rel(developer, amir, "POST /tasks, GET /tasks/{id}", "REST API (JWT)")
-Rel(platform_operator, amir, "Manage definitions, monitor metrics/cost", "REST API / Dashboard")
-Rel(approver, amir, "Grant approvals, resolve escalations", "REST API / Notifications")
+System(amir, "Amir Control Plane", "Orchestrates external AI coding agents: task assignment, session management, workspace observation, cost governance, security enforcement, workflow compensation, and contract validation")
 
-Rel(amir, git_config, "Reads Agent/Role/Team/Workflow definitions", "Git clone/fetch (GitOps)")
-Rel(amir, git_repos, "Clone per workspace, observe workspace state, auto-commit, git-native compensation", "Git (clone, diff, commit, push)")
-Rel(amir, ci_cd, "Produced PRs validated by external CI", "PR creation")
+' ──────────────────────────────────────────────────────────────────
+' EXTERNAL SYSTEMS
+' ──────────────────────────────────────────────────────────────────
 
-Rel(amir, llm_providers, "Agent LLM calls routed through egress proxy", "mTLS via egress proxy")
-Rel(amir, vault, "Fetch secrets, inject via SecretBinding (JIT, TTL)", "Vault API (mTLS)")
-Rel(amir, prometheus, "Emits metrics, cost records, scorecard updates", "Prometheus / OpenTelemetry")
-Rel(amir, object_storage, "Store permanent audit logs, replay metadata", "Object Storage API")
+System_Ext(git_repos, "Git Repositories (VCS)", "Source code repositories cloned per workspace; branch/PR compensation targets. System of record for code promotion via PRs.")
+System_Ext(git_config, "amir-config/ Git Repo", "GitOps-managed definitions: AgentDefinitions, RoleDefinitions, TeamDefinitions, WorkflowDefinitions, Contract/Schema versions, Allowlist profiles")
+System_Ext(ci_cd, "CI/CD Pipeline", "Validates workflow artifacts (PRs, code changes); config validation (JSON Schema, DDL); separate system triggered by Amir PRs")
+System_Ext(llm_providers, "LLM Providers", "OpenAI, Anthropic, Google, etc. — external API endpoints agents call through Amir's egress proxy for inference")
+System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage for JIT injection via SecretBinding with TTL; signing keys for sandbox attestation and linear hash-chain audit root-commit")
+System_Ext(prometheus, "Prometheus / OpenTelemetry", "Metrics collection (cost records, agent performance, validation pipeline); distributed tracing via W3C trace context")
+System_Ext(object_storage, "Object Storage (WORM)", "Permanent audit log retention (linear hash-chained events), replay metadata, large artifact storage, transparency log root-commits")
+System_Ext(notification_system, "Notification System", "Delivers EscalationSignals to assigned recipients (cost_limit_exceeded, compensation_blocked, input_timeout); approval request routing")
+
+' ──────────────────────────────────────────────────────────────────
+' RELATIONSHIPS — ACTORS → AMIR
+' ──────────────────────────────────────────────────────────────────
+
+Rel(developer, amir, "POST /tasks, GET /tasks/{id}, monitor progress", "REST API (JWT)")
+Rel(platform_operator, amir, "Manage definitions, monitor metrics/cost/health, configure teams", "REST API / Dashboard")
+Rel(approver, amir, "Grant approvals (workflow gates, coercion), resolve escalation signals", "REST API / Notifications")
+Rel(agent_owner, amir, "Register agent adapters, declare capabilities, configure output modes", "REST API")
+Rel(security_officer, amir, "Define sandbox policies, network allowlists, secret bindings, attestation rules", "REST API / Config")
+Rel(financial_controller, amir, "Define budget caps (team/tenant/org), review cost reports", "REST API / Dashboard")
+Rel(compliance_officer, amir, "Audit events, verify hash chain, review retention policies", "API / Object Storage")
+
+' ──────────────────────────────────────────────────────────────────
+' RELATIONSHIPS — AMIR → EXTERNAL SYSTEMS
+' ──────────────────────────────────────────────────────────────────
+
+Rel(amir, git_config, "Reads Agent/Role/Team/Workflow/Contract definitions (GitOps pull)", "Git clone/fetch")
+Rel(amir, git_repos, "Clone per workspace, observe workspace state (git diff/status), auto-commit, git-native compensation (revert/branch-delete/PR-close)", "Git (clone, diff, commit, push)")
+Rel(amir, ci_cd, "Produced PRs validated by external CI; config files validated against schemas", "PR creation / webhook")
+
+Rel(amir, llm_providers, "Agent LLM calls routed through egress proxy (mandatory; host mode eliminated)", "mTLS via egress proxy")
+Rel(amir, vault, "Fetch secrets (JIT, TTL), inject via SecretBinding (tmpfs/proxy/env); fetch signing keys for attestation", "Vault API (mTLS)")
+Rel(amir, prometheus, "Emits metrics, cost records, agent scorecard updates, validation metrics, traces", "Prometheus / OpenTelemetry")
+Rel(amir, object_storage, "Store permanent audit logs (WORM), replay metadata, large artifacts, transparency log root-commits", "Object Storage API")
+Rel(amir, notification_system, "Delivers EscalationSignals (cost_limit_exceeded, compensation_blocked, input_timeout), approval requests to assigned recipients", "Webhook / API")
 
 @enduml
