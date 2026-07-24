@@ -41,7 +41,7 @@ System_Ext(message_queue, "Message Queue (optional)", "Kafka / NATS — high-thr
 System_Ext(transparency_log, "Transparency Log (optional)", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
 
-System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemini CLI, MCP servers, API agents — heterogeneous, non-deterministic, untrusted")
+System_Ext(agents, "AI Agent Runtime Providers", "Claude Code, Codex, OpenCode, Gemini CLI, MCP agents — heterogeneous, non-deterministic, untrusted runtime processes")
 
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — ACTORS → AMIR
