@@ -29,8 +29,7 @@ System(amir, "Amir Control Plane", "Orchestrates external AI coding agents: task
 ' EXTERNAL SYSTEMS
 ' ──────────────────────────────────────────────────────────────────
 
-System_Ext(git_repos, "Git Repositories (VCS)", "Source code repositories cloned per workspace; branch/PR compensation targets. System of record for code promotion via PRs.")
-System_Ext(git_config, "amir-config/ Git Repo", "GitOps-managed definitions: AgentDefinitions, RoleDefinitions, TeamDefinitions, WorkflowDefinitions, Contract/Schema versions, Allowlist profiles")
+System_Ext(git_vcs, "Git VCS (GitHub/GitLab)", "Dual-purpose: (1) amir-config/ GitOps definitions (agents, roles, workflows, contracts, allowlists) and (2) source code repos cloned per workspace with durable effects (branches, PRs, commits) as compensation targets")
 System_Ext(ci_cd, "CI/CD Pipeline", "Validates workflow artifacts (PRs, code changes); config validation (JSON Schema, DDL); separate system triggered by Amir PRs")
 System_Ext(llm_providers, "LLM Providers", "OpenAI, Anthropic, Google, etc. — external API endpoints agents call through Amir's egress proxy for inference")
 System_Ext(vault, "HashiCorp Vault / KMS", "Secret storage for JIT injection via SecretBinding with TTL; signing keys for sandbox attestation and linear hash-chain audit root-commit")
@@ -63,8 +62,7 @@ Rel(debugger, amir, "Inspect agent sessions, replay failed executions", "REST AP
 ' RELATIONSHIPS — AMIR → EXTERNAL SYSTEMS
 ' ──────────────────────────────────────────────────────────────────
 
-Rel(amir, git_config, "Reads Agent/Role/Team/Workflow/Contract definitions (GitOps pull)", "Git clone/fetch")
-Rel(amir, git_repos, "Clone per workspace, observe workspace state (git diff/status), auto-commit, git-native compensation (revert/branch-delete/PR-close)", "Git (clone, diff, commit, push)")
+Rel(amir, git_vcs, "Reads GitOps definitions; clones per workspace, observes workspace state (git diff/status), auto-commit, git-native compensation (revert/branch-delete/PR-close)", "Git (clone, diff, commit, push)")
 Rel(amir, ci_cd, "Produced PRs validated by external CI; config files validated against schemas", "PR creation / webhook")
 
 Rel(amir, llm_providers, "Agent LLM calls routed through egress proxy (mandatory; host mode eliminated)", "mTLS via egress proxy")
@@ -84,7 +82,7 @@ Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAu
 
 Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
 Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
-Rel(agents, git_repos, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
+Rel(agents, git_vcs, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
 Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
 Rel_R(llm_providers, amir, "Metered consumption recorded as CostRecord (budget_pool=execution|validation)", "Egress proxy → CostEnforcer")
 
