@@ -76,7 +76,7 @@ Rel(amir, prometheus, "Emits metrics, cost records, scorecards, traces", "Promet
 Rel(amir, object_storage, "Stores audit logs (WORM), replay metadata, artifacts", "Object Storage API")
 Rel(amir, notification_system, "Delivers EscalationSignals and approval requests", "Webhook")
 Rel(amir, registries, "Agent dependency installs and sandbox image pulls via egress proxy (coding_standard + container_build profiles)", "mTLS via egress proxy")
-Rel(amir, message_queue, "Publishes domain events via outbox or direct", "Kafka / NATS")
+Rel(amir, message_queue, "Publishes domain events categorized by retention policy", "Kafka / NATS")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
 Rel(amir, policy_engine, "Requests policy decisions", "Policy evaluation API")
