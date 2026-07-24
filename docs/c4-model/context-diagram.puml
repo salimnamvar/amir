@@ -48,7 +48,7 @@ System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemi
 ' RELATIONSHIPS — ACTORS → AMIR
 ' ──────────────────────────────────────────────────────────────────
 
-Rel(developer, amir, "POST /tasks, GET /tasks/{id}, monitor progress", "REST API (JWT)")
+Rel(developer, amir, "Creates tasks, monitors execution, debugs agent output", "REST API (JWT)")
 Rel(platform_operator, amir, "Manage definitions, monitor metrics/cost/health, configure teams", "REST API / Dashboard")
 Rel(approver, amir, "Grant approvals (workflow gates, coercion), resolve escalation signals", "REST API / Notifications")
 Rel(agent_owner, amir, "Register agent adapters, declare capabilities, configure output modes", "REST API")
