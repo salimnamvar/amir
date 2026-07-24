@@ -102,4 +102,12 @@ note right of amir
   • All mutable operations require idempotency keys
 end note
 
+note bottom of agents
+  Agents are **untrusted external processes**.
+  Amir treats agent stdout as narrative;
+  all artifacts derived from Workspace observation
+  (git diff/status) + claim reconciliation.
+  llm_coercion requires explicit human Approval.
+end note
+
 @enduml
