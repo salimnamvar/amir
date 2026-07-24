@@ -82,39 +82,4 @@ Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAu
 
 Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
 
-' ──────────────────────────────────────────────────────────────────
-' NOTES
-' ──────────────────────────────────────────────────────────────────
-
-note right of amir
-  **P1 Architectural Invariants**
-  • Workspace > agent claims (ground truth)
-  • Fail-closed cost (CostLease revoked = sole kill signal)
-  • Fail-closed parser (workspace_observation unavailable = reject)
-  • lease_revision increments by exactly +1 per mutation
-  • Production runtime in {gVisor, Firecracker} only
-  • Allowlist merge = intersection only
-  • validation_budget required and partitioned
-  • All mutable operations require idempotency keys
-end note
-
-note bottom of agents
-  Agents are **untrusted external processes**.
-  **All agent outbound traffic** (LLM inference, Git push,
-  package install) is **forced through Amir's egress proxy**.
-  Direct network access is eliminated (host mode removed).
-  Effective allowlist = intersection of agent ∩ sandbox ∩ role.
-  Amir treats agent stdout as narrative; all artifacts derived
-  from Workspace observation (git diff/status) + claim reconciliation.
-  llm_coercion requires explicit human Approval.
-end note
-
-note top of object_storage
-  **Event Retention Policies**
-  • Lifecycle events: Permanent
-  • Security / Compensation: Permanent
-  • Cost events: 365 days
-  • Progress events: Configurable
-end note
-
 @enduml
