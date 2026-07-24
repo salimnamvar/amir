@@ -23,7 +23,7 @@ Person(debugger, "On-call / Debugger", "Inspects agent sessions, replays failed 
 ' AMIR SYSTEM
 ' ──────────────────────────────────────────────────────────────────
 
-System(amir, "Amir Control Plane", "Orchestrates external AI coding agents: task assignment, session management, workspace observation, cost governance, security enforcement, workflow compensation, and contract validation")
+System(amir, "Amir Control Plane", "Governance and orchestration platform that coordinates external AI agents through controlled execution workflows, policy enforcement, artifact validation, and auditability")
 
 ' ──────────────────────────────────────────────────────────────────
 ' EXTERNAL SYSTEMS
