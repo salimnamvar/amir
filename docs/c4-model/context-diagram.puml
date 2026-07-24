@@ -42,9 +42,6 @@ System_Ext(message_queue, "Message Queue (optional)", "Kafka / NATS — high-thr
 System_Ext(transparency_log, "Transparency Log (optional)", "Append-only log (Sigstore/Rekor) for periodic root-commit of audit hash-chain tips")
 System_Ext(idp, "Identity Provider", "Issues JWTs / OAuth tokens for API access and service-to-service mTLS authentication")
 
-System_Ext(db_execution, "Execution Database", "PostgreSQL / SQLite — stores Task, AgentSession, Workspace, MatchingDecision, ValidationResult, CostLease, CostRecord")
-System_Ext(db_workflow, "Workflow Database", "PostgreSQL + Event Store — stores WorkflowInstance, StepResult, Approval, CompensationAction, EscalationSignal")
-
 System_Ext(agents, "External AI Agents", "Claude Code CLI, Codex, OpenCode, Gemini CLI, MCP servers, API agents — heterogeneous, non-deterministic, untrusted")
 
 ' ──────────────────────────────────────────────────────────────────
@@ -78,8 +75,6 @@ Rel(amir, container_registries, "Sandbox base image pulls routed through egress 
 Rel(amir, message_queue, "Publishes domain events via outbox table (primary) or direct to queue (alternative)", "Kafka / NATS / Outbox")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes for tamper-evidence anchoring", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
-Rel(amir, db_execution, "Persists execution state (Task, AgentSession, Workspace, CostLease)", "SQL / TCP")
-Rel(amir, db_workflow, "Persists workflow state and event log", "SQL + Event Sourcing")
 
 ' ──────────────────────────────────────────────────────────────────
 ' RELATIONSHIPS — AGENTS → EXTERNAL SYSTEMS (via egress proxy)
