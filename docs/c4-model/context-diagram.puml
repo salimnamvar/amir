@@ -75,7 +75,7 @@ Rel(amir, object_storage, "Store permanent audit logs (WORM), replay metadata, l
 Rel(amir, notification_system, "Delivers EscalationSignals (cost_limit_exceeded, compensation_blocked, input_timeout), approval requests to assigned recipients", "Webhook / API")
 Rel(amir, pkg_registries, "Agent dependency installs routed through egress proxy (coding_standard allowlist profile)", "mTLS via egress proxy")
 Rel(amir, container_registries, "Sandbox base image pulls routed through egress proxy (container_build profile only)", "mTLS via egress proxy")
-Rel(amir, message_queue, "Publishes domain events (categorized by retention policy)", "Kafka / NATS protocol")
+Rel(amir, message_queue, "Publishes domain events via outbox table (primary) or direct to queue (alternative)", "Kafka / NATS / Outbox")
 Rel(amir, transparency_log, "Commits audit hash-chain root hashes for tamper-evidence anchoring", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
 Rel(amir, db_execution, "Persists execution state (Task, AgentSession, Workspace, CostLease)", "SQL / TCP")
