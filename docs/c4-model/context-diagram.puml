@@ -29,7 +29,8 @@ System(amir, "Amir Control Plane", "Governance and orchestration platform that c
 ' EXTERNAL SYSTEMS
 ' ──────────────────────────────────────────────────────────────────
 
-System_Ext(git_vcs, "Git VCS (GitHub/GitLab)", "Dual-purpose: (1) amir-config/ GitOps definitions (agents, roles, workflows, contracts, allowlists) and (2) source code repos cloned per workspace with durable effects (branches, PRs, commits) as compensation targets")
+System_Ext(config_repo, "Amir Configuration Repository", "GitOps source of truth for definitions and policies (agents, roles, workflows, contracts, allowlists)")
+System_Ext(source_repo, "Source Code Repository", "Application repositories modified through controlled workflows (branches, PRs, commits)")
 System_Ext(ci_cd, "CI/CD Pipeline", "Validates workflow artifacts (PRs, code changes); config validation (JSON Schema, DDL); separate system triggered by Amir PRs")
 System_Ext(llm_providers, "LLM Providers", "OpenAI, Anthropic, Google, etc. — external API endpoints agents call through Amir's egress proxy for inference")
 System_Ext(secret_manager, "Secret Manager", "JIT runtime secrets with TTL and SecretBinding")
@@ -63,7 +64,8 @@ Rel(debugger, amir, "Inspects agent sessions, replays failed executions", "REST 
 ' RELATIONSHIPS — AMIR → EXTERNAL SYSTEMS
 ' ──────────────────────────────────────────────────────────────────
 
-Rel(amir, git_vcs, "Reads GitOps definitions; clones workspaces; git-native compensation", "Git")
+Rel(amir, config_repo, "Reads GitOps definitions and policies", "Git")
+Rel(amir, source_repo, "Clones workspaces, executes git-native compensation", "Git")
 Rel(amir, ci_cd, "Produces PRs for external CI validation", "Webhook")
 
 Rel(amir, llm_providers, "Routes agent LLM calls through egress proxy", "mTLS via egress proxy")
