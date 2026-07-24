@@ -81,5 +81,19 @@ Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAu
 ' ──────────────────────────────────────────────────────────────────
 
 Rel(amir, agents, "Invokes via AgentAdapter (start, pump, cancel); injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
+Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
+Rel(agents, git_vcs, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
+Rel(agents, pkg_registries, "Pulls package dependencies (only hosts in effective allowlist)", "HTTPS via egress proxy")
+
+' ──────────────────────────────────────────────────────────────────
+' NOTES
+' ──────────────────────────────────────────────────────────────────
+
+note bottom of agents
+  Agents are untrusted external processes.
+  All agent outbound traffic is forced through Amir's egress proxy.
+  Direct network access is eliminated (host mode removed).
+  Effective allowlist = intersection of agent ∩ sandbox ∩ role.
+end note
 
 @enduml
