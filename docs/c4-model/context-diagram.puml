@@ -13,7 +13,7 @@ Person(developer, "Developer", "Creates tasks programmatically via API, monitors
 Person(platform_operator, "Platform Operator", "Manages team/agent/workflow definitions, monitors system health, cost, and agent performance")
 Person(approver, "Approver / Reviewer", "Grants human approvals (workflow gates, coercion), resolves escalation signals")
 Person(agent_owner, "Agent Owner", "Registers and configures agent adapters, declares capabilities and output modes")
-Person(security_officer, "Security Officer", "Enforces sandbox policy, network allowlists, secret injection, attestation verification")
+Person(security_officer, "Security Officer", "Defines sandbox policies, network allowlists, secret bindings, attestation rules")
 Person(financial_controller, "Financial Controller", "Defines budget caps (team/tenant/org), monitors cost tracking and enforcements")
 Person(compliance_officer, "Compliance Officer", "Audits linear hash-chained events, verifies tamper-evidence, reviews retention policies")
 Person(project_manager, "Project Manager", "Tracks workflow progress, monitors feature delivery and compensation status")
