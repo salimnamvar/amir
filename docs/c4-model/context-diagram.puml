@@ -75,23 +75,23 @@ Rel(amir, transparency_log, "Commits audit hash-chain root hashes", "HTTPS")
 Rel(amir, idp, "Validates JWT tokens, obtains service identities for mTLS", "OAuth / mTLS")
 
 ' ──────────────────────────────────────────────────────────────────
-' RELATIONSHIPS — AGENTS → EXTERNAL SYSTEMS (via egress proxy)
+' RELATIONSHIPS — AMIR → AGENTS (SOLE RELATIONSHIP)
 ' ──────────────────────────────────────────────────────────────────
 
-Rel(amir, agents, "Invokes via AgentAdapter; injects CompiledPrompt + secrets; observes workspace", "Adapter protocol + sandbox")
-Rel(agents, llm_providers, "Calls model APIs for inference (all traffic forced through Amir egress proxy)", "HTTPS via egress proxy")
-Rel(agents, git_vcs, "Commits code changes, pushes durable effects (when policy permits)", "Git via egress proxy")
-Rel(agents, registries, "Pulls package dependencies and sandbox images (only hosts in effective allowlist)", "HTTPS via egress proxy")
+Rel(amir, agents, "Invokes via AgentAdapter; injects CompiledPrompt + secrets; observes workspace as ground truth", "Adapter protocol + sandbox")
 
 ' ──────────────────────────────────────────────────────────────────
 ' NOTES
 ' ──────────────────────────────────────────────────────────────────
 
 note bottom of agents
-  Agents are untrusted external processes.
-  All agent outbound traffic is forced through Amir's egress proxy.
-  Direct network access is eliminated (host mode removed).
+  Agents are **untrusted external processes** isolated in sandboxes.
+  They have zero direct network access. All egress is intercepted,
+  token-counted, and allowlist-enforced by Amir's internal EgressProxy.
   Effective allowlist = intersection of agent ∩ sandbox ∩ role.
+  Agent stdout is narrative only — artifacts derived from
+  Workspace observation + claim reconciliation.
+  **llm_coercion** requires explicit human Approval.
 end note
 
 @enduml
