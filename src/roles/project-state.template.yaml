@@ -1,0 +1,114 @@
+schema:
+  id: aidirections.software-engineering.project-state
+  version: "2.0"
+
+artifact:
+  kind: mutable_project_state
+  template_version: "2.0.0"
+  governed_by: team.yaml
+  rule: >-
+    This file is mutable project state, not a constitutional contract. It is the
+    authoritative continuity artifact for facts explicitly recorded here and must
+    be revised rather than silently contradicted by conversational memory.
+
+project:
+  project_id: null
+  name: null
+  context_revision: 0
+  goal: null
+  priorities: []
+  business_or_product_requirements: []
+  nontechnical_constraints: []
+
+agent_registry:
+  tech-lead:
+    working_name: null
+    session_or_instance_id: null
+  implementer:
+    working_name: null
+    session_or_instance_id: null
+  challenger:
+    working_name: null
+    session_or_instance_id: null
+
+requirements: []
+# Suggested item:
+# - requirement_id: REQ-001
+#   source_or_owner: project-owner
+#   statement: null
+#   kind: business|technical|nonfunctional|constraint
+#   status: active|superseded|withdrawn
+#   acceptance_or_verification_reference: []
+#   supersedes: null
+
+tasks: []
+# Suggested item:
+# - task_id: TASK-001
+#   status: PROPOSED
+#   context_revision: 0
+#   owner_role: tech-lead|implementer
+#   requirement_refs: []
+#   description: null
+#   repository_baseline: null
+#   blockers: []
+#   evidence_refs: []
+
+decisions: []
+# Suggested item:
+# - decision_id: DEC-001
+#   status: PROPOSED
+#   requirement_refs: []
+#   problem: null
+#   decision: null
+#   rationale: null
+#   alternatives: []
+#   evidence_refs: []
+#   challenger_finding_refs: []
+#   residual_uncertainty: []
+#   reopen_triggers: []
+#   supersedes: null
+
+challenger_findings: []
+# Suggested item:
+# - finding_id: FIND-001
+#   status: OPEN
+#   severity: HIGH
+#   claim_or_artifact_challenged: null
+#   statement: null
+#   evidence_refs: []
+#   falsification_condition: null
+#   tech_lead_disposition_ref: null
+#   reopen_trigger: null
+
+unresolved_questions: []
+assumptions: []
+
+repository_baseline:
+  revision: null
+  working_tree_state: null
+  observed_by: implementer
+  observed_at: null
+
+evidence_index: []
+# Suggested item:
+# - evidence_id: EVID-001
+#   producer_role: implementer|tech-lead|challenger|project-owner|external_ci
+#   evidence_class: primary|interpretation|inference
+#   claim_or_requirement_ref: null
+#   repository_revision: null
+#   artifact_or_raw_output_ref: null
+#   reproducibility_status: unknown|reproducible|not_reproducible|not_applicable
+
+technical_readiness:
+  status: NOT_READY
+  decision_ref: null
+  unresolved_risks: []
+  missing_verification: []
+
+release:
+  status: NOT_AUTHORIZED
+  authorized_by: null
+  authorization_ref: null
+  residual_nontechnical_risk: []
+
+incidents_and_operational_learning: []
